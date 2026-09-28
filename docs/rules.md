@@ -1,14 +1,10 @@
 # Rowen — Game Rules
 
-> **Status: draft, awaiting approval.** Sections marked **Decision needed** list
-> options and a recommendation. Nothing in this document is implemented until it
-> is approved.
+> **Status: approved.** Any change to these rules goes through a pull request and
+> is recorded in the decision log (section 14).
 
 Rowen follows the rules of the Gwent minigame from *The Witcher 3* closely, with
 original names for cards and abilities.
-
-> **Decision needed (D1):** every name in this document (rows, lives, abilities,
-> special cards) is a proposal and can be changed.
 
 ## 1. Overview
 
@@ -50,7 +46,7 @@ Each player starts the match with **2 lives**.
 ## 3. Match setup
 
 1. Each deck is shuffled.
-2. A random draw decides who plays first in round 1.
+2. A coin flip decides who plays first in round 1.
 3. Each player draws **10 cards**.
 4. **Redraw:** each player may swap up to **2 cards** from their hand, one at a
    time. A replacement is drawn first and the swapped card is then shuffled back
@@ -96,10 +92,7 @@ Legends always keep their base strength.
 War Horn: each unit is 1 (weather) → 3 (×3 Bond) → 3 (no Inspire) → **6** (×2
 horn), so the row scores 18.
 
-> **Decision needed (D2):** confirm this order of calculation.
-> **Recommendation:** keep it as written. As far as I know it matches the
-> original game, and it keeps weather meaningful without making Bond and
-> War Horn useless.
+This order keeps weather meaningful without making Bond and War Horn useless.
 
 ## 7. Abilities (MVP)
 
@@ -147,9 +140,8 @@ Further rules:
 - A weather card stays in the weather area until Clear Skies is played or the
   round ends. Clear Skies and Wildfire go to the discard pile as soon as they are
   resolved.
-- Destroyed units, discarded weather and resolved specials go to the discard pile
-  of the player who owns that side or played the card (see D4 for units on the
-  opponent's side).
+- A destroyed unit goes to the discard pile of the side it was on. Weather cards
+  and resolved specials go to the discard pile of the player who played them.
 
 ## 9. End of a round
 
@@ -157,33 +149,23 @@ The round ends when **both players have passed**.
 
 1. **Result:** the player with the higher total wins the round and the other
    player loses 1 life. On a **tie**, both players lose 1 life.
-2. **Cleanup:** every card on the board (units, War Horns, Scarecrows) and every
-   weather card goes to a discard pile.
+2. **Cleanup:** every card on the board (units, War Horns, Scarecrows) goes to
+   the discard pile of the side it is on. A Spy therefore ends up in the
+   opponent's discard pile, where that player's Medic can revive it and use it
+   against its original owner. Weather cards go to the discard pile of the player
+   who played them.
 3. Hands and decks carry over. **No cards are drawn.**
-
-> **Decision needed (D3):** who plays first in rounds 2 and 3?
->
-> - **A (recommended):** the **winner** of the previous round. Playing first is a
->   disadvantage, because you reveal your plan first, so this helps the player
->   who is behind. After a tie, the player who played second in the previous
->   round plays first.
-> - **B:** the **loser** of the previous round.
-> - **C:** players alternate every round, regardless of the result.
->
-> I can't confirm which of these the original uses.
-
-> **Decision needed (D4):** at cleanup, a Spy on the opponent's side goes to…
->
-> - **A (recommended):** the discard pile of the side it is **on**, which is the
->   opponent's. That player's Medic can then revive it and use it against its
->   original owner. I believe this matches the original.
-> - **B:** the discard pile of the player who played it.
+4. **Next round:** the **winner** of the round plays first. Playing first is a
+   disadvantage, because you reveal your plan first, so this helps the player
+   who is behind. After a tie, the player who played second in that round plays
+   first.
 
 ## 10. End of the match
 
 - A player who reaches **0 lives** loses the match.
 - If both players reach 0 lives at the same time, the match is a **draw**.
-- A match therefore lasts at most **3 rounds**.
+- With 2 lives, a match lasts at most **3 rounds**. The number of starting lives
+  is a setting rather than a fixed rule, so longer matches remain possible later.
 
 ## 11. Information
 
@@ -215,12 +197,12 @@ at most **10 special cards**.
 - **Extra mechanics:** a weather card that hits two rows, units that transform,
   units that summon another unit when destroyed.
 
-## 14. Decisions needed
+## 14. Decision log
 
-| # | Question | Recommendation |
+| # | Question | Decision |
 |---|---|---|
-| D1 | Names: rows, lives, ability and special card names used in this document | Keep them, or propose your own |
-| D2 | Order of the strength calculation (section 6) | Keep as written |
-| D3 | Who plays first in rounds 2 and 3 (section 9) | A: the previous round's winner |
-| D4 | Discard pile for a Spy at the end of a round (section 9) | A: the side it is on |
-| D5 | MVP scope: the abilities in sections 7–8 now, everything in section 13 later | Accept |
+| D1 | Names of rows, lives, abilities and special cards | Names in this document accepted |
+| D2 | Order of the strength calculation | Weather → Bond → Inspire → War Horn (section 6) |
+| D3 | Who plays first in rounds 2 and 3 | The winner of the previous round; after a tie, the player who played second in it (section 9) |
+| D4 | Discard pile for a Spy at the end of a round | The side it is on, which is the opponent's (section 9) |
+| D5 | MVP scope | Sections 7–8 in the MVP; section 13 later |
