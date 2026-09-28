@@ -157,15 +157,14 @@ The round ends when **both players have passed**.
 3. Hands and decks carry over. **No cards are drawn.**
 4. **Next round:** the **winner** of the round plays first. Playing first is a
    disadvantage, because you reveal your plan first, so this helps the player
-   who is behind. After a tie, the player who played second in that round plays
-   first.
+   who is behind. After a tie, the player who played first in that round plays
+   first again.
 
 ## 10. End of the match
 
 - A player who reaches **0 lives** loses the match.
 - If both players reach 0 lives at the same time, the match is a **draw**.
-- With 2 lives, a match lasts at most **3 rounds**. The number of starting lives
-  is a setting rather than a fixed rule, so longer matches remain possible later.
+- A match therefore lasts at most **3 rounds**.
 
 ## 11. Information
 
@@ -203,6 +202,6 @@ at most **10 special cards**.
 |---|---|---|
 | D1 | Names of rows, lives, abilities and special cards | Names in this document accepted |
 | D2 | Order of the strength calculation | Weather → Bond → Inspire → War Horn (section 6) |
-| D3 | Who plays first in rounds 2 and 3 | The winner of the previous round; after a tie, the player who played second in it (section 9) |
+| D3 | Who plays first in rounds 2 and 3 | The winner of the previous round; after a tie, the player who played first in it (section 9) |
 | D4 | Discard pile for a Spy at the end of a round | The side it is on, which is the opponent's (section 9) |
 | D5 | MVP scope | Sections 7–8 in the MVP; section 13 later |
