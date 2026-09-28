@@ -1,0 +1,10 @@
+# Store text files with LF line endings and check them out with LF on every
+# platform, so Windows and Linux working copies are byte-for-byte identical.
+* text=auto eol=lf
+
+# Binary files: never convert line endings or diff them as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
