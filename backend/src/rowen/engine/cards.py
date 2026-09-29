@@ -108,3 +108,7 @@ class SpecialCard:
     id: str
     name: str
     kind: SpecialKind
+
+
+# Any card, unit or special.
+type Card = UnitCard | SpecialCard
