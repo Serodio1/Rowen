@@ -1,6 +1,5 @@
 """Decks: the cards a player brings to a match."""
 
-import os  # noqa: F401
 from dataclasses import dataclass
 
 from rowen.engine.cards import Card, UnitCard
