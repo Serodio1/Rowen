@@ -174,15 +174,23 @@ Done when: it looks good enough for the README GIF.
 
 ## Working agreement
 
-- Claude writes the code; Rui reviews every pull request and must understand it
-  before merging.
+- **Rui writes the code.** Claude (an AI assistant, used through Claude Code) is
+  his guide and reviewer: before each task it explains the concepts and the
+  design and splits the work into steps; afterwards it reviews the pull request
+  and points out mistakes.
+- **Design decisions are Rui's.** Claude lays out the options and their
+  trade-offs, and Rui chooses. Significant decisions are recorded as ADRs in
+  `docs/adr/`.
+- **Understanding comes before speed.** A task is done when Rui can explain it
+  without help, not just when the code works.
+- Commits made with Claude's help carry a `Co-Authored-By: Claude` trailer. This
+  includes the planning documents and the initial tooling and CI, which Claude
+  drafted before this agreement was adopted.
 - Every change goes through a branch and a pull request, CI must pass, commits
   follow Conventional Commits, pull requests stay small.
 - Only Rui merges into `main`, using *Squash and merge* (one commit per pull
   request, titled after it). Nobody pushes to `main` directly.
-- Each pull request explains *what* and *why*; Claude also explains it in
-  Portuguese in the conversation.
-- Significant decisions are recorded as ADRs in `docs/adr/`.
+- Each pull request explains *what* and *why*.
 - End of every milestone: a retrospective on that phase (what was built, which
   decisions were made and why).
 - Scope guard: nothing from "Later" before `v1.0.0`.
@@ -192,7 +200,7 @@ Done when: it looks good enough for the README GIF.
 | Risk | Mitigation |
 |---|---|
 | Scope grows too large | Every milestone is demo-able on its own; cut *Could* items first. |
-| Code written faster than it is understood | Small PRs, every design decision explained, milestone retrospectives, Rui implements some features himself (new cards/factions). |
+| Slower progress, because Rui learns the stack while writing the code | Accepted on purpose. Small tasks, each explained before it starts, keep progress steady; cut *Could* items before cutting quality. |
 | Free hosting limits (cold starts, database expiry) | Choose hosting in an ADR in Phase 2; everything runs in Docker so it can move. |
 | AI-generated card art | Consistent style, no imitation of the original game's characters, tool documented in the README. |
 | Windows vs Linux differences | LF line endings via `.gitattributes`, PostgreSQL in Docker. |
