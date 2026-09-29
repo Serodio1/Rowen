@@ -174,11 +174,11 @@ Done when: it looks good enough for the README GIF.
 
 ## Working agreement
 
-- **Rui writes the code.** Claude (an AI assistant, used through Claude Code) is
-  his guide and reviewer: before each task it explains the concepts and the
-  design and splits the work into steps; afterwards it reviews the pull request
-  and points out mistakes. When Rui asks, or gets stuck, Claude explains how to
-  write a specific part step by step.
+- **Claude writes the code; Rui reviews it.** Claude (an AI assistant, used
+  through Claude Code) writes each pull request and explains it part by part.
+  Rui reviews every pull request and must be able to explain it before merging.
+  Rui writes parts of the code himself when he chooses to, with Claude as his
+  guide and reviewer.
 - **Design decisions are Rui's.** Claude lays out the options and their
   trade-offs, and Rui chooses. Significant decisions are recorded as ADRs in
   `docs/adr/`.
@@ -186,8 +186,6 @@ Done when: it looks good enough for the README GIF.
   without help, not just when the code works.
 - Commits that contain content written by Claude, in full or in part, carry a
   `Co-Authored-By: Claude` trailer; explanations and reviews alone do not count.
-  This includes the planning documents and the initial tooling and CI, which
-  Claude drafted before this agreement was adopted.
 - Every change goes through a branch and a pull request, CI must pass, commits
   follow Conventional Commits, pull requests stay small.
 - Only Rui merges into `main`, using *Squash and merge* (one commit per pull
@@ -202,7 +200,7 @@ Done when: it looks good enough for the README GIF.
 | Risk | Mitigation |
 |---|---|
 | Scope grows too large | Every milestone is demo-able on its own; cut *Could* items first. |
-| Slower progress, because Rui learns the stack while writing the code | Accepted on purpose. Small tasks, each explained before it starts, keep progress steady; cut *Could* items before cutting quality. |
+| Code written faster than it is understood | Small PRs, each explained part by part; Rui must be able to explain a PR before merging it; milestone retrospectives. |
 | Free hosting limits (cold starts, database expiry) | Choose hosting in an ADR in Phase 2; everything runs in Docker so it can move. |
 | AI-generated card art | Consistent style, no imitation of the original game's characters, tool documented in the README. |
 | Windows vs Linux differences | LF line endings via `.gitattributes`, PostgreSQL in Docker. |
