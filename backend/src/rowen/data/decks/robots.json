@@ -1,0 +1,88 @@
+{
+  "id": "robots",
+  "name": "Robots",
+  "units": [
+    {
+      "id": "robot",
+      "name": "Robot",
+      "rows": ["melee"],
+      "strength": 1,
+      "ability": "bond",
+      "group": "robots",
+      "copies": 5
+    },
+    {
+      "id": "machine",
+      "name": "Machine",
+      "rows": ["melee", "ranged"],
+      "strength": 4,
+      "ability": "agile",
+      "copies": 3
+    },
+    {
+      "id": "drone",
+      "name": "Drone",
+      "rows": ["ranged"],
+      "strength": 5,
+      "copies": 3
+    },
+    {
+      "id": "computer-spy",
+      "name": "Computer Spy",
+      "rows": ["melee"],
+      "strength": 2,
+      "ability": "spy",
+      "copies": 2
+    },
+    {
+      "id": "mechanic",
+      "name": "Mechanic",
+      "rows": ["siege"],
+      "strength": 4,
+      "ability": "medic",
+      "copies": 1
+    },
+    {
+      "id": "ai",
+      "name": "AI",
+      "rows": ["siege"],
+      "strength": 5,
+      "copies": 3
+    },
+    {
+      "id": "server",
+      "name": "Server",
+      "rows": ["siege"],
+      "strength": 3,
+      "ability": "muster",
+      "group": "servers",
+      "copies": 4
+    },
+    {
+      "id": "super-ai",
+      "name": "Super-AI",
+      "rows": ["ranged"],
+      "strength": 7,
+      "legend": true,
+      "copies": 1
+    },
+    {
+      "id": "sentry",
+      "name": "Sentry",
+      "rows": ["melee"],
+      "strength": 10,
+      "ability": "inspire",
+      "legend": true,
+      "copies": 1
+    }
+  ],
+  "specials": {
+    "hoarfrost": 1,
+    "thick-fog": 1,
+    "downpour": 1,
+    "clear-skies": 1,
+    "wildfire": 1,
+    "scarecrow": 2,
+    "war-horn": 3
+  }
+}

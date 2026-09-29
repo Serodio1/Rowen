@@ -3,6 +3,12 @@
 The preconstructed decks of the MVP factions. Every ability and special card is
 explained in the [rules](rules.md).
 
+The game reads these decks from JSON files in
+[`backend/src/rowen/data/`](../backend/src/rowen/data/): `specials.json` defines
+the special cards once, and each file in `decks/` lists a deck's units and how
+many copies of each special card it has. A new file in `decks/` is a new deck,
+and the tests check that every deck in it is valid.
+
 ## Humans
 
 | Card | Type | Row | Strength | Ability | Group | Copies |

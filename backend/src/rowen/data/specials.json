@@ -1,0 +1,9 @@
+[
+  { "id": "hoarfrost", "name": "Hoarfrost", "kind": "hoarfrost" },
+  { "id": "thick-fog", "name": "Thick Fog", "kind": "thick-fog" },
+  { "id": "downpour", "name": "Downpour", "kind": "downpour" },
+  { "id": "clear-skies", "name": "Clear Skies", "kind": "clear-skies" },
+  { "id": "war-horn", "name": "War Horn", "kind": "war-horn" },
+  { "id": "wildfire", "name": "Wildfire", "kind": "wildfire" },
+  { "id": "scarecrow", "name": "Scarecrow", "kind": "scarecrow" }
+]
