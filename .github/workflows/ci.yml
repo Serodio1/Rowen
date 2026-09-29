@@ -41,5 +41,9 @@ jobs:
       - name: Type-check
         run: uv run mypy
 
+      # The engine may only import the modules allowed in pyproject.toml.
+      - name: Check imports
+        run: uv run lint-imports
+
       - name: Test
         run: uv run pytest --cov

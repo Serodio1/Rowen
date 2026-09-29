@@ -9,6 +9,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+    "import-linter>=2.15",
     "mypy>=2.3.1",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
@@ -47,3 +48,30 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.importlinter]
+root_packages = ["rowen"]
+# Also track imports of packages outside rowen, standard library included.
+include_external_packages = true
+
+# ADR 0003: the engine is pure. Outside rowen.engine it may only import the
+# standard library modules allowed below, none of which does I/O or reads the
+# clock. Everything else is forbidden, third-party packages included.
+[[tool.importlinter.contracts]]
+name = "The engine only imports allowed standard library modules"
+type = "forbidden"
+source_modules = ["rowen.engine"]
+# "*" is every top-level package: the standard library and third-party ones.
+forbidden_modules = ["*", "rowen.ai", "rowen.api", "rowen.data", "rowen.db"]
+# The allowed modules. Import-linter has no allow list, so they are written as
+# imports to ignore. A module listed here that the engine stops using is an
+# error, so the list always matches the code.
+ignore_imports = [
+    "rowen.engine.** -> collections",
+    "rowen.engine.** -> dataclasses",
+    "rowen.engine.** -> enum",
+]
+broken_contract_guidance = """
+The engine must stay pure (ADR 0003). If the code needs another standard library
+module that does no I/O and doesn't read the clock, add it to ignore_imports in
+pyproject.toml. Otherwise, the code belongs outside rowen.engine."""
