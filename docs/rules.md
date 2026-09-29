@@ -23,7 +23,7 @@ while spending fewer cards than the opponent, and knowing when to pass.
 | Type | Description |
 |---|---|
 | **Unit** | Has a base strength, a row, and at most one ability. |
-| **Legend** | A unit that is immune to every special card and ability (section 7.3). |
+| **Legend** | A unit that is immune to every special card and ability (section 7.3). It can also have Spy, Medic or Inspire. |
 | **Special** | Has no strength; produces an effect (section 8). |
 
 Every deck belongs to one **faction**. **Neutral** cards can be put in any deck.
@@ -118,6 +118,11 @@ This order keeps weather meaningful without making Bond and War Horn useless.
 | **Inspire** | Gives **+1** to every other unit in its row (section 6, step 4). |
 | **Legend** | Immune to weather, War Horn, Inspire, Wildfire, Scarecrow and Medic. |
 
+A Legend can also have **Spy**, **Medic** or **Inspire** (no other ability).
+The ability works as usual and the Legend stays immune: a Legend with Inspire
+gives +1 to the other units in its row but never receives it, and a Legend Spy
+can't be taken back with a Scarecrow.
+
 Bond groups and muster groups are defined in the card data (usually, cards with
 the same name share a group).
 
@@ -205,3 +210,4 @@ at most **10 special cards**.
 | D3 | Who plays first in rounds 2 and 3 | The winner of the previous round; after a tie, the player who played first in it (section 9) |
 | D4 | Discard pile for a Spy at the end of a round | The side it is on, which is the opponent's (section 9) |
 | D5 | MVP scope | Sections 7–8 in the MVP; section 13 later |
+| D6 | Can a Legend also have an ability? | Yes: Spy, Medic or Inspire, and it stays immune to everything else (section 7.3) |
