@@ -12,6 +12,8 @@ PostgreSQL, and a React + TypeScript frontend.
 
 - [Project plan](docs/plan.md): goals, architecture, tech stack and roadmap.
 - [Game rules](docs/rules.md)
+- [Architecture decision records](docs/adr/README.md): why the main
+  technical decisions were made.
 
 ## Development
 
