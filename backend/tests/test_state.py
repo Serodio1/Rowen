@@ -18,6 +18,7 @@ def test_player_starts_with_an_empty_board() -> None:
         Row.RANGED: RowState(),
         Row.SIEGE: RowState(),
     }
+    assert PLAYER.weather == ()
     assert PLAYER.discard == ()
     assert PLAYER.lives == STARTING_LIVES
     assert not PLAYER.passed

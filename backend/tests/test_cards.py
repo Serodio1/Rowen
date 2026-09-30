@@ -4,7 +4,14 @@ import dataclasses
 
 import pytest
 
-from rowen.engine.cards import Ability, Row, SpecialCard, SpecialKind, UnitCard
+from rowen.engine.cards import (
+    WEATHER_ROWS,
+    Ability,
+    Row,
+    SpecialCard,
+    SpecialKind,
+    UnitCard,
+)
 
 # Valid cards from docs/cards.md. Each test changes one field with
 # dataclasses.replace, which builds a new card and runs its checks again.
@@ -99,3 +106,7 @@ def test_special_card_keeps_its_data() -> None:
     card = SpecialCard(id="thick-fog", name="Thick Fog", kind=SpecialKind.THICK_FOG)
     assert card.name == "Thick Fog"
     assert card.kind is SpecialKind.THICK_FOG
+
+
+def test_each_row_has_one_weather_card() -> None:
+    assert sorted(WEATHER_ROWS.values()) == sorted(Row)
