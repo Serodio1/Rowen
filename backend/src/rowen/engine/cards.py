@@ -5,6 +5,7 @@ strength 6 that goes in the ranged row". How many copies of it a deck holds
 belongs to the deck, not to the card.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -48,6 +49,13 @@ GROUP_ABILITIES = frozenset({Ability.BOND, Ability.MUSTER})
 
 # The only abilities a Legend may have (rules, section 7.3, decision D6).
 LEGEND_ABILITIES = frozenset({None, Ability.SPY, Ability.MEDIC, Ability.INSPIRE})
+
+# The row each weather card affects, on both sides of the board (rules, section 8).
+WEATHER_ROWS: Mapping[SpecialKind, Row] = {
+    SpecialKind.HOARFROST: Row.MELEE,
+    SpecialKind.THICK_FOG: Row.RANGED,
+    SpecialKind.DOWNPOUR: Row.SIEGE,
+}
 
 
 @dataclass(frozen=True, kw_only=True)
