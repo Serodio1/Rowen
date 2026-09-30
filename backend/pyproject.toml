@@ -70,6 +70,7 @@ ignore_imports = [
     "rowen.engine.** -> collections",
     "rowen.engine.** -> dataclasses",
     "rowen.engine.** -> enum",
+    "rowen.engine.** -> random",
 ]
 broken_contract_guidance = """
 The engine must stay pure (ADR 0003). If the code needs another standard library
