@@ -1,0 +1,78 @@
+"""The game state: everything about a match at one moment (ADR 0003).
+
+The state is never changed. Every step of the game builds a new state, usually
+with ``dataclasses.replace``, and the old one stays as it was.
+
+Unlike cards and decks, which come from data files, a state is only ever built
+by the engine's own functions, so it doesn't check itself when it is created.
+Its rules are checked by the tests instead.
+"""
+
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+
+from rowen.engine.cards import Card, Row, UnitCard
+from rowen.engine.rng import Rng
+
+# Lives each player starts the match with (rules, section 2).
+STARTING_LIVES = 2
+
+
+@dataclass(frozen=True, kw_only=True)
+class RowState:
+    """One row on one player's side of the board.
+
+    Attributes:
+        units: The units in the row, in the order they were played.
+    """
+
+    units: tuple[UnitCard, ...] = ()
+
+
+def empty_rows() -> Mapping[Row, RowState]:
+    """Return one empty row for each ``Row``, as at the start of a round."""
+    return {row: RowState() for row in Row}
+
+
+@dataclass(frozen=True, kw_only=True)
+class PlayerState:
+    """Everything that belongs to one player.
+
+    ``rows`` is a dict, which Python lets anyone change. Its type,
+    ``Mapping``, has no way to change it, so mypy rejects any code that tries:
+    a new row means a new dict, ``{**player.rows, row: new_row}``.
+
+    Attributes:
+        deck: The cards left to draw, face down; the next card drawn is the
+            first one.
+        hand: The cards in the player's hand.
+        rows: The player's side of the board, one ``RowState`` per ``Row``.
+        discard: The discard pile, face up; the last card is the most recent.
+        lives: Lives left; a player with none has lost the match.
+        passed: Whether the player has passed this round.
+    """
+
+    deck: tuple[Card, ...]
+    hand: tuple[Card, ...]
+    rows: Mapping[Row, RowState] = field(default_factory=empty_rows)
+    discard: tuple[Card, ...] = ()
+    lives: int = STARTING_LIVES
+    passed: bool = False
+
+
+@dataclass(frozen=True, kw_only=True)
+class GameState:
+    """A match at one moment: with it, the match can go on from there.
+
+    Attributes:
+        players: Both players. They are known by their index, 0 or 1, so the
+            opponent of player ``i`` is player ``1 - i``.
+        current: The index of the player whose turn it is.
+        round: The round being played, from 1 to 3.
+        rng: Where the next random choice comes from.
+    """
+
+    players: tuple[PlayerState, PlayerState]
+    current: int
+    round: int = 1
+    rng: Rng
