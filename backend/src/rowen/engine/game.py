@@ -2,13 +2,15 @@
 
 from dataclasses import replace
 
-from rowen.engine.actions import Action, Pass, PlayUnit
+from rowen.engine.actions import Action, EndRedraw, Pass, PlayUnit, Redraw
 from rowen.engine.cards import Card, UnitCard
 from rowen.engine.decks import Deck
 from rowen.engine.events import (
+    CardRedrawn,
     Event,
     MatchEnded,
     PlayerPassed,
+    RedrawEnded,
     RoundEnded,
     UnitPlayed,
 )
@@ -19,6 +21,9 @@ from rowen.engine.state import GameState, PlayerState, empty_rows
 # Cards each player draws at the start of the match (rules, section 3).
 HAND_SIZE = 10
 
+# Cards each player can swap before round 1 (rules, section 3).
+MAX_REDRAWS = 2
+
 
 class IllegalActionError(ValueError):
     """Raised by ``apply`` for an action that isn't one of the legal actions."""
@@ -27,8 +32,10 @@ class IllegalActionError(ValueError):
 def start_match(decks: tuple[Deck, Deck], seed: int) -> GameState:
     """Set up a match: shuffle both decks, flip a coin and deal 10 cards each.
 
-    This is the rules, section 3, steps 1 to 3; the redraw (step 4) is not
-    part of it yet. The same decks and seed always give the same match.
+    This is the rules, section 3, steps 1 to 3. The match then goes on with
+    the redraw (step 4), through ``legal_actions`` and ``apply``: the player
+    who won the coin flip redraws first, then the other one, and then round 1
+    starts. The same decks and seed always give the same match.
 
     Args:
         decks: The deck of each player: player 0 plays ``decks[0]``.
@@ -49,18 +56,26 @@ def start_match(decks: tuple[Deck, Deck], seed: int) -> GameState:
 def legal_actions(state: GameState) -> tuple[Action, ...]:
     """Return every action the player whose turn it is can take.
 
-    That is playing any unit in the hand on any of its rows, or passing
-    (rules, sections 4 and 5). Special cards can't be played yet. When the
-    match is over, there are none.
+    Before round 1, that is swapping any card in the hand, if there is a card
+    to draw, or ending the redraw (rules, section 3). Then it is playing any
+    unit in the hand on any of its rows, or passing (rules, sections 4 and 5).
+    Special cards can't be played yet. When the match is over, there are none.
     """
     if match_over(state):
         return ()
 
-    hand = state.players[state.current].hand
+    player = state.players[state.current]
+    if _redrawing(state):
+        if not player.deck:
+            return (EndRedraw(),)
+        # Copies of a card give the same action, as below.
+        swaps = dict.fromkeys(Redraw(card=card.id) for card in player.hand)
+        return (*swaps, EndRedraw())
+
     # Copies of a card give the same action. A dict keeps one of each, in order.
     plays = dict.fromkeys(
         PlayUnit(card=card.id, row=row)
-        for card in hand
+        for card in player.hand
         if isinstance(card, UnitCard)
         for row in card.rows
     )
@@ -83,6 +98,13 @@ def apply(state: GameState, action: Action) -> tuple[GameState, tuple[Event, ...
     """
     if action not in legal_actions(state):
         raise IllegalActionError(f"illegal action: {action}")
+
+    # The redraw happens before round 1, so none of the round's steps below
+    # apply to it.
+    if isinstance(action, Redraw):
+        return _redraw(state, action)
+    if isinstance(action, EndRedraw):
+        return _end_redraw(state)
 
     if isinstance(action, Pass):
         state, events = _pass(state)
@@ -122,8 +144,64 @@ def match_winner(state: GameState) -> int | None:
 
 
 def _deal(cards: tuple[Card, ...]) -> PlayerState:
-    """Return a player who has drawn their hand from these shuffled cards."""
-    return PlayerState(hand=cards[:HAND_SIZE], deck=cards[HAND_SIZE:])
+    """Return a player who has drawn their hand from these shuffled cards.
+
+    They can still swap ``MAX_REDRAWS`` cards before round 1.
+    """
+    return PlayerState(
+        hand=cards[:HAND_SIZE],
+        deck=cards[HAND_SIZE:],
+        redraws_left=MAX_REDRAWS,
+    )
+
+
+def _redrawing(state: GameState) -> bool:
+    """Return whether round 1 is waiting for a player to finish redrawing."""
+    return any(player.redraws_left > 0 for player in state.players)
+
+
+def _redraw(state: GameState, action: Redraw) -> tuple[GameState, tuple[Event, ...]]:
+    """Swap one copy of the card for the top card of the deck (rules, section 3).
+
+    The new card is drawn first, into the old card's place in the hand. Only
+    then does the old card go back into the deck, which is shuffled, so it is
+    never drawn straight back. After their last swap, the player is done.
+    """
+    player = state.players[state.current]
+    index = next(i for i, card in enumerate(player.hand) if card.id == action.card)
+    card, drawn = player.hand[index], player.deck[0]
+    deck, rng = state.rng.shuffled((*player.deck[1:], card))
+    player = replace(
+        player,
+        hand=(*player.hand[:index], drawn, *player.hand[index + 1 :]),
+        deck=deck,
+        redraws_left=player.redraws_left - 1,
+    )
+    state = replace(_with_player(state, state.current, player), rng=rng)
+    events: tuple[Event, ...] = (
+        CardRedrawn(player=state.current, card=card.id, drawn=drawn.id),
+    )
+
+    if player.redraws_left == 0:
+        state, end = _end_redraw(state)
+        events += end
+    return state, events
+
+
+def _end_redraw(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
+    """End the redraw of the player whose turn it is.
+
+    The other player redraws next, unless they are done too. Then round 1
+    starts with the player who won the coin flip.
+    """
+    player = replace(state.players[state.current], redraws_left=0)
+    event = RedrawEnded(player=state.current)
+    state = _with_player(state, state.current, player)
+
+    opponent = 1 - state.current
+    if state.players[opponent].redraws_left > 0:
+        return replace(state, current=opponent), (event,)
+    return replace(state, current=state.round_starter), (event,)
 
 
 def _play_unit(

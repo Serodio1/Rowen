@@ -32,5 +32,22 @@ class Pass:
     """Take no more turns this round (rules, section 4)."""
 
 
+@dataclass(frozen=True, kw_only=True)
+class Redraw:
+    """Before round 1, swap a card in the hand for a new one (rules, section 3).
+
+    Attributes:
+        card: The id of the card to swap, special cards included. All copies
+            of a card are the same, so any copy in the hand will do.
+    """
+
+    card: str
+
+
+@dataclass(frozen=True)
+class EndRedraw:
+    """Keep the hand as it is and swap no more cards (rules, section 3)."""
+
+
 # Any action.
-type Action = PlayUnit | Pass
+type Action = PlayUnit | Pass | Redraw | EndRedraw
