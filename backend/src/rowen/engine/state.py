@@ -9,7 +9,7 @@ Its rules are checked by the tests instead.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from rowen.engine.cards import Card, Row, SpecialCard, UnitCard
 from rowen.engine.rng import Rng
@@ -90,3 +90,10 @@ class GameState:
     round_starter: int
     round: int = 1
     rng: Rng
+
+
+def with_player(state: GameState, index: int, player: PlayerState) -> GameState:
+    """Return the state with player ``index`` replaced by ``player``."""
+    if index == 0:
+        return replace(state, players=(player, state.players[1]))
+    return replace(state, players=(state.players[0], player))

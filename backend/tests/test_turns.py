@@ -92,7 +92,7 @@ def test_playing_a_unit_moves_it_from_the_hand_to_its_row() -> None:
     assert player.hand == (KNIGHT,)
     assert player.rows[Row.RANGED] == RowState(units=(SNIPER,))
     assert player.rows[Row.MELEE] == RowState()
-    assert events == (UnitPlayed(player=0, card="sniper", row=Row.RANGED),)
+    assert events == (UnitPlayed(player=0, card="sniper", row=Row.RANGED, side=0),)
 
 
 def test_agile_unit_goes_in_the_row_the_player_chooses() -> None:
@@ -129,7 +129,7 @@ def test_unit_goes_on_the_side_of_the_player_who_plays_it() -> None:
 
     assert state.players[1].rows[Row.MELEE].units == (KNIGHT,)
     assert state.players[0].rows[Row.MELEE].units == ()
-    assert events == (UnitPlayed(player=1, card="knight", row=Row.MELEE),)
+    assert events == (UnitPlayed(player=1, card="knight", row=Row.MELEE, side=1),)
 
 
 def test_apply_doesnt_change_the_old_state() -> None:
@@ -179,7 +179,7 @@ def test_playing_the_last_card_passes_automatically() -> None:
     assert state.players[0].passed
     assert state.current == 1
     assert events == (
-        UnitPlayed(player=0, card="sniper", row=Row.RANGED),
+        UnitPlayed(player=0, card="sniper", row=Row.RANGED, side=0),
         PlayerPassed(player=0),
     )
 

@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+from rowen.engine import abilities
 from rowen.engine.actions import Action, EndRedraw, Pass, PlayUnit, Redraw
 from rowen.engine.cards import Card, UnitCard
 from rowen.engine.decks import Deck
@@ -16,7 +17,7 @@ from rowen.engine.events import (
 )
 from rowen.engine.rng import Rng
 from rowen.engine.scoring import player_total
-from rowen.engine.state import GameState, PlayerState, empty_rows
+from rowen.engine.state import GameState, PlayerState, empty_rows, with_player
 
 # Cards each player draws at the start of the match (rules, section 3).
 HAND_SIZE = 10
@@ -177,7 +178,7 @@ def _redraw(state: GameState, action: Redraw) -> tuple[GameState, tuple[Event, .
         deck=deck,
         redraws_left=player.redraws_left - 1,
     )
-    state = replace(_with_player(state, state.current, player), rng=rng)
+    state = replace(with_player(state, state.current, player), rng=rng)
     events: tuple[Event, ...] = (
         CardRedrawn(player=state.current, card=card.id, drawn=drawn.id),
     )
@@ -196,7 +197,7 @@ def _end_redraw(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
     """
     player = replace(state.players[state.current], redraws_left=0)
     event = RedrawEnded(player=state.current)
-    state = _with_player(state, state.current, player)
+    state = with_player(state, state.current, player)
 
     opponent = 1 - state.current
     if state.players[opponent].redraws_left > 0:
@@ -207,28 +208,39 @@ def _end_redraw(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
 def _play_unit(
     state: GameState, action: PlayUnit
 ) -> tuple[GameState, tuple[Event, ...]]:
-    """Move one copy of the unit from the hand to the end of the row."""
+    """Move one copy of the unit from the hand to the end of the row.
+
+    The row is on the side the unit goes on, which is the opponent's for a
+    Spy. Then the unit's on-play ability, if it has one, takes effect.
+    """
     player = state.players[state.current]
     unit = next(
         card
         for card in player.hand
         if isinstance(card, UnitCard) and card.id == action.card
     )
-    row = player.rows[action.row]
-    player = replace(
-        player,
-        hand=_without(player.hand, unit),
-        rows={**player.rows, action.row: replace(row, units=(*row.units, unit))},
+    player = replace(player, hand=_without(player.hand, unit))
+    state = with_player(state, state.current, player)
+
+    side = abilities.side(unit, state.current)
+    owner = state.players[side]
+    row = owner.rows[action.row]
+    owner = replace(
+        owner,
+        rows={**owner.rows, action.row: replace(row, units=(*row.units, unit))},
     )
-    event = UnitPlayed(player=state.current, card=unit.id, row=action.row)
-    return _with_player(state, state.current, player), (event,)
+    state = with_player(state, side, owner)
+    event = UnitPlayed(player=state.current, card=unit.id, row=action.row, side=side)
+
+    state, ability_events = abilities.on_play(state, state.current, unit)
+    return state, (event, *ability_events)
 
 
 def _pass(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
     """Mark the player whose turn it is as passed."""
     player = replace(state.players[state.current], passed=True)
     event = PlayerPassed(player=state.current)
-    return _with_player(state, state.current, player), (event,)
+    return with_player(state, state.current, player), (event,)
 
 
 def _pass_empty_hands(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
@@ -236,7 +248,7 @@ def _pass_empty_hands(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
     events: list[Event] = []
     for index, player in enumerate(state.players):
         if not player.hand and not player.passed:
-            state = _with_player(state, index, replace(player, passed=True))
+            state = with_player(state, index, replace(player, passed=True))
             events.append(PlayerPassed(player=index))
     return state, tuple(events)
 
@@ -268,7 +280,7 @@ def _end_round(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
     winner = _round_winner(scores)
     for index, player in enumerate(state.players):
         if index != winner:
-            state = _with_player(state, index, replace(player, lives=player.lives - 1))
+            state = with_player(state, index, replace(player, lives=player.lives - 1))
     events: tuple[Event, ...] = (RoundEnded(scores=scores, winner=winner),)
 
     if match_over(state):
@@ -324,13 +336,6 @@ def _clear_board(player: PlayerState) -> PlayerState:
         discard=(*player.discard, *in_play),
         passed=False,
     )
-
-
-def _with_player(state: GameState, index: int, player: PlayerState) -> GameState:
-    """Return the state with player ``index`` replaced by ``player``."""
-    if index == 0:
-        return replace(state, players=(player, state.players[1]))
-    return replace(state, players=(state.players[0], player))
 
 
 def _without(cards: tuple[Card, ...], card: Card) -> tuple[Card, ...]:
