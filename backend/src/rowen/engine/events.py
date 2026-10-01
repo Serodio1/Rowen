@@ -40,6 +40,24 @@ class PlayerPassed:
 
 
 @dataclass(frozen=True, kw_only=True)
+class UnitRevived:
+    """A player chose a unit from their discard pile with a Medic and played it.
+
+    Attributes:
+        player: The index of the player who revived it.
+        card: The id of the unit.
+        row: The row it was played in.
+        side: The index of the player whose side of the board it went on:
+            the opponent's for a Spy, the player's own for any other unit.
+    """
+
+    player: int
+    card: str
+    row: Row
+    side: int
+
+
+@dataclass(frozen=True, kw_only=True)
 class UnitMustered:
     """A Muster called a unit to the board from its player's deck or hand.
 
@@ -132,6 +150,7 @@ class RedrawEnded:
 # Any event.
 type Event = (
     UnitPlayed
+    | UnitRevived
     | UnitMustered
     | CardsDrawn
     | PlayerPassed

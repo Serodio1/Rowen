@@ -3,8 +3,15 @@
 from dataclasses import replace
 
 from rowen.engine import abilities
-from rowen.engine.actions import Action, EndRedraw, Pass, PlayUnit, Redraw
-from rowen.engine.cards import Card, UnitCard
+from rowen.engine.actions import (
+    Action,
+    EndRedraw,
+    Pass,
+    PlayUnit,
+    Redraw,
+    Revive,
+)
+from rowen.engine.cards import Card, Row, UnitCard
 from rowen.engine.decks import Deck
 from rowen.engine.events import (
     CardRedrawn,
@@ -14,6 +21,7 @@ from rowen.engine.events import (
     RedrawEnded,
     RoundEnded,
     UnitPlayed,
+    UnitRevived,
 )
 from rowen.engine.rng import Rng
 from rowen.engine.scoring import player_total
@@ -66,12 +74,22 @@ def legal_actions(state: GameState) -> tuple[Action, ...]:
     Before round 1, that is swapping any card in the hand, if there is a card
     to draw, or ending the redraw (rules, section 3). Then it is playing any
     unit in the hand on any of its rows, or passing (rules, sections 4 and 5).
-    Special cards can't be played yet. When the match is over, there are none.
+    Right after a Medic, it is only reviving a unit from the discard pile on
+    any of its rows (rules, section 7.2). Special cards can't be played yet.
+    When the match is over, there are none.
     """
     if match_over(state):
         return ()
 
     player = state.players[state.current]
+    if state.reviving:
+        # Copies of a card give the same action, as below.
+        revives = dict.fromkeys(
+            Revive(card=unit.id, row=row)
+            for unit in abilities.revivable(player)
+            for row in unit.rows
+        )
+        return tuple(revives)
     if _redrawing(state):
         if not player.deck:
             return (EndRedraw(),)
@@ -115,8 +133,14 @@ def apply(state: GameState, action: Action) -> tuple[GameState, tuple[Event, ...
 
     if isinstance(action, Pass):
         state, events = _pass(state)
+    elif isinstance(action, Revive):
+        state, events = _revive(state, action)
     else:
         state, events = _play_unit(state, action)
+
+    # After a Medic, the turn waits for the player to choose a unit to revive.
+    if state.reviving:
+        return state, events
 
     state, auto_passes = _pass_empty_hands(state)
     state = _turn_to(state, 1 - state.current)
@@ -214,11 +238,7 @@ def _end_redraw(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
 def _play_unit(
     state: GameState, action: PlayUnit
 ) -> tuple[GameState, tuple[Event, ...]]:
-    """Move one copy of the unit from the hand to the end of the row.
-
-    The row is on the side the unit goes on, which is the opponent's for a
-    Spy. Then the unit's on-play ability, if it has one, takes effect.
-    """
+    """Move one copy of the unit from the hand to the end of the row."""
     player = state.players[state.current]
     unit = next(
         card
@@ -228,12 +248,43 @@ def _play_unit(
     player = replace(player, hand=_without(player.hand, unit))
     state = with_player(state, state.current, player)
 
-    side = abilities.side(unit, state.current)
-    state = with_unit(state, side, action.row, unit)
+    state, side, ability_events = _put_on_board(state, unit, action.row)
     event = UnitPlayed(player=state.current, card=unit.id, row=action.row, side=side)
-
-    state, ability_events = abilities.on_play(state, state.current, unit)
     return state, (event, *ability_events)
+
+
+def _revive(state: GameState, action: Revive) -> tuple[GameState, tuple[Event, ...]]:
+    """Move one copy of the unit from the discard pile to the end of the row.
+
+    This is the choice a Medic asks for. As with any unit played, its on-play
+    ability takes effect, so a revived Medic asks for another choice.
+    """
+    player = state.players[state.current]
+    unit = next(card for card in abilities.revivable(player) if card.id == action.card)
+    player = replace(player, discard=_without(player.discard, unit))
+    state = replace(with_player(state, state.current, player), reviving=False)
+
+    state, side, ability_events = _put_on_board(state, unit, action.row)
+    event = UnitRevived(player=state.current, card=unit.id, row=action.row, side=side)
+    return state, (event, *ability_events)
+
+
+def _put_on_board(
+    state: GameState, unit: UnitCard, row: Row
+) -> tuple[GameState, int, tuple[Event, ...]]:
+    """Put a unit of the player whose turn it is at the end of the row.
+
+    The row is on the side the unit goes on, which is the opponent's for a
+    Spy. Then the unit's on-play ability, if it has one, takes effect.
+
+    Returns:
+        The new state, the index of the side the unit went on and the events
+        of its ability.
+    """
+    side = abilities.side(unit, state.current)
+    state = with_unit(state, side, row, unit)
+    state, events = abilities.on_play(state, state.current, unit)
+    return state, side, events
 
 
 def _pass(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
