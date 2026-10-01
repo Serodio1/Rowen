@@ -130,13 +130,13 @@ def test_playing_a_copy_keeps_the_others_in_hand() -> None:
 
 
 def test_new_unit_goes_after_the_units_already_in_the_row() -> None:
-    state = make_state((SNIPER, SNIPER, KNIGHT), (KNIGHT, KNIGHT))
+    state = make_state((SNIPER, SCOUT), (KNIGHT, KNIGHT))
 
     state, _ = apply(state, PLAY_SNIPER)
     state, _ = apply(state, PLAY_KNIGHT)
-    state, _ = apply(state, PLAY_SNIPER)
+    state, _ = apply(state, PlayUnit(card="scout", row=Row.RANGED))
 
-    assert state.players[0].rows[Row.RANGED].units == (SNIPER, SNIPER)
+    assert state.players[0].rows[Row.RANGED].units == (SNIPER, SCOUT)
 
 
 def test_unit_goes_on_the_side_of_the_player_who_plays_it() -> None:
