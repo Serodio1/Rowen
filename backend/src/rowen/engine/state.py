@@ -75,11 +75,14 @@ class GameState:
         players: Both players. They are known by their index, 0 or 1, so the
             opponent of player ``i`` is player ``1 - i``.
         current: The index of the player whose turn it is.
+        round_starter: The index of the player who had the first turn of this
+            round. After a tie, they have it again (rules, section 9).
         round: The round being played, from 1 to 3.
         rng: Where the next random choice comes from.
     """
 
     players: tuple[PlayerState, PlayerState]
     current: int
+    round_starter: int
     round: int = 1
     rng: Rng

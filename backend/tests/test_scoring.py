@@ -59,7 +59,9 @@ def strengths(row: RowState, *, weathered: bool = False) -> list[int]:
 
 def make_state(first: PlayerState, second: PlayerState = EMPTY_PLAYER) -> GameState:
     """Build a match with these two players."""
-    return GameState(players=(first, second), current=0, rng=Rng(seed=7))
+    return GameState(
+        players=(first, second), current=0, round_starter=0, rng=Rng(seed=7)
+    )
 
 
 def test_unit_keeps_its_base_strength() -> None:

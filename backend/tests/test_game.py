@@ -68,6 +68,7 @@ def test_match_starts_in_round_one() -> None:
     state = start_match(DECKS, seed=7)
 
     assert state.round == 1
+    assert state.round_starter == state.current
     for player in state.players:
         assert player.lives == STARTING_LIVES
         assert not player.passed

@@ -9,7 +9,7 @@ from rowen.engine.rng import Rng
 from rowen.engine.state import STARTING_LIVES, GameState, PlayerState, RowState
 
 PLAYER = PlayerState(deck=(), hand=())
-STATE = GameState(players=(PLAYER, PLAYER), current=0, rng=Rng(seed=7))
+STATE = GameState(players=(PLAYER, PLAYER), current=0, round_starter=0, rng=Rng(seed=7))
 
 
 def test_player_starts_with_an_empty_board() -> None:
