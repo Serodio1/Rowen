@@ -97,3 +97,11 @@ def with_player(state: GameState, index: int, player: PlayerState) -> GameState:
     if index == 0:
         return replace(state, players=(player, state.players[1]))
     return replace(state, players=(state.players[0], player))
+
+
+def with_unit(state: GameState, side: int, row: Row, unit: UnitCard) -> GameState:
+    """Return the state with the unit at the end of a row on one side."""
+    player = state.players[side]
+    units = (*player.rows[row].units, unit)
+    rows = {**player.rows, row: replace(player.rows[row], units=units)}
+    return with_player(state, side, replace(player, rows=rows))

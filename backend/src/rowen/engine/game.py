@@ -17,7 +17,13 @@ from rowen.engine.events import (
 )
 from rowen.engine.rng import Rng
 from rowen.engine.scoring import player_total
-from rowen.engine.state import GameState, PlayerState, empty_rows, with_player
+from rowen.engine.state import (
+    GameState,
+    PlayerState,
+    empty_rows,
+    with_player,
+    with_unit,
+)
 
 # Cards each player draws at the start of the match (rules, section 3).
 HAND_SIZE = 10
@@ -223,13 +229,7 @@ def _play_unit(
     state = with_player(state, state.current, player)
 
     side = abilities.side(unit, state.current)
-    owner = state.players[side]
-    row = owner.rows[action.row]
-    owner = replace(
-        owner,
-        rows={**owner.rows, action.row: replace(row, units=(*row.units, unit))},
-    )
-    state = with_player(state, side, owner)
+    state = with_unit(state, side, action.row, unit)
     event = UnitPlayed(player=state.current, card=unit.id, row=action.row, side=side)
 
     state, ability_events = abilities.on_play(state, state.current, unit)

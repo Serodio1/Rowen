@@ -108,7 +108,7 @@ This order keeps weather meaningful without making Bond and War Horn useless.
 |---|---|
 | **Spy** | Placed on the **opponent's** side, where its strength counts for the opponent. The player who played it draws **2 cards** from their deck (fewer if the deck has fewer). |
 | **Medic** | The player chooses a unit (not a Legend) from **their own** discard pile and plays it immediately. Its ability triggers too, so a revived Medic or Spy works normally. With no valid target, nothing happens. |
-| **Muster** | Immediately plays, from the player's **deck**, every card in the same muster group. Cards in hand are not affected. |
+| **Muster** | Immediately plays, from the player's **deck and hand**, every card in the same muster group. |
 
 ### 7.3 Ongoing (active while the card is on the board)
 
@@ -211,3 +211,4 @@ at most **10 special cards**.
 | D4 | Discard pile for a Spy at the end of a round | The side it is on, which is the opponent's (section 9) |
 | D5 | MVP scope | Sections 7–8 in the MVP; section 13 later |
 | D6 | Can a Legend also have an ability? | Yes: Spy, Medic or Inspire, and it stays immune to everything else (section 7.3) |
+| D7 | Does Muster also play the cards of its group from the hand? | Yes: from the deck and the hand, so one card plays the whole group (section 7.2) |
