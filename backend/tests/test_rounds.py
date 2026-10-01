@@ -123,7 +123,7 @@ def test_playing_the_last_card_can_end_the_round() -> None:
     state, events = apply(state, PlayUnit(card="sniper", row=Row.RANGED))
 
     assert events[:3] == (
-        UnitPlayed(player=1, card="sniper", row=Row.RANGED),
+        UnitPlayed(player=1, card="sniper", row=Row.RANGED, side=1),
         PlayerPassed(player=1),
         RoundEnded(scores=(0, 6), winner=1),
     )
@@ -223,7 +223,7 @@ def test_round_with_no_cards_on_either_side_ends_straight_away() -> None:
     state, events = apply(state, PlayUnit(card="sniper", row=Row.RANGED))
 
     assert events == (
-        UnitPlayed(player=0, card="sniper", row=Row.RANGED),
+        UnitPlayed(player=0, card="sniper", row=Row.RANGED, side=0),
         PlayerPassed(player=0),
         RoundEnded(scores=(6, 0), winner=0),
         PlayerPassed(player=0),
@@ -306,11 +306,10 @@ def choose(actions: tuple[Action, ...], turn: int) -> Action:
 
 @pytest.mark.parametrize("seed", range(5))
 def test_a_match_runs_from_the_first_turn_to_the_end(seed: int) -> None:
-    # The "done when" of issues #11 to #13, with the real decks: each turn
+    # The "done when" of issues #11 to #14, with the real decks: each turn
     # tries every legal action, then takes one of them.
     decks = (load_deck("humans"), load_deck("robots"))
     state = start_match(decks, seed=seed)
-    cards_at_start = [Counter(player.hand + player.deck) for player in state.players]
     events: list[Event] = []
 
     for turn in range(100):
@@ -326,9 +325,10 @@ def test_a_match_runs_from_the_first_turn_to_the_end(seed: int) -> None:
     assert events[-1] == MatchEnded(winner=match_winner(state))
     rounds = [event for event in events if isinstance(event, RoundEnded)]
     assert len(rounds) == state.round <= 3
-    # Every card is still in the hand, the deck, on the board or in the
-    # discard pile.
-    for player, at_start in zip(state.players, cards_at_start, strict=True):
-        on_board = [unit for row in player.rows.values() for unit in row.units]
-        cards = Counter(player.hand + player.deck + player.discard)
-        assert cards + Counter(on_board) == at_start
+    # Every card is still in a hand, a deck, on the board or in a discard
+    # pile. A Spy changes sides, so both players' cards are counted together.
+    cards: Counter[Card] = Counter()
+    for player in state.players:
+        cards.update(player.hand + player.deck + player.discard)
+        cards.update(unit for row in player.rows.values() for unit in row.units)
+    assert cards == Counter(decks[0].cards + decks[1].cards)

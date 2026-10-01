@@ -18,11 +18,14 @@ class UnitPlayed:
         player: The index of the player who played it.
         card: The id of the unit.
         row: The row it was played in.
+        side: The index of the player whose side of the board it went on:
+            the opponent's for a Spy, the player's own for any other unit.
     """
 
     player: int
     card: str
     row: Row
+    side: int
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -34,6 +37,22 @@ class PlayerPassed:
     """
 
     player: int
+
+
+@dataclass(frozen=True, kw_only=True)
+class CardsDrawn:
+    """A player drew cards from their deck into their hand.
+
+    Only that player may know which cards they are, so the opponent's view of
+    this event must leave them out and keep only how many there are.
+
+    Attributes:
+        player: The index of the player who drew them.
+        cards: The ids of the cards drawn, in the order they were drawn.
+    """
+
+    player: int
+    cards: tuple[str, ...]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -95,5 +114,11 @@ class RedrawEnded:
 
 # Any event.
 type Event = (
-    UnitPlayed | PlayerPassed | RoundEnded | MatchEnded | CardRedrawn | RedrawEnded
+    UnitPlayed
+    | CardsDrawn
+    | PlayerPassed
+    | RoundEnded
+    | MatchEnded
+    | CardRedrawn
+    | RedrawEnded
 )
