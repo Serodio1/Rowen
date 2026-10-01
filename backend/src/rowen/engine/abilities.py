@@ -6,8 +6,8 @@ implemented once, in the part of the engine that matches its kind:
 - **Placement**, where the unit goes. Agile needs no code: an Agile unit has
   two rows, so ``legal_actions`` offers both. A Spy goes on the opponent's
   side, as ``side`` says.
-- **On play**, once, when the unit is played: Spy. Each one is a function in
-  the ``ON_PLAY`` table, which ``on_play`` looks up.
+- **On play**, once, when the unit is played: Spy and Muster. Each one is a
+  function in the ``ON_PLAY`` table, which ``on_play`` looks up.
 - **Ongoing**, while the unit is on the board: Bond and Inspire, in
   ``scoring``.
 
@@ -19,8 +19,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import replace
 
 from rowen.engine.cards import Ability, UnitCard
-from rowen.engine.events import CardsDrawn, Event
-from rowen.engine.state import GameState, with_player
+from rowen.engine.events import CardsDrawn, Event, UnitMustered
+from rowen.engine.state import GameState, with_player, with_unit
 
 # Cards the player of a Spy draws (rules, section 7.2).
 SPY_DRAWS = 2
@@ -58,6 +58,37 @@ def _spy(
     return _draw(state, player, SPY_DRAWS)
 
 
+def _muster(
+    state: GameState, player: int, unit: UnitCard
+) -> tuple[GameState, tuple[Event, ...]]:
+    """Play every unit of the same muster group from the player's deck.
+
+    They go in their row, in the order they were in the deck. The cards in the
+    hand stay there. The units that arrive don't muster again: there are none
+    of their group left in the deck.
+    """
+    deck = state.players[player].deck
+    mustered = tuple(
+        card
+        for card in deck
+        if isinstance(card, UnitCard) and _same_muster_group(card, unit)
+    )
+    rest = tuple(card for card in deck if card not in mustered)
+    state = with_player(state, player, replace(state.players[player], deck=rest))
+
+    events: list[Event] = []
+    for card in mustered:
+        # A Muster unit isn't Agile, so it has one row.
+        state = with_unit(state, player, card.rows[0], card)
+        events.append(UnitMustered(player=player, card=card.id, row=card.rows[0]))
+    return state, tuple(events)
+
+
+def _same_muster_group(card: UnitCard, unit: UnitCard) -> bool:
+    """Return whether the card musters with the unit."""
+    return card.ability is Ability.MUSTER and card.group == unit.group
+
+
 def _draw(
     state: GameState, player: int, count: int
 ) -> tuple[GameState, tuple[Event, ...]]:
@@ -74,4 +105,5 @@ def _draw(
 # The on-play abilities, by key.
 ON_PLAY: Mapping[Ability, OnPlay] = {
     Ability.SPY: _spy,
+    Ability.MUSTER: _muster,
 }

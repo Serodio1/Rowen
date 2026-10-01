@@ -40,6 +40,21 @@ class PlayerPassed:
 
 
 @dataclass(frozen=True, kw_only=True)
+class UnitMustered:
+    """A unit came from its player's deck to the board, called by a Muster.
+
+    Attributes:
+        player: The index of the player whose deck and side it is.
+        card: The id of the unit.
+        row: The row it went in.
+    """
+
+    player: int
+    card: str
+    row: Row
+
+
+@dataclass(frozen=True, kw_only=True)
 class CardsDrawn:
     """A player drew cards from their deck into their hand.
 
@@ -115,6 +130,7 @@ class RedrawEnded:
 # Any event.
 type Event = (
     UnitPlayed
+    | UnitMustered
     | CardsDrawn
     | PlayerPassed
     | RoundEnded
