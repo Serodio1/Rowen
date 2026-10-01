@@ -52,6 +52,15 @@ SERVER = UnitCard(
     ability=Ability.MUSTER,
     group="servers",
 )
+# A Bond unit that happens to share the Planes' group name.
+PILOT = UnitCard(
+    id="pilot",
+    name="Pilot",
+    rows=(Row.SIEGE,),
+    strength=2,
+    ability=Ability.BOND,
+    group="planes",
+)
 
 PLAY_INFORMANT = PlayUnit(card="informant", row=Row.MELEE)
 PLAY_PLANE = PlayUnit(card="plane", row=Row.SIEGE)
@@ -218,6 +227,16 @@ def test_muster_plays_the_deck_first_then_the_hand() -> None:
     assert state.players[0].hand == (KNIGHT,)
     assert state.players[0].deck == ()
     assert events == (PLANE_PLAYED, FROM_DECK, FROM_HAND)
+
+
+def test_muster_only_calls_muster_units_of_its_group() -> None:
+    state = make_state((PLANE, KNIGHT, PILOT), deck=(PILOT,))
+
+    state, events = apply(state, PLAY_PLANE)
+
+    assert state.players[0].hand == (KNIGHT, PILOT)
+    assert state.players[0].deck == (PILOT,)
+    assert events == (PLANE_PLAYED,)
 
 
 def test_mustered_units_count_for_the_score() -> None:
