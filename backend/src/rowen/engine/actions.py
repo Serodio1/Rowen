@@ -33,6 +33,20 @@ class Pass:
 
 
 @dataclass(frozen=True, kw_only=True)
+class Revive:
+    """After playing a Medic, play a unit from the discard pile (rules, 7.2).
+
+    Attributes:
+        card: The id of the unit, which can't be a Legend. Any copy in the
+            discard pile will do.
+        row: The row to play it in, one of the unit's rows.
+    """
+
+    card: str
+    row: Row
+
+
+@dataclass(frozen=True, kw_only=True)
 class Redraw:
     """Before round 1, swap a card in the hand for a new one (rules, section 3).
 
@@ -50,4 +64,4 @@ class EndRedraw:
 
 
 # Any action.
-type Action = PlayUnit | Pass | Redraw | EndRedraw
+type Action = PlayUnit | Pass | Revive | Redraw | EndRedraw

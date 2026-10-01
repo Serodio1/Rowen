@@ -6,8 +6,10 @@ implemented once, in the part of the engine that matches its kind:
 - **Placement**, where the unit goes. Agile needs no code: an Agile unit has
   two rows, so ``legal_actions`` offers both. A Spy goes on the opponent's
   side, as ``side`` says.
-- **On play**, once, when the unit is played: Spy and Muster. Each one is a
-  function in the ``ON_PLAY`` table, which ``on_play`` looks up.
+- **On play**, once, when the unit is played: Spy, Medic and Muster. Each one
+  is a function in the ``ON_PLAY`` table, which ``on_play`` looks up. The
+  Medic only starts a choice: the unit to revive is the player's next action,
+  ``Revive``, offered by ``legal_actions`` from ``revivable``.
 - **Ongoing**, while the unit is on the board: Bond and Inspire, in
   ``scoring``.
 
@@ -20,7 +22,7 @@ from dataclasses import replace
 
 from rowen.engine.cards import Ability, Card, UnitCard
 from rowen.engine.events import CardsDrawn, Event, UnitMustered
-from rowen.engine.state import GameState, with_player, with_unit
+from rowen.engine.state import GameState, PlayerState, with_player, with_unit
 
 # Cards the player of a Spy draws (rules, section 7.2).
 SPY_DRAWS = 2
@@ -49,6 +51,27 @@ def on_play(
     if unit.ability is None or unit.ability not in ON_PLAY:
         return state, ()
     return ON_PLAY[unit.ability](state, player, unit)
+
+
+def revivable(player: PlayerState) -> tuple[UnitCard, ...]:
+    """Return the units in the discard pile that a Medic can revive.
+
+    That is every unit that isn't a Legend (rules, section 7.2).
+    """
+    return tuple(
+        card
+        for card in player.discard
+        if isinstance(card, UnitCard) and not card.legend
+    )
+
+
+def _medic(
+    state: GameState, player: int, unit: UnitCard
+) -> tuple[GameState, tuple[Event, ...]]:
+    """The player must choose a unit to revive, if there is one."""
+    if not revivable(state.players[player]):
+        return state, ()
+    return replace(state, reviving=True), ()
 
 
 def _spy(
@@ -116,5 +139,6 @@ def _draw(
 # The on-play abilities, by key.
 ON_PLAY: Mapping[Ability, OnPlay] = {
     Ability.SPY: _spy,
+    Ability.MEDIC: _medic,
     Ability.MUSTER: _muster,
 }

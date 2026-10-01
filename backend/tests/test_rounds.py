@@ -6,7 +6,7 @@ from dataclasses import replace
 import pytest
 
 from rowen.data import load_deck
-from rowen.engine.actions import Action, EndRedraw, Pass, PlayUnit
+from rowen.engine.actions import Action, Pass, PlayUnit
 from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.events import (
     Event,
@@ -294,11 +294,12 @@ def test_no_action_is_legal_when_the_match_is_over() -> None:
 def choose(actions: tuple[Action, ...], turn: int) -> Action:
     """Pick one of the legal actions, a different one each turn.
 
-    It redraws or ends the redraw as it comes. In a round, it plays a unit,
-    but passes every fourth turn, to spread the cards over the rounds, and
-    when there is no unit left to play.
+    When it can't pass, which is in the redraw or after a Medic, it takes the
+    actions as they come. Otherwise it plays a unit, but passes every fourth
+    turn, to spread the cards over the rounds, and when there is no unit left
+    to play.
     """
-    if EndRedraw() in actions:
+    if Pass() not in actions:
         return actions[turn % len(actions)]
     plays = [action for action in actions if isinstance(action, PlayUnit)]
     return plays[turn % len(plays)] if plays and turn % 4 != 3 else Pass()
@@ -306,7 +307,7 @@ def choose(actions: tuple[Action, ...], turn: int) -> Action:
 
 @pytest.mark.parametrize("seed", range(5))
 def test_a_match_runs_from_the_first_turn_to_the_end(seed: int) -> None:
-    # The "done when" of issues #11 to #14, with the real decks: each turn
+    # The "done when" of issues #11 to #15, with the real decks: each turn
     # tries every legal action, then takes one of them.
     decks = (load_deck("humans"), load_deck("robots"))
     state = start_match(decks, seed=seed)

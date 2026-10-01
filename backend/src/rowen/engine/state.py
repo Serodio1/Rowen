@@ -82,6 +82,9 @@ class GameState:
         round_starter: The index of the player who had the first turn of this
             round. After a tie, they have it again (rules, section 9).
         round: The round being played, from 1 to 3.
+        reviving: Whether the player whose turn it is has just played a Medic
+            and must choose a unit from their discard pile to revive (rules,
+            section 7.2). Their turn only ends after that choice.
         rng: Where the next random choice comes from.
     """
 
@@ -89,6 +92,7 @@ class GameState:
     current: int
     round_starter: int
     round: int = 1
+    reviving: bool = False
     rng: Rng
 
 
