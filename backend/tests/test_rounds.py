@@ -6,7 +6,7 @@ from dataclasses import replace
 import pytest
 
 from rowen.data import load_deck
-from rowen.engine.actions import Pass, PlayUnit
+from rowen.engine.actions import Action, EndRedraw, Pass, PlayUnit
 from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.events import (
     Event,
@@ -291,15 +291,26 @@ def test_no_action_is_legal_when_the_match_is_over() -> None:
 # A whole match
 
 
+def choose(actions: tuple[Action, ...], turn: int) -> Action:
+    """Pick one of the legal actions, a different one each turn.
+
+    It redraws or ends the redraw as it comes. In a round, it plays a unit,
+    but passes every fourth turn, to spread the cards over the rounds, and
+    when there is no unit left to play.
+    """
+    if EndRedraw() in actions:
+        return actions[turn % len(actions)]
+    plays = [action for action in actions if isinstance(action, PlayUnit)]
+    return plays[turn % len(plays)] if plays and turn % 4 != 3 else Pass()
+
+
 @pytest.mark.parametrize("seed", range(5))
 def test_a_match_runs_from_the_first_turn_to_the_end(seed: int) -> None:
-    # The "done when" of issues #11 and #12, with the real decks. Each turn
-    # tries every legal action, then plays a unit, a different one each turn.
-    # It passes every fourth turn, to spread the cards over the rounds, and
-    # when there is no unit left to play.
+    # The "done when" of issues #11 to #13, with the real decks: each turn
+    # tries every legal action, then takes one of them.
     decks = (load_deck("humans"), load_deck("robots"))
     state = start_match(decks, seed=seed)
-    cards_at_start = [Counter(player.hand) for player in state.players]
+    cards_at_start = [Counter(player.hand + player.deck) for player in state.players]
     events: list[Event] = []
 
     for turn in range(100):
@@ -308,17 +319,16 @@ def test_a_match_runs_from_the_first_turn_to_the_end(seed: int) -> None:
             break
         for action in actions:
             apply(state, action)
-        plays = [action for action in actions if isinstance(action, PlayUnit)]
-        action = plays[turn % len(plays)] if plays and turn % 4 != 3 else Pass()
-        state, new_events = apply(state, action)
+        state, new_events = apply(state, choose(actions, turn))
         events.extend(new_events)
 
     assert match_over(state)
     assert events[-1] == MatchEnded(winner=match_winner(state))
     rounds = [event for event in events if isinstance(event, RoundEnded)]
     assert len(rounds) == state.round <= 3
-    # Every card is still in the hand, on the board or in the discard pile.
+    # Every card is still in the hand, the deck, on the board or in the
+    # discard pile.
     for player, at_start in zip(state.players, cards_at_start, strict=True):
         on_board = [unit for row in player.rows.values() for unit in row.units]
-        in_play = Counter(player.hand) + Counter(on_board) + Counter(player.discard)
-        assert in_play == at_start
+        cards = Counter(player.hand + player.deck + player.discard)
+        assert cards + Counter(on_board) == at_start

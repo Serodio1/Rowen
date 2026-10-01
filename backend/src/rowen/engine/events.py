@@ -64,5 +64,36 @@ class MatchEnded:
     winner: int | None
 
 
+@dataclass(frozen=True, kw_only=True)
+class CardRedrawn:
+    """A player swapped a card in their hand before round 1.
+
+    Only that player may know which cards they are, so the opponent's view of
+    this event must leave them out.
+
+    Attributes:
+        player: The index of the player who swapped the card.
+        card: The id of the card that went back into the deck.
+        drawn: The id of the card drawn in its place.
+    """
+
+    player: int
+    card: str
+    drawn: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class RedrawEnded:
+    """A player is done redrawing, by choice or after their last swap.
+
+    Attributes:
+        player: The index of the player who is done.
+    """
+
+    player: int
+
+
 # Any event.
-type Event = UnitPlayed | PlayerPassed | RoundEnded | MatchEnded
+type Event = (
+    UnitPlayed | PlayerPassed | RoundEnded | MatchEnded | CardRedrawn | RedrawEnded
+)

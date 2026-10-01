@@ -56,6 +56,8 @@ class PlayerState:
         discard: The discard pile, face up; the last card is the most recent.
         lives: Lives left; a player with none has lost the match.
         passed: Whether the player has passed this round.
+        redraws_left: How many more cards the player can swap before round 1
+            (rules, section 3). It is 0 once they are done redrawing.
     """
 
     deck: tuple[Card, ...]
@@ -65,6 +67,7 @@ class PlayerState:
     discard: tuple[Card, ...] = ()
     lives: int = STARTING_LIVES
     passed: bool = False
+    redraws_left: int = 0
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -74,7 +77,8 @@ class GameState:
     Attributes:
         players: Both players. They are known by their index, 0 or 1, so the
             opponent of player ``i`` is player ``1 - i``.
-        current: The index of the player whose turn it is.
+        current: The index of the player whose turn it is, or who is
+            redrawing before round 1.
         round_starter: The index of the player who had the first turn of this
             round. After a tie, they have it again (rules, section 9).
         round: The round being played, from 1 to 3.

@@ -3,7 +3,7 @@
 from collections import Counter
 
 from rowen.data import load_deck
-from rowen.engine.game import HAND_SIZE, start_match
+from rowen.engine.game import HAND_SIZE, MAX_REDRAWS, start_match
 from rowen.engine.rng import Rng
 from rowen.engine.state import STARTING_LIVES
 
@@ -73,3 +73,4 @@ def test_match_starts_in_round_one() -> None:
         assert player.lives == STARTING_LIVES
         assert not player.passed
         assert player.discard == ()
+        assert player.redraws_left == MAX_REDRAWS
