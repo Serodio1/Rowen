@@ -18,7 +18,7 @@ one entry in ``ON_PLAY``.
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 
-from rowen.engine.cards import Ability, UnitCard
+from rowen.engine.cards import Ability, Card, UnitCard
 from rowen.engine.events import CardsDrawn, Event, UnitMustered
 from rowen.engine.state import GameState, with_player, with_unit
 
@@ -61,32 +61,43 @@ def _spy(
 def _muster(
     state: GameState, player: int, unit: UnitCard
 ) -> tuple[GameState, tuple[Event, ...]]:
-    """Play every unit of the same muster group from the player's deck.
+    """Play every unit of the same muster group from the player's deck and hand.
 
-    They go in their row, in the order they were in the deck. The cards in the
-    hand stay there. The units that arrive don't muster again: there are none
-    of their group left in the deck.
+    The units from the deck come first, then the ones from the hand, each in
+    the order they were in (rules, section 7.2, and D7). The units that arrive
+    don't muster again: there are none of their group left to call.
     """
-    deck = state.players[player].deck
-    mustered = tuple(
-        card
-        for card in deck
-        if isinstance(card, UnitCard) and _same_muster_group(card, unit)
+    musterer = state.players[player]
+    in_deck = _muster_group(musterer.deck, unit)
+    in_hand = _muster_group(musterer.hand, unit)
+    musterer = replace(
+        musterer,
+        deck=tuple(card for card in musterer.deck if card not in in_deck),
+        hand=tuple(card for card in musterer.hand if card not in in_hand),
     )
-    rest = tuple(card for card in deck if card not in mustered)
-    state = with_player(state, player, replace(state.players[player], deck=rest))
+    state = with_player(state, player, musterer)
 
     events: list[Event] = []
-    for card in mustered:
-        # A Muster unit isn't Agile, so it has one row.
-        state = with_unit(state, player, card.rows[0], card)
-        events.append(UnitMustered(player=player, card=card.id, row=card.rows[0]))
+    for cards, from_hand in ((in_deck, False), (in_hand, True)):
+        for card in cards:
+            # A Muster unit isn't Agile, so it has one row.
+            state = with_unit(state, player, card.rows[0], card)
+            event = UnitMustered(
+                player=player, card=card.id, row=card.rows[0], from_hand=from_hand
+            )
+            events.append(event)
     return state, tuple(events)
 
 
-def _same_muster_group(card: UnitCard, unit: UnitCard) -> bool:
-    """Return whether the card musters with the unit."""
-    return card.ability is Ability.MUSTER and card.group == unit.group
+def _muster_group(cards: tuple[Card, ...], unit: UnitCard) -> tuple[UnitCard, ...]:
+    """Return the cards that muster with the unit: Muster and the same group."""
+    return tuple(
+        card
+        for card in cards
+        if isinstance(card, UnitCard)
+        and card.ability is Ability.MUSTER
+        and card.group == unit.group
+    )
 
 
 def _draw(

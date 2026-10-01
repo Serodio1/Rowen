@@ -56,7 +56,8 @@ SERVER = UnitCard(
 PLAY_INFORMANT = PlayUnit(card="informant", row=Row.MELEE)
 PLAY_PLANE = PlayUnit(card="plane", row=Row.SIEGE)
 PLANE_PLAYED = UnitPlayed(player=0, card="plane", row=Row.SIEGE, side=0)
-PLANE_MUSTERED = UnitMustered(player=0, card="plane", row=Row.SIEGE)
+FROM_DECK = UnitMustered(player=0, card="plane", row=Row.SIEGE, from_hand=False)
+FROM_HAND = UnitMustered(player=0, card="plane", row=Row.SIEGE, from_hand=True)
 INFORMANT_PLAYED = UnitPlayed(player=0, card="informant", row=Row.MELEE, side=1)
 
 
@@ -194,39 +195,56 @@ def test_muster_plays_every_unit_of_its_group_from_the_deck() -> None:
 
     assert state.players[0].rows[Row.SIEGE].units == (PLANE, PLANE, PLANE)
     assert state.players[0].deck == (SNIPER, SERVER)
-    assert events == (PLANE_PLAYED, PLANE_MUSTERED, PLANE_MUSTERED)
+    assert events == (PLANE_PLAYED, FROM_DECK, FROM_DECK)
+
+
+def test_muster_plays_its_group_from_the_hand_too() -> None:
+    # Rules, D7. The other cards in the hand stay there.
+    state = make_state((PLANE, KNIGHT, PLANE, SERVER), deck=(SNIPER,))
+
+    state, events = apply(state, PLAY_PLANE)
+
+    assert state.players[0].hand == (KNIGHT, SERVER)
+    assert state.players[0].rows[Row.SIEGE].units == (PLANE, PLANE)
+    assert events == (PLANE_PLAYED, FROM_HAND)
+
+
+def test_muster_plays_the_deck_first_then_the_hand() -> None:
+    state = make_state((PLANE, PLANE, KNIGHT), deck=(PLANE,))
+
+    state, events = apply(state, PLAY_PLANE)
+
+    assert state.players[0].rows[Row.SIEGE].units == (PLANE, PLANE, PLANE)
+    assert state.players[0].hand == (KNIGHT,)
+    assert state.players[0].deck == ()
+    assert events == (PLANE_PLAYED, FROM_DECK, FROM_HAND)
 
 
 def test_mustered_units_count_for_the_score() -> None:
-    state = make_state((PLANE, KNIGHT), deck=(PLANE, PLANE))
+    state = make_state((PLANE, KNIGHT, PLANE), deck=(PLANE,))
 
     state, _ = apply(state, PLAY_PLANE)
 
     assert player_total(state, 0) == 9
 
 
-def test_muster_leaves_the_cards_in_hand() -> None:
-    state = make_state((PLANE, PLANE, KNIGHT), deck=(PLANE,))
-
-    state, _ = apply(state, PLAY_PLANE)
-
-    assert state.players[0].hand == (PLANE, KNIGHT)
-    assert state.players[0].rows[Row.SIEGE].units == (PLANE, PLANE)
-
-
-def test_muster_with_none_of_its_group_in_the_deck_only_plays_itself() -> None:
-    state = make_state((PLANE, KNIGHT), deck=(SNIPER, SERVER))
+def test_muster_with_none_of_its_group_left_only_plays_itself() -> None:
+    state = make_state((PLANE, KNIGHT, SERVER), deck=(SNIPER, SERVER))
 
     state, events = apply(state, PLAY_PLANE)
 
     assert state.players[0].rows[Row.SIEGE].units == (PLANE,)
+    assert state.players[0].hand == (KNIGHT, SERVER)
     assert state.players[0].deck == (SNIPER, SERVER)
     assert events == (PLANE_PLAYED,)
 
 
-def test_muster_happens_before_the_automatic_pass() -> None:
-    state = make_state((PLANE,), deck=(PLANE,))
+def test_muster_that_empties_the_hand_passes_automatically() -> None:
+    # The other Plane leaves the hand too, so it is empty afterwards.
+    state = make_state((PLANE, PLANE), deck=(SNIPER,))
 
     state, events = apply(state, PLAY_PLANE)
 
-    assert events == (PLANE_PLAYED, PLANE_MUSTERED, PlayerPassed(player=0))
+    assert state.players[0].hand == ()
+    assert state.players[0].passed
+    assert events == (PLANE_PLAYED, FROM_HAND, PlayerPassed(player=0))
