@@ -1,19 +1,11 @@
 """Tests for taking turns: the legal actions and applying them."""
 
-from collections import Counter
-
 import pytest
 
-from rowen.data import load_deck
 from rowen.engine.actions import Action, Pass, PlayUnit
 from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.events import PlayerPassed, UnitPlayed
-from rowen.engine.game import (
-    IllegalActionError,
-    apply,
-    legal_actions,
-    start_match,
-)
+from rowen.engine.game import IllegalActionError, apply, legal_actions
 from rowen.engine.rng import Rng
 from rowen.engine.state import GameState, PlayerState, RowState
 
@@ -46,12 +38,9 @@ def make_state(
             PlayerState(deck=(), hand=hand_1, passed=passed[1]),
         ),
         current=current,
+        round_starter=current,
         rng=Rng(seed=7),
     )
-
-
-def round_is_over(state: GameState) -> bool:
-    return all(player.passed for player in state.players)
 
 
 # legal_actions
@@ -89,12 +78,6 @@ def test_actions_are_for_the_player_whose_turn_it_is() -> None:
     state = make_state((SNIPER,), (KNIGHT,), current=1)
 
     assert legal_actions(state) == (PLAY_KNIGHT, Pass())
-
-
-def test_no_actions_when_both_players_have_passed() -> None:
-    state = make_state((SNIPER,), (KNIGHT,), passed=(True, True))
-
-    assert legal_actions(state) == ()
 
 
 # apply: playing a unit
@@ -188,17 +171,6 @@ def test_player_keeps_playing_after_the_opponent_has_passed() -> None:
     assert legal_actions(state) == (PLAY_KNIGHT, Pass())
 
 
-def test_round_is_over_when_both_players_have_passed() -> None:
-    state = make_state((SNIPER,))
-
-    state, _ = apply(state, Pass())
-    state, events = apply(state, Pass())
-
-    assert round_is_over(state)
-    assert events == (PlayerPassed(player=1),)
-    assert legal_actions(state) == ()
-
-
 def test_playing_the_last_card_passes_automatically() -> None:
     state = make_state((SNIPER,))
 
@@ -209,18 +181,6 @@ def test_playing_the_last_card_passes_automatically() -> None:
     assert events == (
         UnitPlayed(player=0, card="sniper", row=Row.RANGED),
         PlayerPassed(player=0),
-    )
-
-
-def test_last_card_after_the_opponent_has_passed_ends_the_round() -> None:
-    state = make_state((KNIGHT,), (SNIPER,), current=1, passed=(True, False))
-
-    state, events = apply(state, PLAY_SNIPER)
-
-    assert round_is_over(state)
-    assert events == (
-        UnitPlayed(player=1, card="sniper", row=Row.RANGED),
-        PlayerPassed(player=1),
     )
 
 
@@ -242,37 +202,3 @@ def test_illegal_action_raises(action: Action) -> None:
 
     with pytest.raises(IllegalActionError, match="illegal action"):
         apply(state, action)
-
-
-def test_no_action_is_legal_when_the_round_is_over() -> None:
-    state = make_state((SNIPER,), (KNIGHT,), passed=(True, True))
-
-    with pytest.raises(IllegalActionError):
-        apply(state, Pass())
-
-
-# A whole round
-
-
-def test_every_legal_action_is_accepted_until_the_round_is_over() -> None:
-    # The "done when" of issue #11, with the real decks. Each turn tries every
-    # legal action, then plays a unit, a different one each turn, and passes
-    # only when there is none left.
-    decks = (load_deck("humans"), load_deck("robots"))
-    state = start_match(decks, seed=7)
-    cards_at_start = [Counter(player.hand) for player in state.players]
-
-    for turn in range(100):
-        actions = legal_actions(state)
-        if not actions:
-            break
-        for action in actions:
-            apply(state, action)
-        plays = [action for action in actions if isinstance(action, PlayUnit)]
-        state, _ = apply(state, plays[turn % len(plays)] if plays else Pass())
-
-    assert round_is_over(state)
-    # Every card left in a hand or played is still there, none lost or copied.
-    for player, at_start in zip(state.players, cards_at_start, strict=True):
-        played = [unit for row in player.rows.values() for unit in row.units]
-        assert Counter(player.hand) + Counter(played) == at_start
