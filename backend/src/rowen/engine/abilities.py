@@ -65,6 +65,20 @@ def revivable(player: PlayerState) -> tuple[UnitCard, ...]:
     )
 
 
+def muster_group(cards: tuple[Card, ...], unit: UnitCard) -> tuple[UnitCard, ...]:
+    """Return the cards that muster with the unit: Muster and the same group.
+
+    The unit itself is one of them, if it is among the cards.
+    """
+    return tuple(
+        card
+        for card in cards
+        if isinstance(card, UnitCard)
+        and card.ability is Ability.MUSTER
+        and card.group == unit.group
+    )
+
+
 def _medic(
     state: GameState, player: int, unit: UnitCard
 ) -> tuple[GameState, tuple[Event, ...]]:
@@ -91,8 +105,8 @@ def _muster(
     don't muster again: there are none of their group left to call.
     """
     musterer = state.players[player]
-    in_deck = _muster_group(musterer.deck, unit)
-    in_hand = _muster_group(musterer.hand, unit)
+    in_deck = muster_group(musterer.deck, unit)
+    in_hand = muster_group(musterer.hand, unit)
     musterer = replace(
         musterer,
         deck=tuple(card for card in musterer.deck if card not in in_deck),
@@ -110,17 +124,6 @@ def _muster(
             )
             events.append(event)
     return state, tuple(events)
-
-
-def _muster_group(cards: tuple[Card, ...], unit: UnitCard) -> tuple[UnitCard, ...]:
-    """Return the cards that muster with the unit: Muster and the same group."""
-    return tuple(
-        card
-        for card in cards
-        if isinstance(card, UnitCard)
-        and card.ability is Ability.MUSTER
-        and card.group == unit.group
-    )
 
 
 def _draw(

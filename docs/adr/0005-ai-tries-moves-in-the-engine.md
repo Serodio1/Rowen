@@ -1,6 +1,6 @@
 # ADR 0005: Let the AI judge each move by trying it in the engine
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR 0006
 - **Date:** 2026-10-02
 
 ## Context
