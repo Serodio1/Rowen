@@ -4,15 +4,19 @@ How weather and a War Horn change a unit's strength is tested in
 test_scoring.py; here, playing the cards and where they go.
 """
 
+from collections.abc import Mapping
+
 import pytest
 
 from rowen.engine.actions import Action, Pass, PlayHorn, PlaySpecial, PlayUnit
-from rowen.engine.cards import Card, Row, SpecialCard, SpecialKind, UnitCard
+from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.events import (
     HornPlayed,
     PlayerPassed,
+    UnitDestroyed,
     WeatherCleared,
     WeatherPlayed,
+    WildfirePlayed,
 )
 from rowen.engine.game import IllegalActionError, apply, legal_actions
 from rowen.engine.rng import Rng
@@ -21,6 +25,19 @@ from rowen.engine.state import GameState, PlayerState, RowState
 
 SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
 KNIGHT = UnitCard(id="knight", name="Knight", rows=(Row.MELEE,), strength=5)
+SCOUT = UnitCard(id="scout", name="Scout", rows=(Row.MELEE,), strength=3)
+CHAMPION = UnitCard(id="champion", name="Champion", rows=(Row.MELEE,), strength=8)
+HUMAN = UnitCard(
+    id="human",
+    name="Human",
+    rows=(Row.MELEE,),
+    strength=4,
+    ability=Ability.BOND,
+    group="humans",
+)
+PRESIDENT = UnitCard(
+    id="president", name="President", rows=(Row.MELEE,), strength=10, legend=True
+)
 HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
 THICK_FOG = SpecialCard(id="thick-fog", name="Thick Fog", kind=SpecialKind.THICK_FOG)
 DOWNPOUR = SpecialCard(id="downpour", name="Downpour", kind=SpecialKind.DOWNPOUR)
@@ -36,6 +53,7 @@ BOARD = {Row.MELEE: (KNIGHT,), Row.RANGED: (SNIPER,), Row.SIEGE: ()}
 
 PLAY_HOARFROST = PlaySpecial(card="hoarfrost")
 PLAY_CLEAR_SKIES = PlaySpecial(card="clear-skies")
+PLAY_WILDFIRE = PlaySpecial(card="wildfire")
 
 
 def player(
@@ -43,13 +61,14 @@ def player(
     *,
     weather: tuple[SpecialCard, ...] = (),
     horns: tuple[Row, ...] = (),
+    board: Mapping[Row, tuple[UnitCard, ...]] = BOARD,
 ) -> PlayerState:
-    """Return a player with ``BOARD`` on their side and War Horns in ``horns``.
+    """Return a player with ``board`` on their side and War Horns in ``horns``.
 
     By default they hold a Knight, so they don't pass by themselves.
     """
     rows = {
-        row: RowState(units=BOARD[row], horn=WAR_HORN if row in horns else None)
+        row: RowState(units=board[row], horn=WAR_HORN if row in horns else None)
         for row in Row
     }
     return PlayerState(deck=(), hand=hand, rows=rows, weather=weather)
@@ -75,12 +94,13 @@ def totals(state: GameState) -> tuple[int, int]:
 
 
 def test_each_card_in_the_hand_gives_its_plays_in_order() -> None:
-    state = make_state(player((HOARFROST, SNIPER, CLEAR_SKIES)))
+    state = make_state(player((HOARFROST, SNIPER, CLEAR_SKIES, WILDFIRE)))
 
     assert legal_actions(state) == (
         PLAY_HOARFROST,
         PlayUnit(card="sniper", row=Row.RANGED),
         PLAY_CLEAR_SKIES,
+        PLAY_WILDFIRE,
         Pass(),
     )
 
@@ -124,8 +144,8 @@ def test_copies_of_a_special_card_give_the_same_actions_once() -> None:
     )
 
 
-def test_wildfire_and_scarecrow_cant_be_played_yet() -> None:
-    state = make_state(player((WILDFIRE, SCARECROW)))
+def test_scarecrow_cant_be_played_yet() -> None:
+    state = make_state(player((SCARECROW,)))
 
     assert legal_actions(state) == (Pass(),)
 
@@ -228,6 +248,115 @@ def test_clear_skies_without_weather_only_goes_to_the_discard_pile() -> None:
     assert events == (WeatherCleared(player=0, card="clear-skies"),)
 
 
+# Wildfire
+
+
+def test_wildfire_destroys_the_strongest_units_on_both_sides() -> None:
+    # Each side has a Sniper (6), the strongest unit on the board.
+    state = make_state(player((WILDFIRE, KNIGHT)))
+
+    state, events = apply(state, PLAY_WILDFIRE)
+
+    for side in (0, 1):
+        assert state.players[side].rows[Row.MELEE].units == (KNIGHT,)
+        assert state.players[side].rows[Row.RANGED].units == ()
+    # The Wildfire goes last: it is resolved once the units are destroyed.
+    assert state.players[0].discard == (SNIPER, WILDFIRE)
+    assert state.players[1].discard == (SNIPER,)
+    assert state.players[0].hand == (KNIGHT,)
+    assert events == (
+        WildfirePlayed(player=0, card="wildfire"),
+        UnitDestroyed(side=0, row=Row.RANGED, card="sniper"),
+        UnitDestroyed(side=1, row=Row.RANGED, card="sniper"),
+    )
+
+
+def test_wildfire_destroys_only_the_strongest_unit() -> None:
+    board = {Row.MELEE: (SCOUT, CHAMPION, KNIGHT), Row.RANGED: (), Row.SIEGE: ()}
+    state = make_state(player((WILDFIRE, KNIGHT)), player(board=board))
+
+    state, events = apply(state, PLAY_WILDFIRE)
+
+    # The other units keep their places.
+    assert state.players[1].rows[Row.MELEE].units == (SCOUT, KNIGHT)
+    assert state.players[1].discard == (CHAMPION,)
+    assert state.players[0].rows == player().rows
+    assert events[1:] == (UnitDestroyed(side=1, row=Row.MELEE, card="champion"),)
+
+
+def test_wildfire_destroys_every_copy_tied_for_highest() -> None:
+    board = {Row.MELEE: (), Row.RANGED: (SNIPER, SNIPER), Row.SIEGE: ()}
+    state = make_state(player((WILDFIRE, KNIGHT), board=board))
+
+    state, _ = apply(state, PLAY_WILDFIRE)
+
+    assert state.players[0].rows[Row.RANGED].units == ()
+    assert state.players[0].discard == (SNIPER, SNIPER, WILDFIRE)
+    assert state.players[1].discard == (SNIPER,)
+
+
+def test_wildfire_goes_by_current_strength() -> None:
+    # Under Thick Fog the Snipers are 1, so the Knights (5) are the strongest.
+    state = make_state(player((WILDFIRE, KNIGHT), weather=(THICK_FOG,)))
+
+    state, events = apply(state, PLAY_WILDFIRE)
+
+    assert events[1:] == (
+        UnitDestroyed(side=0, row=Row.MELEE, card="knight"),
+        UnitDestroyed(side=1, row=Row.MELEE, card="knight"),
+    )
+
+
+def test_wildfire_finds_every_unit_before_destroying_any() -> None:
+    # Two Humans with Bond are 4 x 2 = 8 each. Once one is destroyed, the
+    # other would only be 4, but it was among the strongest, so it goes too.
+    board = {Row.MELEE: (HUMAN, HUMAN), Row.RANGED: (SNIPER,), Row.SIEGE: ()}
+    state = make_state(player((WILDFIRE, KNIGHT)), player(board=board))
+
+    state, _ = apply(state, PLAY_WILDFIRE)
+
+    assert state.players[1].rows[Row.MELEE].units == ()
+    assert state.players[1].discard == (HUMAN, HUMAN)
+
+
+def test_wildfire_leaves_legends_out() -> None:
+    # The President (10) is the strongest unit, but a Legend (D8), so the
+    # Snipers (6) are destroyed.
+    board = {Row.MELEE: (PRESIDENT,), Row.RANGED: (SNIPER,), Row.SIEGE: ()}
+    state = make_state(player((WILDFIRE, KNIGHT)), player(board=board))
+
+    state, events = apply(state, PLAY_WILDFIRE)
+
+    assert state.players[1].rows[Row.MELEE].units == (PRESIDENT,)
+    assert events[1:] == (
+        UnitDestroyed(side=0, row=Row.RANGED, card="sniper"),
+        UnitDestroyed(side=1, row=Row.RANGED, card="sniper"),
+    )
+
+
+def test_wildfire_with_only_legends_only_goes_to_the_discard_pile() -> None:
+    board = {Row.MELEE: (PRESIDENT,), Row.RANGED: (), Row.SIEGE: ()}
+    state = make_state(player((WILDFIRE, KNIGHT), board=board), player(board=board))
+
+    state, events = apply(state, PLAY_WILDFIRE)
+
+    assert state.players[0].rows[Row.MELEE].units == (PRESIDENT,)
+    assert state.players[1].rows[Row.MELEE].units == (PRESIDENT,)
+    assert state.players[0].discard == (WILDFIRE,)
+    assert state.players[1].discard == ()
+    assert events == (WildfirePlayed(player=0, card="wildfire"),)
+
+
+def test_wildfire_goes_to_the_discard_pile_of_the_player_who_played_it() -> None:
+    state = make_state(player(), player((WILDFIRE, KNIGHT)), current=1)
+
+    state, events = apply(state, PLAY_WILDFIRE)
+
+    assert state.players[0].discard == (SNIPER,)
+    assert state.players[1].discard == (SNIPER, WILDFIRE)
+    assert events[0] == WildfirePlayed(player=1, card="wildfire")
+
+
 # War Horn
 
 
@@ -294,11 +423,11 @@ def test_playing_the_last_card_in_hand_passes() -> None:
         pytest.param(PlayHorn(card="war-horn", row=Row.RANGED), id="horn slot taken"),
         pytest.param(PlaySpecial(card="thick-fog"), id="card not in hand"),
         pytest.param(PlaySpecial(card="knight"), id="unit as a special card"),
-        pytest.param(PlaySpecial(card="wildfire"), id="not playable yet"),
+        pytest.param(PlaySpecial(card="scarecrow"), id="not playable yet"),
     ],
 )
 def test_illegal_action_raises(action: Action) -> None:
-    hand = (WAR_HORN, HOARFROST, KNIGHT, WILDFIRE)
+    hand = (WAR_HORN, HOARFROST, KNIGHT, SCARECROW)
     state = make_state(player(hand, horns=(Row.RANGED,)))
 
     with pytest.raises(IllegalActionError, match="illegal action"):

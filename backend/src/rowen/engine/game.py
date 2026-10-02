@@ -193,7 +193,7 @@ def _plays(player: PlayerState, card: Card) -> tuple[Action, ...]:
     """Return the ways to play a card from the hand, one action per choice.
 
     A unit goes on any of its rows; a War Horn in any row with an empty horn
-    slot; a weather card or Clear Skies needs no choice. Wildfire and
+    slot; a weather card, Clear Skies or Wildfire needs no choice. The
     Scarecrow can't be played yet.
     """
     if isinstance(card, UnitCard):

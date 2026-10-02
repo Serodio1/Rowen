@@ -4,23 +4,31 @@ The card data refers to a special card's effect by its kind, ``SpecialKind``,
 and each effect is implemented once, here. Special cards come in two shapes,
 by what the player chooses besides the card:
 
-- **Nothing else:** weather and Clear Skies. Each kind has a function in the
-  ``EFFECTS`` table, which ``play`` looks up. The function puts the card
-  where it goes: the weather area or the discard pile.
+- **Nothing else:** weather, Clear Skies and Wildfire. Each kind has a
+  function in the ``EFFECTS`` table, which ``play`` looks up. The function
+  puts the card where it goes: the weather area or the discard pile.
 - **A row:** the War Horn, which ``play_horn`` puts in the horn slot of one of
   the player's rows. Only a row in ``free_horn_rows`` will do.
 
 So a new special card that needs no choice is one function, with the
-``Effect`` signature, and one entry in ``EFFECTS``. Wildfire and Scarecrow
-have no effect here yet, so they can't be played.
+``Effect`` signature, and one entry in ``EFFECTS``. The Scarecrow has no
+effect here yet, so it can't be played.
 """
 
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 
-from rowen.engine.cards import WEATHER_ROWS, Row, SpecialCard, SpecialKind
-from rowen.engine.events import Event, HornPlayed, WeatherCleared, WeatherPlayed
-from rowen.engine.state import GameState, PlayerState, with_player
+from rowen.engine.cards import WEATHER_ROWS, Card, Row, SpecialCard, SpecialKind
+from rowen.engine.events import (
+    Event,
+    HornPlayed,
+    UnitDestroyed,
+    WeatherCleared,
+    WeatherPlayed,
+    WildfirePlayed,
+)
+from rowen.engine.scoring import unit_strength, weathered_rows
+from rowen.engine.state import GameState, PlayerState, with_player, without_unit
 
 # The effect of a special card that needs no choice. It gets the state just
 # after the card left the hand, the index of the player who played it and the
@@ -84,13 +92,50 @@ def _clear_skies(
     play, only the Clear Skies goes.
     """
     for index, owner in enumerate(state.players):
-        owner = replace(owner, weather=(), discard=(*owner.discard, *owner.weather))
-        state = with_player(state, index, owner)
+        state = with_player(state, index, replace(owner, weather=()))
+        state = _discard(state, index, owner.weather)
 
-    clearer = state.players[player]
-    clearer = replace(clearer, discard=(*clearer.discard, card))
-    event = WeatherCleared(player=player, card=card.id)
-    return with_player(state, player, clearer), (event,)
+    state = _discard(state, player, (card,))
+    return state, (WeatherCleared(player=player, card=card.id),)
+
+
+def _wildfire(
+    state: GameState, player: int, card: SpecialCard
+) -> tuple[GameState, tuple[Event, ...]]:
+    """Destroy the strongest units on the board, on both sides, then discard.
+
+    Legends don't count (rules, section 8, and D8): the highest strength is
+    that of the strongest unit that isn't a Legend, and every unit with it is
+    destroyed, into the discard pile of its side. They are all found before
+    any is destroyed, so a Bond unit that would get weaker once another one
+    goes is still destroyed. Then the Wildfire goes to its player's discard
+    pile.
+    """
+    weather = weathered_rows(state)
+    candidates = [
+        (side, row, unit, unit_strength(unit, row_state, weathered=row in weather))
+        for side, owner in enumerate(state.players)
+        for row, row_state in owner.rows.items()
+        for unit in row_state.units
+        if not unit.legend
+    ]
+    highest = max((strength for *_, strength in candidates), default=None)
+
+    events: list[Event] = [WildfirePlayed(player=player, card=card.id)]
+    for side, row, unit, strength in candidates:
+        if strength == highest:
+            state = without_unit(state, side, row, unit)
+            state = _discard(state, side, (unit,))
+            events.append(UnitDestroyed(side=side, row=row, card=unit.id))
+
+    state = _discard(state, player, (card,))
+    return state, tuple(events)
+
+
+def _discard(state: GameState, player: int, cards: tuple[Card, ...]) -> GameState:
+    """Return the state with the cards at the end of a player's discard pile."""
+    owner = state.players[player]
+    return with_player(state, player, replace(owner, discard=(*owner.discard, *cards)))
 
 
 # The effects of the special cards that need no choice, by kind.
@@ -99,4 +144,5 @@ EFFECTS: Mapping[SpecialKind, Effect] = {
     SpecialKind.THICK_FOG: _weather,
     SpecialKind.DOWNPOUR: _weather,
     SpecialKind.CLEAR_SKIES: _clear_skies,
+    SpecialKind.WILDFIRE: _wildfire,
 }

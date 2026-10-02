@@ -31,7 +31,7 @@ class PlayUnit:
 class PlaySpecial:
     """Play a special card from the hand that needs no choice (rules, section 8).
 
-    That is a weather card or Clear Skies.
+    That is a weather card, Clear Skies or Wildfire.
 
     Attributes:
         card: The id of the special card. Any copy in the hand will do.

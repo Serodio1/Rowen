@@ -76,6 +76,37 @@ class HornPlayed:
 
 
 @dataclass(frozen=True, kw_only=True)
+class WildfirePlayed:
+    """A player played Wildfire, which went to their discard pile.
+
+    The units it destroyed come next, each in a ``UnitDestroyed``.
+
+    Attributes:
+        player: The index of the player who played it.
+        card: The id of the Wildfire.
+    """
+
+    player: int
+    card: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnitDestroyed:
+    """A unit was destroyed and went to the discard pile of the side it was on.
+
+    Attributes:
+        side: The index of the player whose side of the board it was on.
+        row: The row it was in.
+        card: The id of the unit. Copies of a unit in the same row always
+            have the same strength, so they are destroyed together.
+    """
+
+    side: int
+    row: Row
+    card: str
+
+
+@dataclass(frozen=True, kw_only=True)
 class PlayerPassed:
     """A player passed, by choice or because their hand is empty.
 
@@ -203,6 +234,8 @@ type Event = (
     | WeatherPlayed
     | WeatherCleared
     | HornPlayed
+    | WildfirePlayed
+    | UnitDestroyed
     | PlayerPassed
     | RoundEnded
     | MatchEnded
