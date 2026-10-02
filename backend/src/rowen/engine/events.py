@@ -29,6 +29,53 @@ class UnitPlayed:
 
 
 @dataclass(frozen=True, kw_only=True)
+class WeatherPlayed:
+    """A player played a weather card into the weather area.
+
+    Attributes:
+        player: The index of the player who played it.
+        card: The id of the weather card.
+        row: The row it affects, on both sides of the board. If that row was
+            already under weather, nothing changes.
+    """
+
+    player: int
+    card: str
+    row: Row
+
+
+@dataclass(frozen=True, kw_only=True)
+class WeatherCleared:
+    """A player played Clear Skies, which cleared every weather card.
+
+    Each weather card went to the discard pile of the player who played it,
+    and the Clear Skies to its player's.
+
+    Attributes:
+        player: The index of the player who played the Clear Skies.
+        card: The id of the Clear Skies.
+    """
+
+    player: int
+    card: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class HornPlayed:
+    """A player played a War Horn into the horn slot of one of their rows.
+
+    Attributes:
+        player: The index of the player who played it, on whose side it is.
+        card: The id of the War Horn.
+        row: The row whose horn slot it went in.
+    """
+
+    player: int
+    card: str
+    row: Row
+
+
+@dataclass(frozen=True, kw_only=True)
 class PlayerPassed:
     """A player passed, by choice or because their hand is empty.
 
@@ -153,6 +200,9 @@ type Event = (
     | UnitRevived
     | UnitMustered
     | CardsDrawn
+    | WeatherPlayed
+    | WeatherCleared
+    | HornPlayed
     | PlayerPassed
     | RoundEnded
     | MatchEnded

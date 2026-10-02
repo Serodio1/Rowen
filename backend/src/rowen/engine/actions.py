@@ -27,6 +27,32 @@ class PlayUnit:
     row: Row
 
 
+@dataclass(frozen=True, kw_only=True)
+class PlaySpecial:
+    """Play a special card from the hand that needs no choice (rules, section 8).
+
+    That is a weather card or Clear Skies.
+
+    Attributes:
+        card: The id of the special card. Any copy in the hand will do.
+    """
+
+    card: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class PlayHorn:
+    """Play a War Horn from the hand in one of the player's rows (rules, section 8).
+
+    Attributes:
+        card: The id of the War Horn. Any copy in the hand will do.
+        row: The row whose horn slot it goes in, which must be empty.
+    """
+
+    card: str
+    row: Row
+
+
 @dataclass(frozen=True)
 class Pass:
     """Take no more turns this round (rules, section 4)."""
@@ -64,4 +90,4 @@ class EndRedraw:
 
 
 # Any action.
-type Action = PlayUnit | Pass | Revive | Redraw | EndRedraw
+type Action = PlayUnit | PlaySpecial | PlayHorn | Pass | Revive | Redraw | EndRedraw
