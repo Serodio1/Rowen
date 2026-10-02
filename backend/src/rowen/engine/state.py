@@ -109,3 +109,16 @@ def with_unit(state: GameState, side: int, row: Row, unit: UnitCard) -> GameStat
     units = (*player.rows[row].units, unit)
     rows = {**player.rows, row: replace(player.rows[row], units=units)}
     return with_player(state, side, replace(player, rows=rows))
+
+
+def without_unit(state: GameState, side: int, row: Row, unit: UnitCard) -> GameState:
+    """Return the state with one copy of the unit taken out of a row on one side.
+
+    The other units in the row keep their order.
+    """
+    player = state.players[side]
+    units = player.rows[row].units
+    index = units.index(unit)
+    units = units[:index] + units[index + 1 :]
+    rows = {**player.rows, row: replace(player.rows[row], units=units)}
+    return with_player(state, side, replace(player, rows=rows))

@@ -135,7 +135,7 @@ the same name share a group).
 | **Downpour** | Weather. Same effect on **Siege** rows. |
 | **Clear Skies** | Removes every weather card from the weather area. |
 | **War Horn** | Placed in the horn slot of one of the player's own rows. Doubles the strength of the units in that row (section 6, step 5). It can't be played into a slot that is already taken. |
-| **Wildfire** | Destroys the unit(s) with the highest current strength on the whole board, on **both** sides. Every unit tied for highest is destroyed. Legends are never affected. |
+| **Wildfire** | Destroys the unit(s) with the highest current strength on the whole board, on **both** sides. Every unit tied for highest is destroyed. Legends are never affected and don't count: if the strongest unit is a Legend, Wildfire destroys the strongest units that aren't Legends. |
 | **Scarecrow** | Swaps places with a unit (not a Legend) on the player's own side, including an opponent's Spy on that side. That unit goes to the player's hand. The Scarecrow stays in its place, with 0 strength, until the end of the round. It can only be played if there is a valid target. |
 
 Further rules:
@@ -212,3 +212,4 @@ at most **10 special cards**.
 | D5 | MVP scope | Sections 7–8 in the MVP; section 13 later |
 | D6 | Can a Legend also have an ability? | Yes: Spy, Medic or Inspire, and it stays immune to everything else (section 7.3) |
 | D7 | Does Muster also play the cards of its group from the hand? | Yes: from the deck and the hand, so one card plays the whole group (section 7.2) |
+| D8 | What does Wildfire destroy when the strongest unit is a Legend? | The strongest units that aren't Legends: Legends are left out of the count (section 8) |
