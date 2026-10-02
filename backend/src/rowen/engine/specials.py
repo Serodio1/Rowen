@@ -106,9 +106,10 @@ def _wildfire(
 
     Legends don't count (rules, section 8, and D8): the highest strength is
     that of the strongest unit that isn't a Legend, and every unit with it is
-    destroyed, into the discard pile of its side. All of them are found
-    first, so destroying one doesn't change the strength of the others. Then
-    the Wildfire goes to its player's discard pile.
+    destroyed, into the discard pile of its side. They are all found before
+    any is destroyed, so a Bond unit that would get weaker once another one
+    goes is still destroyed. Then the Wildfire goes to its player's discard
+    pile.
     """
     weather = weathered_rows(state)
     candidates = [
