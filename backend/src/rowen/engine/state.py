@@ -25,10 +25,14 @@ class RowState:
     Attributes:
         units: The units in the row, in the order they were played.
         horn: The War Horn in the row's horn slot, if there is one.
+        scarecrows: The Scarecrows played in the row this round. Each one
+            took a unit's place, but isn't a unit: it has no strength, so
+            scoring, Wildfire and Medic leave it alone.
     """
 
     units: tuple[UnitCard, ...] = ()
     horn: SpecialCard | None = None
+    scarecrows: tuple[SpecialCard, ...] = ()
 
 
 def empty_rows() -> Mapping[Row, RowState]:

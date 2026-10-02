@@ -76,6 +76,26 @@ class HornPlayed:
 
 
 @dataclass(frozen=True, kw_only=True)
+class ScarecrowPlayed:
+    """A player swapped a Scarecrow for a unit on their side of the board.
+
+    The Scarecrow stays in the row until the end of the round, and the unit
+    went to the end of the player's hand.
+
+    Attributes:
+        player: The index of the player who played it, on whose side it is.
+        card: The id of the Scarecrow.
+        row: The row it went in.
+        unit: The id of the unit that went back to the hand.
+    """
+
+    player: int
+    card: str
+    row: Row
+    unit: str
+
+
+@dataclass(frozen=True, kw_only=True)
 class WildfirePlayed:
     """A player played Wildfire, which went to their discard pile.
 
@@ -234,6 +254,7 @@ type Event = (
     | WeatherPlayed
     | WeatherCleared
     | HornPlayed
+    | ScarecrowPlayed
     | WildfirePlayed
     | UnitDestroyed
     | PlayerPassed

@@ -44,6 +44,7 @@ INFILTRATOR = UnitCard(
 )
 WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
 HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
+SCARECROW = SpecialCard(id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW)
 
 
 def player(
@@ -140,7 +141,7 @@ def test_cards_on_the_board_go_to_the_discard_pile_of_their_side() -> None:
         deck=(),
         hand=(KNIGHT,),
         rows={
-            Row.MELEE: RowState(units=(KNIGHT, INFILTRATOR)),
+            Row.MELEE: RowState(units=(KNIGHT, INFILTRATOR), scarecrows=(SCARECROW,)),
             Row.RANGED: RowState(units=(SNIPER,), horn=WAR_HORN),
             Row.SIEGE: RowState(),
         },
@@ -150,7 +151,14 @@ def test_cards_on_the_board_go_to_the_discard_pile_of_their_side() -> None:
     state, _ = end_round(first, player(SCOUT))
 
     assert state.players[0].rows == empty_rows()
-    assert state.players[0].discard == (SCOUT, KNIGHT, INFILTRATOR, SNIPER, WAR_HORN)
+    assert state.players[0].discard == (
+        SCOUT,
+        KNIGHT,
+        INFILTRATOR,
+        SCARECROW,
+        SNIPER,
+        WAR_HORN,
+    )
     assert state.players[1].rows == empty_rows()
     assert state.players[1].discard == (SCOUT,)
 
@@ -307,7 +315,7 @@ def choose(actions: tuple[Action, ...], turn: int) -> Action:
 
 @pytest.mark.parametrize("seed", range(5))
 def test_a_match_runs_from_the_first_turn_to_the_end(seed: int) -> None:
-    # The "done when" of issues #11 to #16, with the real decks: each turn
+    # The "done when" of issues #11 to #17, with the real decks: each turn
     # tries every legal action, then takes one of them.
     decks = (load_deck("humans"), load_deck("robots"))
     state = start_match(decks, seed=seed)
@@ -333,7 +341,7 @@ def test_a_match_runs_from_the_first_turn_to_the_end(seed: int) -> None:
     for player in state.players:
         cards.update(player.hand + player.deck + player.weather + player.discard)
         for row in player.rows.values():
-            cards.update(row.units)
+            cards.update(row.units + row.scarecrows)
             if row.horn is not None:
                 cards[row.horn] += 1
     assert cards == Counter(decks[0].cards + decks[1].cards)
