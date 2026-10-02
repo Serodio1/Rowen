@@ -9,6 +9,9 @@ someone puts it in the view on purpose.
 The view also carries what the rules work out from the board: each unit's
 current strength, each row's score and each player's total. So nothing outside
 the engine needs the rules to show a match.
+
+The events of an action are seen the same way, through ``player_events``: the
+cards the opponent drew or swapped are hidden, and only how many is left.
 """
 
 from collections.abc import Mapping
@@ -16,6 +19,24 @@ from dataclasses import dataclass
 
 from rowen.engine.actions import Action
 from rowen.engine.cards import Card, Row, SpecialCard, UnitCard
+from rowen.engine.events import (
+    CardRedrawn,
+    CardsDrawn,
+    Event,
+    HornPlayed,
+    MatchEnded,
+    PlayerPassed,
+    RedrawEnded,
+    RoundEnded,
+    ScarecrowPlayed,
+    UnitDestroyed,
+    UnitMustered,
+    UnitPlayed,
+    UnitRevived,
+    WeatherCleared,
+    WeatherPlayed,
+    WildfirePlayed,
+)
 from rowen.engine.game import legal_actions, match_over, match_winner
 from rowen.engine.scoring import unit_strength, weathered_rows
 from rowen.engine.state import GameState, PlayerState, RowState
@@ -113,6 +134,34 @@ class PlayerView:
     winner: int | None
 
 
+@dataclass(frozen=True, kw_only=True)
+class OpponentDrew:
+    """The opponent drew cards: ``CardsDrawn`` as the other player sees it.
+
+    Attributes:
+        player: The index of the player who drew them.
+        count: How many cards they drew.
+    """
+
+    player: int
+    count: int
+
+
+@dataclass(frozen=True, kw_only=True)
+class OpponentRedrew:
+    """The opponent swapped a card: ``CardRedrawn`` as the other player sees it.
+
+    Attributes:
+        player: The index of the player who swapped it.
+    """
+
+    player: int
+
+
+# An event as one player may see it.
+type EventView = Event | OpponentDrew | OpponentRedrew
+
+
 def player_view(state: GameState, player: int) -> PlayerView:
     """Return what ``player`` may see of the match (rules, section 11).
 
@@ -136,6 +185,54 @@ def player_view(state: GameState, player: int) -> PlayerView:
         match_over=over,
         winner=match_winner(state) if over else None,
     )
+
+
+def player_events(events: tuple[Event, ...], player: int) -> tuple[EventView, ...]:
+    """Return the events of an action as ``player`` may see them, in order.
+
+    The cards the opponent drew or swapped stay hidden: ``CardsDrawn`` and
+    ``CardRedrawn`` become ``OpponentDrew`` and ``OpponentRedrew``. Every
+    other event is public: the cards it names are, or were, on the board for
+    both players to see (rules, section 11).
+
+    Args:
+        events: The events, as ``apply`` returned them.
+        player: The player's index, 0 or 1.
+    """
+    return tuple(_event_view(event, player) for event in events)
+
+
+def _event_view(event: Event, player: int) -> EventView:
+    """Return one event as ``player`` may see it.
+
+    Every kind of event is named here, so a new one can't reach the opponent
+    before someone decides what they may see of it: mypy reports a missing
+    return until the new kind gets its own case or joins the public ones.
+    """
+    match event:
+        case CardsDrawn() if event.player != player:
+            return OpponentDrew(player=event.player, count=len(event.cards))
+        case CardRedrawn() if event.player != player:
+            return OpponentRedrew(player=event.player)
+        # One of these always matches, so the match never falls through.
+        case (  # pragma: no branch
+            CardsDrawn()
+            | CardRedrawn()
+            | UnitPlayed()
+            | UnitRevived()
+            | UnitMustered()
+            | WeatherPlayed()
+            | WeatherCleared()
+            | HornPlayed()
+            | ScarecrowPlayed()
+            | WildfirePlayed()
+            | UnitDestroyed()
+            | PlayerPassed()
+            | RoundEnded()
+            | MatchEnded()
+            | RedrawEnded()
+        ):
+            return event
 
 
 def _side_view(player: PlayerState, weather: frozenset[Row]) -> SideView:
