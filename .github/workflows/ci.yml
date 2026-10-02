@@ -41,7 +41,7 @@ jobs:
       - name: Type-check
         run: uv run mypy
 
-      # The engine may only import the modules allowed in pyproject.toml.
+      # The engine and the AI may only import what pyproject.toml allows.
       - name: Check imports
         run: uv run lint-imports
 

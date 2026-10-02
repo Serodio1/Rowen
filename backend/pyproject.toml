@@ -80,3 +80,21 @@ broken_contract_guidance = """
 The engine must stay pure (ADR 0003). If the code needs another standard library
 module that does no I/O and doesn't read the clock, add it to ignore_imports in
 pyproject.toml. Otherwise, the code belongs outside rowen.engine."""
+
+# ADR 0003: the AI only plays through the engine, as a human player does. It
+# may import rowen.engine and nothing else: no other part of rowen, no
+# third-party package and no standard library module. As above, what is
+# allowed is written as imports to ignore.
+[[tool.importlinter.contracts]]
+name = "The AI only imports the engine"
+type = "forbidden"
+source_modules = ["rowen.ai"]
+# Every top-level package, and every other part of rowen.
+forbidden_modules = ["*", "rowen.*"]
+# The only imports allowed: the engine's modules.
+ignore_imports = ["rowen.ai.** -> rowen.engine.**"]
+broken_contract_guidance = """
+The AI may only import the engine (ADR 0003), so it sees a match only through
+its player view, as a human player does. If the code needs a standard library
+module that does no I/O and doesn't read the clock, add it to ignore_imports in
+pyproject.toml."""
