@@ -9,6 +9,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.168.3",
     "import-linter>=2.15",
     "mypy>=2.3.1",
     "pytest>=9.1.1",
@@ -48,6 +49,9 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
+# Every line and branch must be tested. A line that can't be reached carries
+# "# pragma: no branch" or "# pragma: no cover", with a comment saying why.
+fail_under = 100
 
 [tool.importlinter]
 root_packages = ["rowen"]
