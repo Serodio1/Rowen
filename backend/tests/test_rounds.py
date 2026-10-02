@@ -295,19 +295,19 @@ def choose(actions: tuple[Action, ...], turn: int) -> Action:
     """Pick one of the legal actions, a different one each turn.
 
     When it can't pass, which is in the redraw or after a Medic, it takes the
-    actions as they come. Otherwise it plays a unit, but passes every fourth
-    turn, to spread the cards over the rounds, and when there is no unit left
+    actions as they come. Otherwise it plays a card, but passes every fourth
+    turn, to spread the cards over the rounds, and when there is no card left
     to play.
     """
     if Pass() not in actions:
         return actions[turn % len(actions)]
-    plays = [action for action in actions if isinstance(action, PlayUnit)]
+    plays = [action for action in actions if action != Pass()]
     return plays[turn % len(plays)] if plays and turn % 4 != 3 else Pass()
 
 
 @pytest.mark.parametrize("seed", range(5))
 def test_a_match_runs_from_the_first_turn_to_the_end(seed: int) -> None:
-    # The "done when" of issues #11 to #15, with the real decks: each turn
+    # The "done when" of issues #11 to #16, with the real decks: each turn
     # tries every legal action, then takes one of them.
     decks = (load_deck("humans"), load_deck("robots"))
     state = start_match(decks, seed=seed)
@@ -326,10 +326,14 @@ def test_a_match_runs_from_the_first_turn_to_the_end(seed: int) -> None:
     assert events[-1] == MatchEnded(winner=match_winner(state))
     rounds = [event for event in events if isinstance(event, RoundEnded)]
     assert len(rounds) == state.round <= 3
-    # Every card is still in a hand, a deck, on the board or in a discard
-    # pile. A Spy changes sides, so both players' cards are counted together.
+    # Every card is still in a hand, a deck, on the board, in the weather area
+    # or in a discard pile. A Spy changes sides, so both players' cards are
+    # counted together.
     cards: Counter[Card] = Counter()
     for player in state.players:
-        cards.update(player.hand + player.deck + player.discard)
-        cards.update(unit for row in player.rows.values() for unit in row.units)
+        cards.update(player.hand + player.deck + player.weather + player.discard)
+        for row in player.rows.values():
+            cards.update(row.units)
+            if row.horn is not None:
+                cards[row.horn] += 1
     assert cards == Counter(decks[0].cards + decks[1].cards)

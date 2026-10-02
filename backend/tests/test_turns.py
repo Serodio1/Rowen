@@ -68,12 +68,6 @@ def test_copies_of_a_card_give_one_action() -> None:
     assert legal_actions(state) == (PLAY_SNIPER, Pass())
 
 
-def test_special_cards_cant_be_played_yet() -> None:
-    state = make_state((WAR_HORN,))
-
-    assert legal_actions(state) == (Pass(),)
-
-
 def test_actions_are_for_the_player_whose_turn_it_is() -> None:
     state = make_state((SNIPER,), (KNIGHT,), current=1)
 

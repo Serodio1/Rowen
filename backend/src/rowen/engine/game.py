@@ -2,16 +2,18 @@
 
 from dataclasses import replace
 
-from rowen.engine import abilities
+from rowen.engine import abilities, specials
 from rowen.engine.actions import (
     Action,
     EndRedraw,
     Pass,
+    PlayHorn,
+    PlaySpecial,
     PlayUnit,
     Redraw,
     Revive,
 )
-from rowen.engine.cards import Card, Row, UnitCard
+from rowen.engine.cards import Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.decks import Deck
 from rowen.engine.events import (
     CardRedrawn,
@@ -73,10 +75,10 @@ def legal_actions(state: GameState) -> tuple[Action, ...]:
 
     Before round 1, that is swapping any card in the hand, if there is a card
     to draw, or ending the redraw (rules, section 3). Then it is playing any
-    unit in the hand on any of its rows, or passing (rules, sections 4 and 5).
-    Right after a Medic, it is only reviving a unit from the discard pile on
-    any of its rows (rules, section 7.2). Special cards can't be played yet.
-    When the match is over, there are none.
+    card in the hand, as ``_plays`` says, or passing (rules, sections 4, 5
+    and 8). Right after a Medic, it is only reviving a unit from the discard
+    pile on any of its rows (rules, section 7.2). When the match is over,
+    there are none.
     """
     if match_over(state):
         return ()
@@ -97,12 +99,9 @@ def legal_actions(state: GameState) -> tuple[Action, ...]:
         swaps = dict.fromkeys(Redraw(card=card.id) for card in player.hand)
         return (*swaps, EndRedraw())
 
-    # Copies of a card give the same action. A dict keeps one of each, in order.
+    # Copies of a card give the same actions. A dict keeps one of each, in order.
     plays = dict.fromkeys(
-        PlayUnit(card=card.id, row=row)
-        for card in player.hand
-        if isinstance(card, UnitCard)
-        for row in card.rows
+        action for card in player.hand for action in _plays(player, card)
     )
     return (*plays, Pass())
 
@@ -135,6 +134,10 @@ def apply(state: GameState, action: Action) -> tuple[GameState, tuple[Event, ...
         state, events = _pass(state)
     elif isinstance(action, Revive):
         state, events = _revive(state, action)
+    elif isinstance(action, PlaySpecial):
+        state, events = _play_special(state, action)
+    elif isinstance(action, PlayHorn):
+        state, events = _play_horn(state, action)
     else:
         state, events = _play_unit(state, action)
 
@@ -184,6 +187,23 @@ def _deal(cards: tuple[Card, ...]) -> PlayerState:
         deck=cards[HAND_SIZE:],
         redraws_left=MAX_REDRAWS,
     )
+
+
+def _plays(player: PlayerState, card: Card) -> tuple[Action, ...]:
+    """Return the ways to play a card from the hand, one action per choice.
+
+    A unit goes on any of its rows; a War Horn in any row with an empty horn
+    slot; a weather card or Clear Skies needs no choice. Wildfire and
+    Scarecrow can't be played yet.
+    """
+    if isinstance(card, UnitCard):
+        return tuple(PlayUnit(card=card.id, row=row) for row in card.rows)
+    if card.kind is SpecialKind.WAR_HORN:
+        rows = specials.free_horn_rows(player)
+        return tuple(PlayHorn(card=card.id, row=row) for row in rows)
+    if card.kind in specials.EFFECTS:
+        return (PlaySpecial(card=card.id),)
+    return ()
 
 
 def _redrawing(state: GameState) -> bool:
@@ -251,6 +271,38 @@ def _play_unit(
     state, side, ability_events = _put_on_board(state, unit, action.row)
     event = UnitPlayed(player=state.current, card=unit.id, row=action.row, side=side)
     return state, (event, *ability_events)
+
+
+def _play_special(
+    state: GameState, action: PlaySpecial
+) -> tuple[GameState, tuple[Event, ...]]:
+    """Take one copy of the special card from the hand and carry out its effect.
+
+    The effect puts the card where it goes: the weather area or the discard
+    pile.
+    """
+    state, card = _take_special(state, action.card)
+    return specials.play(state, state.current, card)
+
+
+def _play_horn(
+    state: GameState, action: PlayHorn
+) -> tuple[GameState, tuple[Event, ...]]:
+    """Move one copy of the War Horn from the hand to the row's horn slot."""
+    state, card = _take_special(state, action.card)
+    return specials.play_horn(state, state.current, card, action.row)
+
+
+def _take_special(state: GameState, card_id: str) -> tuple[GameState, SpecialCard]:
+    """Take one copy of a special card from the hand of the player whose turn it is."""
+    player = state.players[state.current]
+    card = next(
+        card
+        for card in player.hand
+        if isinstance(card, SpecialCard) and card.id == card_id
+    )
+    player = replace(player, hand=_without(player.hand, card))
+    return with_player(state, state.current, player), card
 
 
 def _revive(state: GameState, action: Revive) -> tuple[GameState, tuple[Event, ...]]:
