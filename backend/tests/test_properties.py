@@ -15,7 +15,7 @@ from collections import Counter
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from rowen.data import load_deck
+from rowen.data import deck_ids, load_deck
 from rowen.engine.cards import Card
 from rowen.engine.decks import Deck
 from rowen.engine.events import CardRedrawn, CardsDrawn, Event
@@ -24,7 +24,9 @@ from rowen.engine.scoring import player_total
 from rowen.engine.state import GameState
 from rowen.engine.view import player_events, player_view
 
-DECKS = (load_deck("humans"), load_deck("robots"))
+# Every deck in the data files, by id. Hypothesis picks the ids, so a failing
+# match shows "humans" instead of every card of the deck.
+DECKS = {deck_id: load_deck(deck_id) for deck_id in deck_ids()}
 
 # A match ends long before this: almost every action uses up a card from a
 # hand or a deck, and there are 66 of them.
@@ -37,15 +39,15 @@ MAX_ROUNDS = 3
 # on a slow machine, which would fail the test for no real reason.
 @settings(deadline=None)
 @given(
-    first=st.sampled_from(DECKS),
-    second=st.sampled_from(DECKS),
+    first=st.sampled_from(sorted(DECKS)),
+    second=st.sampled_from(sorted(DECKS)),
     seed=st.integers(),
     data=st.data(),
 )
 def test_invariants_hold_after_every_action(
-    first: Deck, second: Deck, seed: int, data: st.DataObject
+    first: str, second: str, seed: int, data: st.DataObject
 ) -> None:
-    decks = (first, second)
+    decks = (DECKS[first], DECKS[second])
     state = start_match(decks, seed=seed)
     check_state(state, decks)
 
