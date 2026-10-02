@@ -9,19 +9,28 @@ by what the player chooses besides the card:
   puts the card where it goes: the weather area or the discard pile.
 - **A row:** the War Horn, which ``play_horn`` puts in the horn slot of one of
   the player's rows. Only a row in ``free_horn_rows`` will do.
+- **A unit:** the Scarecrow, which ``play_scarecrow`` swaps for a unit on the
+  player's side. Only a unit in ``scarecrow_targets`` will do.
 
 So a new special card that needs no choice is one function, with the
-``Effect`` signature, and one entry in ``EFFECTS``. The Scarecrow has no
-effect here yet, so it can't be played.
+``Effect`` signature, and one entry in ``EFFECTS``.
 """
 
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 
-from rowen.engine.cards import WEATHER_ROWS, Card, Row, SpecialCard, SpecialKind
+from rowen.engine.cards import (
+    WEATHER_ROWS,
+    Card,
+    Row,
+    SpecialCard,
+    SpecialKind,
+    UnitCard,
+)
 from rowen.engine.events import (
     Event,
     HornPlayed,
+    ScarecrowPlayed,
     UnitDestroyed,
     WeatherCleared,
     WeatherPlayed,
@@ -65,6 +74,37 @@ def play_horn(
     rows = {**hornist.rows, row: replace(hornist.rows[row], horn=card)}
     state = with_player(state, player, replace(hornist, rows=rows))
     return state, (HornPlayed(player=player, card=card.id, row=row),)
+
+
+def scarecrow_targets(player: PlayerState) -> tuple[tuple[Row, UnitCard], ...]:
+    """Return the units a Scarecrow can swap with, each with its row.
+
+    That is every unit on the player's side that isn't a Legend, an
+    opponent's Spy included (rules, section 8). With none, the Scarecrow
+    can't be played.
+    """
+    return tuple(
+        (row, unit) for row in Row for unit in player.rows[row].units if not unit.legend
+    )
+
+
+def play_scarecrow(
+    state: GameState, player: int, card: SpecialCard, row: Row, unit: UnitCard
+) -> tuple[GameState, tuple[Event, ...]]:
+    """Swap the Scarecrow for a unit on the player's side (rules, section 8).
+
+    The unit goes to the end of the player's hand, even an opponent's Spy, so
+    it can be played again. The Scarecrow stays in the row, with no strength,
+    until the end of the round.
+    """
+    state = without_unit(state, player, row, unit)
+    owner = state.players[player]
+    row_state = replace(owner.rows[row], scarecrows=(*owner.rows[row].scarecrows, card))
+    owner = replace(
+        owner, rows={**owner.rows, row: row_state}, hand=(*owner.hand, unit)
+    )
+    event = ScarecrowPlayed(player=player, card=card.id, row=row, unit=unit.id)
+    return with_player(state, player, owner), (event,)
 
 
 def _weather(

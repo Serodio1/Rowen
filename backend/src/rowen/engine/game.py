@@ -8,6 +8,7 @@ from rowen.engine.actions import (
     EndRedraw,
     Pass,
     PlayHorn,
+    PlayScarecrow,
     PlaySpecial,
     PlayUnit,
     Redraw,
@@ -138,6 +139,8 @@ def apply(state: GameState, action: Action) -> tuple[GameState, tuple[Event, ...
         state, events = _play_special(state, action)
     elif isinstance(action, PlayHorn):
         state, events = _play_horn(state, action)
+    elif isinstance(action, PlayScarecrow):
+        state, events = _play_scarecrow(state, action)
     else:
         state, events = _play_unit(state, action)
 
@@ -193,17 +196,20 @@ def _plays(player: PlayerState, card: Card) -> tuple[Action, ...]:
     """Return the ways to play a card from the hand, one action per choice.
 
     A unit goes on any of its rows; a War Horn in any row with an empty horn
-    slot; a weather card, Clear Skies or Wildfire needs no choice. The
-    Scarecrow can't be played yet.
+    slot; a Scarecrow in place of any unit it can swap with. Every other
+    special card needs no choice: its effect is in ``specials.EFFECTS``.
     """
     if isinstance(card, UnitCard):
         return tuple(PlayUnit(card=card.id, row=row) for row in card.rows)
     if card.kind is SpecialKind.WAR_HORN:
         rows = specials.free_horn_rows(player)
         return tuple(PlayHorn(card=card.id, row=row) for row in rows)
-    if card.kind in specials.EFFECTS:
-        return (PlaySpecial(card=card.id),)
-    return ()
+    if card.kind is SpecialKind.SCARECROW:
+        targets = specials.scarecrow_targets(player)
+        return tuple(
+            PlayScarecrow(card=card.id, row=row, unit=unit.id) for row, unit in targets
+        )
+    return (PlaySpecial(card=card.id),)
 
 
 def _redrawing(state: GameState) -> bool:
@@ -291,6 +297,16 @@ def _play_horn(
     """Move one copy of the War Horn from the hand to the row's horn slot."""
     state, card = _take_special(state, action.card)
     return specials.play_horn(state, state.current, card, action.row)
+
+
+def _play_scarecrow(
+    state: GameState, action: PlayScarecrow
+) -> tuple[GameState, tuple[Event, ...]]:
+    """Swap one copy of the Scarecrow from the hand for the unit in the row."""
+    state, card = _take_special(state, action.card)
+    row = state.players[state.current].rows[action.row]
+    unit = next(unit for unit in row.units if unit.id == action.unit)
+    return specials.play_scarecrow(state, state.current, card, action.row, unit)
 
 
 def _take_special(state: GameState, card_id: str) -> tuple[GameState, SpecialCard]:
@@ -429,6 +445,7 @@ def _clear_board(player: PlayerState) -> PlayerState:
     in_play: list[Card] = []
     for row in player.rows.values():
         in_play.extend(row.units)
+        in_play.extend(row.scarecrows)
         if row.horn is not None:
             in_play.append(row.horn)
     in_play.extend(player.weather)

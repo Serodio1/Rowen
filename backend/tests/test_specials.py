@@ -5,15 +5,26 @@ test_scoring.py; here, playing the cards and where they go.
 """
 
 from collections.abc import Mapping
+from dataclasses import replace
 
 import pytest
 
-from rowen.engine.actions import Action, Pass, PlayHorn, PlaySpecial, PlayUnit
+from rowen.engine.actions import (
+    Action,
+    Pass,
+    PlayHorn,
+    PlayScarecrow,
+    PlaySpecial,
+    PlayUnit,
+)
 from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.events import (
+    CardsDrawn,
     HornPlayed,
     PlayerPassed,
+    ScarecrowPlayed,
     UnitDestroyed,
+    UnitPlayed,
     WeatherCleared,
     WeatherPlayed,
     WildfirePlayed,
@@ -21,6 +32,7 @@ from rowen.engine.events import (
 from rowen.engine.game import IllegalActionError, apply, legal_actions
 from rowen.engine.rng import Rng
 from rowen.engine.scoring import player_total
+from rowen.engine.specials import EFFECTS
 from rowen.engine.state import GameState, PlayerState, RowState
 
 SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
@@ -38,6 +50,13 @@ HUMAN = UnitCard(
 PRESIDENT = UnitCard(
     id="president", name="President", rows=(Row.MELEE,), strength=10, legend=True
 )
+INFORMANT = UnitCard(
+    id="informant",
+    name="Informant",
+    rows=(Row.MELEE,),
+    strength=3,
+    ability=Ability.SPY,
+)
 HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
 THICK_FOG = SpecialCard(id="thick-fog", name="Thick Fog", kind=SpecialKind.THICK_FOG)
 DOWNPOUR = SpecialCard(id="downpour", name="Downpour", kind=SpecialKind.DOWNPOUR)
@@ -54,6 +73,7 @@ BOARD = {Row.MELEE: (KNIGHT,), Row.RANGED: (SNIPER,), Row.SIEGE: ()}
 PLAY_HOARFROST = PlaySpecial(card="hoarfrost")
 PLAY_CLEAR_SKIES = PlaySpecial(card="clear-skies")
 PLAY_WILDFIRE = PlaySpecial(card="wildfire")
+SWAP_SNIPER = PlayScarecrow(card="scarecrow", row=Row.RANGED, unit="sniper")
 
 
 def player(
@@ -144,10 +164,37 @@ def test_copies_of_a_special_card_give_the_same_actions_once() -> None:
     )
 
 
-def test_scarecrow_cant_be_played_yet() -> None:
-    state = make_state(player((SCARECROW,)))
+def test_scarecrow_can_swap_with_any_unit_on_the_players_side() -> None:
+    # The President is a Legend. The Informant is a Spy the opponent played
+    # here. The two Snipers give the same action. The opponent's units, on
+    # the other side, can't be swapped.
+    board = {
+        Row.MELEE: (KNIGHT, PRESIDENT, INFORMANT),
+        Row.RANGED: (SNIPER, SNIPER),
+        Row.SIEGE: (),
+    }
+    state = make_state(player((SCARECROW,), board=board))
+
+    assert legal_actions(state) == (
+        PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="knight"),
+        PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="informant"),
+        SWAP_SNIPER,
+        Pass(),
+    )
+
+
+def test_scarecrow_cant_be_played_without_a_unit_to_swap_with() -> None:
+    board = {Row.MELEE: (PRESIDENT,), Row.RANGED: (), Row.SIEGE: ()}
+    state = make_state(player((SCARECROW,), board=board))
 
     assert legal_actions(state) == (Pass(),)
+
+
+def test_every_other_special_card_needs_no_choice() -> None:
+    # They are played with PlaySpecial, so each kind needs an effect.
+    with_a_choice = {SpecialKind.WAR_HORN, SpecialKind.SCARECROW}
+
+    assert set(EFFECTS) == set(SpecialKind) - with_a_choice
 
 
 # Weather
@@ -357,6 +404,74 @@ def test_wildfire_goes_to_the_discard_pile_of_the_player_who_played_it() -> None
     assert events[0] == WildfirePlayed(player=1, card="wildfire")
 
 
+# Scarecrow
+
+
+def test_scarecrow_takes_the_units_place_and_the_unit_goes_to_the_hand() -> None:
+    state = make_state(player((SCARECROW, KNIGHT)))
+
+    state, events = apply(state, SWAP_SNIPER)
+
+    assert state.players[0].rows[Row.RANGED] == RowState(scarecrows=(SCARECROW,))
+    assert state.players[0].hand == (KNIGHT, SNIPER)
+    assert events == (
+        ScarecrowPlayed(player=0, card="scarecrow", row=Row.RANGED, unit="sniper"),
+    )
+
+
+def test_scarecrow_has_no_strength() -> None:
+    state = make_state(player((SCARECROW, KNIGHT)))
+
+    state, _ = apply(state, SWAP_SNIPER)
+
+    # Only the Knight (5) is left on player 0's side.
+    assert totals(state) == (5, 11)
+
+
+def test_scarecrow_takes_one_copy_of_the_unit() -> None:
+    board = {Row.MELEE: (), Row.RANGED: (SNIPER, SNIPER), Row.SIEGE: ()}
+    state = make_state(player((SCARECROW, KNIGHT), board=board))
+
+    state, _ = apply(state, SWAP_SNIPER)
+
+    assert state.players[0].rows[Row.RANGED] == RowState(
+        units=(SNIPER,), scarecrows=(SCARECROW,)
+    )
+
+
+def test_scarecrow_of_player_1_goes_on_their_side() -> None:
+    state = make_state(player(), player((SCARECROW, KNIGHT)), current=1)
+    swap = PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="knight")
+
+    state, events = apply(state, swap)
+
+    assert state.players[1].rows[Row.MELEE] == RowState(scarecrows=(SCARECROW,))
+    assert state.players[1].hand == (KNIGHT, KNIGHT)
+    assert state.players[0].rows == player().rows
+    assert events == (
+        ScarecrowPlayed(player=1, card="scarecrow", row=Row.MELEE, unit="knight"),
+    )
+
+
+def test_scarecrow_takes_back_an_opponents_spy_to_play_it_again() -> None:
+    # Player 1 played an Informant on player 0's side. Player 0 takes it back
+    # and plays it on player 1's side, which draws them 2 cards.
+    board = {Row.MELEE: (INFORMANT,), Row.RANGED: (), Row.SIEGE: ()}
+    first = replace(player((SCARECROW,), board=board), deck=(SCOUT, CHAMPION))
+    state = make_state(first, replace(player(), passed=True))
+    swap = PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="informant")
+
+    state, _ = apply(state, swap)
+    state, events = apply(state, PlayUnit(card="informant", row=Row.MELEE))
+
+    assert state.players[1].rows[Row.MELEE].units == (KNIGHT, INFORMANT)
+    assert state.players[0].hand == (SCOUT, CHAMPION)
+    assert events == (
+        UnitPlayed(player=0, card="informant", row=Row.MELEE, side=1),
+        CardsDrawn(player=0, cards=("scout", "champion")),
+    )
+
+
 # War Horn
 
 
@@ -423,7 +538,15 @@ def test_playing_the_last_card_in_hand_passes() -> None:
         pytest.param(PlayHorn(card="war-horn", row=Row.RANGED), id="horn slot taken"),
         pytest.param(PlaySpecial(card="thick-fog"), id="card not in hand"),
         pytest.param(PlaySpecial(card="knight"), id="unit as a special card"),
-        pytest.param(PlaySpecial(card="scarecrow"), id="not playable yet"),
+        pytest.param(PlaySpecial(card="scarecrow"), id="scarecrow without a unit"),
+        pytest.param(
+            PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="sniper"),
+            id="unit not in that row",
+        ),
+        pytest.param(
+            PlayScarecrow(card="war-horn", row=Row.MELEE, unit="knight"),
+            id="horn as scarecrow",
+        ),
     ],
 )
 def test_illegal_action_raises(action: Action) -> None:

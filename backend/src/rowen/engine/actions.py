@@ -53,6 +53,23 @@ class PlayHorn:
     row: Row
 
 
+@dataclass(frozen=True, kw_only=True)
+class PlayScarecrow:
+    """Play a Scarecrow from the hand in place of a unit (rules, section 8).
+
+    Attributes:
+        card: The id of the Scarecrow. Any copy in the hand will do.
+        row: The row of the unit, on the player's own side.
+        unit: The id of the unit, which goes back to the hand. It can't be a
+            Legend. Copies of a unit in the same row are the same, so any of
+            them will do.
+    """
+
+    card: str
+    row: Row
+    unit: str
+
+
 @dataclass(frozen=True)
 class Pass:
     """Take no more turns this round (rules, section 4)."""
@@ -90,4 +107,13 @@ class EndRedraw:
 
 
 # Any action.
-type Action = PlayUnit | PlaySpecial | PlayHorn | Pass | Revive | Redraw | EndRedraw
+type Action = (
+    PlayUnit
+    | PlaySpecial
+    | PlayHorn
+    | PlayScarecrow
+    | Pass
+    | Revive
+    | Redraw
+    | EndRedraw
+)
