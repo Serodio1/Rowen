@@ -173,13 +173,25 @@ def test_views_match_the_state_turn_after_turn(seed: int) -> None:
     decks = (load_deck("humans"), load_deck("robots"))
     state = start_match(decks, seed=seed)
 
+    # It starts with the redraw, then goes through the rounds.
     for turn in range(60):
         for player in (0, 1):
             view = player_view(state, player)
             assert view.hand == state.players[player].hand
+            assert (view.current, view.round, view.reviving) == (
+                state.current,
+                state.round,
+                state.reviving,
+            )
             for index, side in enumerate(view.players):
-                assert side.hand_size == len(state.players[index].hand)
-                assert side.deck_size == len(state.players[index].deck)
+                public = state.players[index]
+                assert side.hand_size == len(public.hand)
+                assert side.deck_size == len(public.deck)
+                assert side.weather == public.weather
+                assert side.discard == public.discard
+                assert side.lives == public.lives
+                assert side.passed == public.passed
+                assert side.redraws_left == public.redraws_left
                 assert side.total == player_total(state, index)
             assert "Rng" not in repr(view)
         actions = legal_actions(state)
