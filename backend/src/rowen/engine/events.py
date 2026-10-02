@@ -176,8 +176,8 @@ class UnitMustered:
 class CardsDrawn:
     """A player drew cards from their deck into their hand.
 
-    Only that player may know which cards they are, so the opponent's view of
-    this event must leave them out and keep only how many there are.
+    Only that player may know which cards they are, so the opponent sees this
+    event as ``view.OpponentDrew``, with only how many there are.
 
     Attributes:
         player: The index of the player who drew them.
@@ -220,8 +220,8 @@ class MatchEnded:
 class CardRedrawn:
     """A player swapped a card in their hand before round 1.
 
-    Only that player may know which cards they are, so the opponent's view of
-    this event must leave them out.
+    Only that player may know which cards they are, so the opponent sees this
+    event as ``view.OpponentRedrew``, without them.
 
     Attributes:
         player: The index of the player who swapped the card.

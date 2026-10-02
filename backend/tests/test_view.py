@@ -6,11 +6,36 @@ import pytest
 
 from rowen.data import load_deck
 from rowen.engine.cards import Row, SpecialCard, SpecialKind, UnitCard
+from rowen.engine.events import (
+    CardRedrawn,
+    CardsDrawn,
+    Event,
+    HornPlayed,
+    MatchEnded,
+    PlayerPassed,
+    RedrawEnded,
+    RoundEnded,
+    ScarecrowPlayed,
+    UnitDestroyed,
+    UnitMustered,
+    UnitPlayed,
+    UnitRevived,
+    WeatherCleared,
+    WeatherPlayed,
+    WildfirePlayed,
+)
 from rowen.engine.game import apply, legal_actions, start_match
 from rowen.engine.rng import Rng
 from rowen.engine.scoring import player_total
 from rowen.engine.state import GameState, PlayerState, RowState, with_player
-from rowen.engine.view import RowView, UnitView, player_view
+from rowen.engine.view import (
+    OpponentDrew,
+    OpponentRedrew,
+    RowView,
+    UnitView,
+    player_events,
+    player_view,
+)
 
 SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
 KNIGHT = UnitCard(id="knight", name="Knight", rows=(Row.MELEE,), strength=5)
@@ -165,6 +190,59 @@ def test_the_view_says_when_the_match_is_over_and_who_won() -> None:
     assert view.legal_actions == ()
 
 
+# Events
+
+
+def test_the_opponent_sees_how_many_cards_were_drawn_but_not_which() -> None:
+    drawn = CardsDrawn(player=0, cards=("secret-deck", "secret-deck"))
+
+    assert player_events((drawn,), 0) == (drawn,)
+    assert player_events((drawn,), 1) == (OpponentDrew(player=0, count=2),)
+
+
+def test_the_opponent_sees_a_swap_but_not_the_cards() -> None:
+    swapped = CardRedrawn(player=1, card="secret-hand", drawn="secret-deck")
+
+    assert player_events((swapped,), 1) == (swapped,)
+    assert player_events((swapped,), 0) == (OpponentRedrew(player=1),)
+
+
+def test_events_keep_their_order() -> None:
+    played = UnitPlayed(player=0, card="informant", row=Row.MELEE, side=1)
+    drawn = CardsDrawn(player=0, cards=("secret-deck",))
+    passed = PlayerPassed(player=0)
+
+    seen = player_events((played, drawn, passed), 1)
+
+    assert seen == (played, OpponentDrew(player=0, count=1), passed)
+    assert "secret" not in repr(seen)
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        UnitPlayed(player=0, card="sniper", row=Row.RANGED, side=0),
+        UnitRevived(player=0, card="sniper", row=Row.RANGED, side=0),
+        UnitMustered(player=0, card="plane", row=Row.SIEGE, from_hand=True),
+        WeatherPlayed(player=0, card="thick-fog", row=Row.RANGED),
+        WeatherCleared(player=0, card="clear-skies"),
+        HornPlayed(player=0, card="war-horn", row=Row.MELEE),
+        ScarecrowPlayed(player=0, card="scarecrow", row=Row.MELEE, unit="knight"),
+        WildfirePlayed(player=0, card="wildfire"),
+        UnitDestroyed(side=1, row=Row.RANGED, card="sniper"),
+        PlayerPassed(player=0),
+        RoundEnded(scores=(7, 5), winner=0),
+        MatchEnded(winner=None),
+        RedrawEnded(player=0),
+    ],
+    ids=lambda event: type(event).__name__,
+)
+def test_every_other_event_is_public(event: Event) -> None:
+    # The cards they name are, or were, on the board for both to see.
+    for player in (0, 1):
+        assert player_events((event,), player) == (event,)
+
+
 # With the real decks
 
 
@@ -197,4 +275,11 @@ def test_views_match_the_state_turn_after_turn(seed: int) -> None:
         actions = legal_actions(state)
         if not actions:
             break
-        state, _ = apply(state, actions[turn % len(actions)])
+        state, events = apply(state, actions[turn % len(actions)])
+        for player in (0, 1):
+            seen = player_events(events, player)
+            assert len(seen) == len(events)
+            # Only the player's own draws and swaps show their cards.
+            for event in seen:
+                if isinstance(event, CardsDrawn | CardRedrawn):
+                    assert event.player == player
