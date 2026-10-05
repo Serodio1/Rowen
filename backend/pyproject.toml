@@ -1,6 +1,6 @@
 [project]
 name = "rowen"
-version = "0.0.0"
+version = "0.1.0"
 description = "Rules engine and API for Rowen, a turn-based card game."
 license = "MIT"
 authors = [{ name = "Rui Vasconcelos" }]
