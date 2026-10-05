@@ -78,9 +78,11 @@ def test_the_board_and_the_menu_come_before_each_choice() -> None:
 
     play(1, player.read, player.write)
 
-    # After the faction, each prompt follows the board, "Your move:" and the
-    # menu, which ends with keeping the hand in the redraw and passing later.
+    # After the faction, each prompt follows an empty line, the board, "Your
+    # move:" and the menu, which ends with keeping the hand in the redraw and
+    # passing later.
     board = player.lines.index("Your move:") - 1
+    assert player.lines[board - 1] == ""
     assert player.lines[board].startswith("Round 1: your turn\n")
     assert player.lines[board + 1 : board + 3] == ["Your move:", "   1. Swap Downpour"]
     assert player.lines[board + 11] == "  10. Keep this hand"
