@@ -241,7 +241,7 @@ def _side_text(label: str, side: SideView) -> str:
 def _row_text(row: Row, view: RowView) -> str:
     """Return one row: its score, its units with their strength, and the rest.
 
-    For example ``  melee    8 | Sniper 6, Scarecrow  [War Horn]  [weather]``.
+    For example ``  melee    8 | Soldier 8, Scarecrow  [War Horn]  [weather]``.
     """
     cards = [f"{unit.card.name} {unit.strength}" for unit in view.units]
     cards.extend(scarecrow.name for scarecrow in view.scarecrows)
@@ -265,8 +265,11 @@ def _whose(player: int, viewer: int) -> str:
 
 
 def _where(row: Row, side: int, player: int, viewer: int) -> str:
-    """Return the row a unit went in, and whose side it is on when it isn't the
-    player's own: a Spy's."""
+    """Return the row a unit went in, like ``in the ranged row``.
+
+    A unit that went on the other player's side, a Spy, also says whose side
+    it is: ``in your melee row``.
+    """
     if side == player:
         return f"in the {row} row"
     return f"in {_whose(side, viewer)} {row} row"

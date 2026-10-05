@@ -81,6 +81,7 @@ SPY = UnitCard(
     ability=Ability.SPY,
 )
 DOWNPOUR = SpecialCard(id="downpour", name="Downpour", kind=SpecialKind.DOWNPOUR)
+HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
 CLEAR_SKIES = SpecialCard(
     id="clear-skies", name="Clear Skies", kind=SpecialKind.CLEAR_SKIES
 )
@@ -96,6 +97,7 @@ CARDS: tuple[Card, ...] = (
     PRIME_MINISTER,
     SPY,
     DOWNPOUR,
+    HOARFROST,
     CLEAR_SKIES,
     WAR_HORN,
     WILDFIRE,
@@ -214,17 +216,19 @@ def test_the_player_of_the_view_is_at_the_bottom() -> None:
 
 
 @pytest.mark.parametrize(
-    ("current", "over", "line"),
+    ("player", "current", "over", "line"),
     [
-        (0, False, "Round 2: your turn"),
-        (1, False, "Round 2: the AI's turn"),
-        (0, True, "Round 2: match over"),
+        (0, 0, False, "Round 2: your turn"),
+        (0, 1, False, "Round 2: the AI's turn"),
+        (1, 1, False, "Round 2: your turn"),
+        (1, 0, False, "Round 2: the AI's turn"),
+        (0, 0, True, "Round 2: match over"),
     ],
 )
 def test_the_first_line_says_whose_turn_it_is(
-    current: int, over: bool, line: str
+    player: int, current: int, over: bool, line: str
 ) -> None:
-    view = replace(make_view(), current=current, match_over=over)
+    view = replace(make_view(), player=player, current=current, match_over=over)
 
     assert view_text(view).splitlines()[0] == line
 
@@ -238,13 +242,25 @@ def test_swaps_left_show_while_there_are_any() -> None:
     assert "total 15  swaps left 2" in text
 
 
-def test_no_weather_leaves_the_middle_line_plain() -> None:
+@pytest.mark.parametrize(
+    ("ai_weather", "your_weather", "line"),
+    [
+        ((), (), "-" * 40),
+        ((DOWNPOUR,), (HOARFROST,), "-" * 40 + " weather: Downpour, Hoarfrost"),
+    ],
+)
+def test_the_middle_line_shows_the_weather_of_both_players(
+    ai_weather: tuple[SpecialCard, ...],
+    your_weather: tuple[SpecialCard, ...],
+    line: str,
+) -> None:
     view = make_view()
-    ai = replace(view.players[1], weather=())
+    you = replace(view.players[0], weather=your_weather)
+    ai = replace(view.players[1], weather=ai_weather)
 
-    lines = view_text(replace(view, players=(view.players[0], ai))).splitlines()
+    lines = view_text(replace(view, players=(you, ai))).splitlines()
 
-    assert lines[5] == "-" * 40
+    assert lines[5] == line
 
 
 def test_an_empty_hand_says_so() -> None:
