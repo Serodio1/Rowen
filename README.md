@@ -6,7 +6,8 @@ A turn-based card game inspired by the Gwent minigame from *The Witcher 3*, buil
 as a full-stack web application: a pure Python rules engine behind a FastAPI API,
 PostgreSQL, and a React + TypeScript frontend.
 
-> **Status:** early development (Phase 0, foundations). Not playable yet.
+> **Status:** early development (Phase 1, game engine). A match against the AI
+> can be played in the terminal; the web interface comes next.
 
 ## Documentation
 
@@ -14,6 +15,20 @@ PostgreSQL, and a React + TypeScript frontend.
 - [Game rules](docs/rules.md)
 - [Architecture decision records](docs/adr/README.md): why the main
   technical decisions were made.
+
+## Play in the terminal
+
+Until the web interface is ready, a match against the AI can be played in the
+terminal (see [Development](#development) for uv):
+
+```sh
+cd backend
+uv run rowen              # choose a faction, then play against the AI
+uv run rowen --seed 42    # play the match with seed 42 again
+```
+
+Each turn shows the board and a numbered list of what you can do: type a number
+to choose. The same seed and the same choices always give the same match.
 
 ## Development
 
@@ -27,6 +42,7 @@ uv run pytest           # run the tests
 uv run ruff check       # lint
 uv run ruff format      # format the code
 uv run mypy             # type-check
+uv run lint-imports     # check which modules may import which
 ```
 
 Every push and pull request runs the same checks on GitHub Actions.

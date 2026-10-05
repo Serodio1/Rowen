@@ -7,6 +7,10 @@ authors = [{ name = "Rui Vasconcelos" }]
 requires-python = ">=3.14"
 dependencies = []
 
+# The commands the package installs: "uv run rowen" plays a match in the terminal.
+[project.scripts]
+rowen = "rowen.cli.play:main"
+
 [dependency-groups]
 dev = [
     "hypothesis>=6.168.3",
@@ -102,18 +106,23 @@ pyproject.toml."""
 # ADR 0002: the CLI holds no rules. It shows the player view and passes the
 # player's choice to the engine. So of the engine it may only import the
 # modules allowed below, which hold no rules: what cards, actions and events
-# are, and the player view. The standard library and third-party packages are
-# fine: reading and printing is the CLI's job.
+# are, the player view, and starting a match and applying an action. The
+# standard library and third-party packages are fine: reading and printing is
+# the CLI's job.
 [[tool.importlinter.contracts]]
 name = "The CLI only uses the engine through the player view"
 type = "forbidden"
 source_modules = ["rowen.cli"]
 forbidden_modules = ["rowen.engine.*"]
+# Only the CLI's own imports count. The AI and rowen.data, which it imports,
+# use the engine themselves, and that is how it should be.
+allow_indirect_imports = true
 # The allowed modules, written as imports to ignore, as above.
 ignore_imports = [
     "rowen.cli.** -> rowen.engine.actions",
     "rowen.cli.** -> rowen.engine.cards",
     "rowen.cli.** -> rowen.engine.events",
+    "rowen.cli.** -> rowen.engine.game",
     "rowen.cli.** -> rowen.engine.view",
 ]
 broken_contract_guidance = """
