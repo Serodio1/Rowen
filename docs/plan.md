@@ -71,7 +71,7 @@ rowen/
 │   │   ├── ai/          # AI opponent (depends only on engine)
 │   │   ├── api/         # FastAPI routes and schemas
 │   │   ├── db/          # SQLAlchemy models and repositories
-│   │   └── cli.py       # play in the terminal (dev tool)
+│   │   └── cli/         # play in the terminal (dev tool, no rules)
 │   ├── migrations/      # Alembic
 │   ├── tests/
 │   └── pyproject.toml

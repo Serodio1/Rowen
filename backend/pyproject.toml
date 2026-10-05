@@ -66,7 +66,7 @@ name = "The engine only imports allowed standard library modules"
 type = "forbidden"
 source_modules = ["rowen.engine"]
 # "*" is every top-level package: the standard library and third-party ones.
-forbidden_modules = ["*", "rowen.ai", "rowen.api", "rowen.data", "rowen.db"]
+forbidden_modules = ["*", "rowen.ai", "rowen.api", "rowen.cli", "rowen.data", "rowen.db"]
 # The allowed modules. Import-linter has no allow list, so they are written as
 # imports to ignore. A module listed here that the engine stops using is an
 # error, so the list always matches the code.
@@ -98,3 +98,26 @@ The AI may only import the engine (ADR 0003), so it sees a match only through
 its player view, as a human player does. If the code needs a standard library
 module that does no I/O and doesn't read the clock, add it to ignore_imports in
 pyproject.toml."""
+
+# ADR 0002: the CLI holds no rules. It shows the player view and passes the
+# player's choice to the engine. So of the engine it may only import the
+# modules allowed below, which hold no rules: what cards, actions and events
+# are, and the player view. The standard library and third-party packages are
+# fine: reading and printing is the CLI's job.
+[[tool.importlinter.contracts]]
+name = "The CLI only uses the engine through the player view"
+type = "forbidden"
+source_modules = ["rowen.cli"]
+forbidden_modules = ["rowen.engine.*"]
+# The allowed modules, written as imports to ignore, as above.
+ignore_imports = [
+    "rowen.cli.** -> rowen.engine.actions",
+    "rowen.cli.** -> rowen.engine.cards",
+    "rowen.cli.** -> rowen.engine.events",
+    "rowen.cli.** -> rowen.engine.view",
+]
+broken_contract_guidance = """
+The CLI holds no rules (ADR 0002): what it shows comes from the player view,
+which the engine works out. If the CLI needs an engine module that holds no
+rules, add it to ignore_imports in pyproject.toml. Otherwise, what the CLI
+needs belongs in the player view."""
