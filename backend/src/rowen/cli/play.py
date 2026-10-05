@@ -10,6 +10,10 @@ The loop keeps the match state, but never looks inside it: it only passes it
 to ``player_view`` and ``apply``. Everything it shows comes from the view and
 from ``player_events``, so the AI's hand never shows (ADR 0002).
 
+The seed is shown only once the match is over or abandoned: whoever knows it
+can work out the order of every deck, and so the AI's hand. Then it lets the
+player play the same match again, for example to report a bug.
+
 Reading and printing are passed in as ``read`` and ``write``: ``input`` and
 ``print`` in the terminal, a script of answers and a list of lines in the
 tests.
@@ -64,6 +68,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # Ctrl+C, or the end of the input (Ctrl+D, or Ctrl+Z on Windows).
     except KeyboardInterrupt, EOFError:
         print("\nMatch abandoned.")
+    print(f"Seed {seed}. To play this match again: uv run rowen --seed {seed}")
 
 
 def play(seed: int, read: Read, write: Write) -> None:
@@ -83,7 +88,6 @@ def play(seed: int, read: Read, write: Write) -> None:
     names = {card.id: card.name for deck in decks for card in deck.cards}
 
     write(f"You play {yours.name} and the AI plays {theirs.name}.")
-    write(f"Seed {seed}: to play this match again, run rowen --seed {seed}.")
     write("Press Ctrl+C to stop.")
 
     state = start_match((yours, theirs), seed=seed)
@@ -107,14 +111,14 @@ def play(seed: int, read: Read, write: Write) -> None:
 def _choose(labels: Sequence[str], read: Read, write: Write) -> int:
     """Show a numbered menu and return the index of the label the player picks.
 
-    The menu starts at 1. Until the answer is one of its numbers, the player
-    is told so and asked again.
+    The menu starts at 1. Until the answer is one of its numbers, as it is
+    shown, the player is told so and asked again.
     """
-    for number, label in enumerate(labels, start=1):
+    numbers = [str(number) for number in range(1, len(labels) + 1)]
+    for number, label in zip(numbers, labels, strict=True):
         write(f"{number:>4}. {label}")
     while True:
         answer = read(f"Choose 1-{len(labels)}: ").strip()
-        # isdecimal() is only true for digits, so int() can't fail.
-        if answer.isdecimal() and 1 <= int(answer) <= len(labels):
-            return int(answer) - 1
+        if answer in numbers:
+            return numbers.index(answer)
         write(f"Type a number from 1 to {len(labels)}.")

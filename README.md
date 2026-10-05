@@ -28,7 +28,8 @@ uv run rowen --seed 42    # play the match with seed 42 again
 ```
 
 Each turn shows the board and a numbered list of what you can do: type a number
-to choose. The same seed and the same choices always give the same match.
+to choose. When the match ends, the seed is shown: the same seed and the same
+choices always give the same match.
 
 ## Development
 
