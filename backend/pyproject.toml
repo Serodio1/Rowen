@@ -7,6 +7,10 @@ authors = [{ name = "Rui Vasconcelos" }]
 requires-python = ">=3.14"
 dependencies = []
 
+# The commands the package installs: "uv run rowen" plays a match in the terminal.
+[project.scripts]
+rowen = "rowen.cli.play:main"
+
 [dependency-groups]
 dev = [
     "hypothesis>=6.168.3",
@@ -100,21 +104,29 @@ module that does no I/O and doesn't read the clock, add it to ignore_imports in
 pyproject.toml."""
 
 # ADR 0002: the CLI holds no rules. It shows the player view and passes the
-# player's choice to the engine. So of the engine it may only import the
-# modules allowed below, which hold no rules: what cards, actions and events
-# are, and the player view. The standard library and third-party packages are
-# fine: reading and printing is the CLI's job.
+# player's choice to the engine. So it may only import the parts of the engine
+# allowed below: what cards, actions and events are, the player view, and the
+# game module, for starting a match and applying an action. The game module
+# also holds the rules, such as legal_actions; the contract can't keep the
+# CLI from calling them, so that is left to review. The CLI may also import
+# the AI and the card data, which use the engine themselves. The standard
+# library and third-party packages are fine: reading and printing is the
+# CLI's job.
 [[tool.importlinter.contracts]]
-name = "The CLI only uses the engine through the player view"
+name = "The CLI only imports the allowed parts of the engine"
 type = "forbidden"
 source_modules = ["rowen.cli"]
 forbidden_modules = ["rowen.engine.*"]
-# The allowed modules, written as imports to ignore, as above.
+# The allowed imports, written as imports to ignore, as above. What an allowed
+# module imports doesn't count against the CLI.
 ignore_imports = [
     "rowen.cli.** -> rowen.engine.actions",
     "rowen.cli.** -> rowen.engine.cards",
     "rowen.cli.** -> rowen.engine.events",
+    "rowen.cli.** -> rowen.engine.game",
     "rowen.cli.** -> rowen.engine.view",
+    "rowen.cli.** -> rowen.ai.baseline",
+    "rowen.cli.** -> rowen.data",
 ]
 broken_contract_guidance = """
 The CLI holds no rules (ADR 0002): what it shows comes from the player view,
