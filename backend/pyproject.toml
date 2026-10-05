@@ -102,16 +102,13 @@ pyproject.toml."""
 # ADR 0002: the CLI holds no rules. It shows the player view and passes the
 # player's choice to the engine. So of the engine it may only import the
 # modules allowed below, which hold no rules: what cards, actions and events
-# are, and the player view. Any other part of rowen, the standard library and
-# third-party packages are fine: reading and printing is the CLI's job.
+# are, and the player view. The standard library and third-party packages are
+# fine: reading and printing is the CLI's job.
 [[tool.importlinter.contracts]]
 name = "The CLI only uses the engine through the player view"
 type = "forbidden"
 source_modules = ["rowen.cli"]
 forbidden_modules = ["rowen.engine.*"]
-# Only the CLI's own imports count. The engine modules it imports, and the AI,
-# use the rest of the engine, which is how it should be.
-allow_indirect_imports = true
 # The allowed modules, written as imports to ignore, as above.
 ignore_imports = [
     "rowen.cli.** -> rowen.engine.actions",
