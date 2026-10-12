@@ -26,8 +26,7 @@ from collections.abc import Callable, Sequence
 from rowen.ai.baseline import choose_action
 from rowen.cli.display import action_text, event_text, view_text
 from rowen.data import deck_ids, load_deck
-from rowen.engine.game import apply, start_match
-from rowen.engine.view import player_events, player_view
+from rowen.engine.public import apply, player_events, player_view, start_match
 
 # Read a line from the player after showing a prompt, like ``input``.
 type Read = Callable[[str], str]
