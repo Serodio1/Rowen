@@ -94,7 +94,7 @@ so the repository is presentable at any point in time.
 
 - `docs/rules.md`: Rowen rules, close to Witcher 3 Gwent, split into *MVP* and
   *later* mechanics. **Approved by Rui before any engine code.**
-- Monorepo scaffold, uv project, ruff, mypy, pytest, import-linter, pre-commit.
+- Monorepo scaffold, uv project, ruff, mypy, pytest, import-linter.
 - GitHub Actions running lint, type-check and tests on every push and PR.
 - `.gitattributes` (LF line endings, Windows-safe), VS Code recommended settings.
 - LICENSE (code) and a note on asset licensing.
