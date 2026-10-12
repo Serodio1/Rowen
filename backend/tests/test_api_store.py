@@ -4,7 +4,7 @@ import sys
 import threading
 from uuid import uuid4
 
-from rowen.api.store import MatchStore
+from rowen.api.store import MAX_MATCHES, MatchStore
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import GameState, start_match
 
@@ -56,6 +56,15 @@ def test_a_full_store_pushes_out_the_match_left_unused_the_longest() -> None:
     assert store.get(second) is None
     assert store.get(first) is states[0]
     assert store.get(third) is states[2]
+
+
+def test_a_store_holds_max_matches_by_default() -> None:
+    store = MatchStore()
+    state = new_state()
+    ids = [store.create(state) for _ in range(MAX_MATCHES + 1)]
+
+    assert store.get(ids[0]) is None
+    assert all(store.get(match_id) is state for match_id in ids[1:])
 
 
 def test_many_threads_can_use_the_store_at_once() -> None:
