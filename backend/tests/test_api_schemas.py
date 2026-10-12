@@ -313,7 +313,7 @@ def test_the_json_schema_tells_each_kind_apart_by_its_type(
 def test_every_field_is_always_sent() -> None:
     # So the browser's types have no optional fields: a field that may be empty
     # is sent as null or as an empty list, never left out.
-    schema = schemas.PlayerView.model_json_schema(mode="serialization")
+    schema = schemas.Match.model_json_schema(mode="serialization")
     shapes = [schema, *schema["$defs"].values()]
 
     for shape in shapes:

@@ -6,7 +6,9 @@ license = "MIT"
 authors = [{ name = "Rui Vasconcelos" }]
 requires-python = ">=3.14"
 dependencies = [
+    "fastapi>=0.143.0",
     "pydantic>=2.14.1",
+    "uvicorn>=0.54.0",
 ]
 
 # The commands the package installs: "uv run rowen" plays a match in the terminal.
@@ -15,6 +17,7 @@ rowen = "rowen.cli.play:main"
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.13.1",
     "hypothesis>=6.168.3",
     "import-linter>=2.15",
     "mypy>=2.3.1",
@@ -139,8 +142,9 @@ needs belongs in the player view."""
 # player view and passes the player's choice to the engine, so the only part
 # of the engine it may import is rowen.engine.public. The same two things are
 # left to review: looking inside the match state, which the API keeps for
-# each match, and reaching another engine module through the package.
-# The standard library and third-party packages, such as Pydantic, are fine.
+# each match, and reaching another engine module through the package. Like
+# the CLI, it may also import the AI and the card data. The standard library
+# and third-party packages, such as FastAPI, are fine.
 [[tool.importlinter.contracts]]
 name = "The API only imports the engine's public module"
 type = "forbidden"
@@ -148,7 +152,11 @@ source_modules = ["rowen.api"]
 # The whole engine: the package and every module in it.
 forbidden_modules = ["rowen.engine"]
 # The allowed imports, written as imports to ignore, as above.
-ignore_imports = ["rowen.api.** -> rowen.engine.public"]
+ignore_imports = [
+    "rowen.api.** -> rowen.engine.public",
+    "rowen.api.** -> rowen.ai.baseline",
+    "rowen.api.** -> rowen.data",
+]
 broken_contract_guidance = """
 The API holds no rules (ADR 0002): it reaches the engine only through
 rowen.engine.public. If the API needs something from the engine that holds no
