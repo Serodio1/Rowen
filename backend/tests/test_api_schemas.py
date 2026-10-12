@@ -259,22 +259,47 @@ def test_each_kind_of_action_is_sent_with_its_type(
     assert sent["legal_actions"] == [expected]
 
 
-def test_the_json_schema_tells_every_kind_of_action_apart() -> None:
+def test_a_view_after_a_medic_says_the_player_is_reviving() -> None:
+    # After a Medic, the only actions are revives (rules, section 7.2).
+    view = replace(
+        EMPTY_VIEW,
+        reviving=True,
+        legal_actions=(engine.Revive(card="sniper", row=RANGED),),
+    )
+
+    sent = schemas.from_view(view).model_dump(mode="json")
+
+    assert sent["reviving"] is True
+
+
+@pytest.mark.parametrize(
+    ("union", "types"),
+    [
+        ("Card", {"unit", "special"}),
+        (
+            "Action",
+            {
+                "play_unit",
+                "play_special",
+                "play_horn",
+                "play_scarecrow",
+                "pass",
+                "revive",
+                "redraw",
+                "end_redraw",
+            },
+        ),
+    ],
+)
+def test_the_json_schema_tells_each_kind_apart_by_its_type(
+    union: str, types: set[str]
+) -> None:
     # The browser's types are built from this schema (OpenAPI).
     schema = schemas.PlayerView.model_json_schema(mode="serialization")
 
-    discriminator = schema["$defs"]["Action"]["discriminator"]
+    discriminator = schema["$defs"][union]["discriminator"]
     assert discriminator["propertyName"] == "type"
-    assert set(discriminator["mapping"]) == {
-        "play_unit",
-        "play_special",
-        "play_horn",
-        "play_scarecrow",
-        "pass",
-        "revive",
-        "redraw",
-        "end_redraw",
-    }
+    assert set(discriminator["mapping"]) == types
 
 
 @pytest.mark.parametrize("seed", range(4))
