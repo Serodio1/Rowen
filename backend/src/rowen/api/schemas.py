@@ -2,11 +2,11 @@
 
 Each class here is a Pydantic model: a mould for one part of a request or a
 response. In a response, what isn't in a model isn't sent. ``from_view`` fills
-them field by field from the player view, so they are an allow list on top of
-the view's own: nothing the view hides can reach a response (ADR 0002), and a
-field the engine adds stays out of the API until someone adds it here on
-purpose. In a request, a field that is missing or of the wrong type turns the
-request down before any endpoint sees it.
+the models of the player view field by field from the engine's, so they are an
+allow list on top of the view's own: nothing the view hides can reach a
+response (ADR 0002), and a field the engine adds stays out of the API until
+someone adds it here on purpose. In a request, a field that is missing or of
+the wrong type turns the request down before any endpoint sees it.
 
 The shapes and names follow the engine's player view, so the types of the
 browser read like the engine's. Players are known by their index, 0 or 1, as

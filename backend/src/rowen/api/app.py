@@ -12,7 +12,7 @@ and ``new_seed``, through FastAPI's ``Depends``. The tests replace both with
 ``app.dependency_overrides``: a new store for each test, and seeds they know.
 
 To run the server on your computer, in ``backend``:
-``uv run uvicorn rowen.api.app:app --reload``.
+``uv run uvicorn rowen.api.app:app --reload --reload-dir src``.
 """
 
 import secrets
@@ -40,7 +40,10 @@ SEED_BITS = 64
 
 app = FastAPI(title="Rowen", version=version("rowen"))
 
-# The server runs as a single process, so all its matches are here.
+# All the server's matches, in the memory of its process. So the server must
+# run as a single process, as uvicorn does unless told otherwise: with several
+# workers, each would have a store of its own, and a match started in one
+# would be unknown to the others.
 _store = MatchStore()
 
 
@@ -97,7 +100,7 @@ def get_match(match_id: UUID, store: Store) -> Match:
 def _ai_plays(state: GameState) -> GameState:
     """Let the AI play until it is the player's turn or the match is over.
 
-    The AI chooses from its own view, as the player does (ADR 0003).
+    The AI chooses from its own view, as the player does (ADR 0006).
     """
     view = player_view(state, AI)
     while view.current == AI and not view.match_over:

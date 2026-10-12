@@ -42,13 +42,14 @@ match against the AI and show it, as JSON:
 
 ```sh
 cd backend
-uv run uvicorn rowen.api.app:app --reload
+uv run uvicorn rowen.api.app:app --reload --reload-dir src
 ```
 
 Then open <http://127.0.0.1:8000/docs>: it lists the endpoints and lets you
 try them, such as `POST /matches` with `{"deck": "humans"}` to start a match.
-`--reload` restarts the server whenever the code changes. Matches are kept in
-memory for now, so they are lost when the server stops.
+`--reload` restarts the server whenever the Python code in `src` changes.
+Matches are kept in memory for now, so they are lost when the server stops or
+restarts.
 
 ## Development
 
