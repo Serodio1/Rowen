@@ -35,6 +35,21 @@ Each turn shows the board and a numbered list of what you can do: type a number
 to choose. When the match ends, the seed is shown: the same seed and the same
 choices always give the same match.
 
+## Run the web API
+
+The web API is what the browser will play through. It can already start a
+match against the AI and show it, as JSON:
+
+```sh
+cd backend
+uv run uvicorn rowen.api.app:app --reload
+```
+
+Then open <http://127.0.0.1:8000/docs>: it lists the endpoints and lets you
+try them, such as `POST /matches` with `{"deck": "humans"}` to start a match.
+`--reload` restarts the server whenever the code changes. Matches are kept in
+memory for now, so they are lost when the server stops.
+
 ## Development
 
 The backend needs [uv](https://docs.astral.sh/uv/), which also installs the

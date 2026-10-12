@@ -1,10 +1,12 @@
-"""What the web API sends as JSON: the player view, in shapes of its own.
+"""What the web API sends and receives as JSON, in shapes of its own.
 
-Each class here is a Pydantic model: a mould for one part of a response, and
-what isn't in a model isn't sent. ``from_view`` fills them field by field from
-the player view, so they are an allow list on top of the view's own: nothing
-the view hides can reach a response (ADR 0002), and a field the engine adds
-stays out of the API until someone adds it here on purpose.
+Each class here is a Pydantic model: a mould for one part of a request or a
+response. In a response, what isn't in a model isn't sent. ``from_view`` fills
+them field by field from the player view, so they are an allow list on top of
+the view's own: nothing the view hides can reach a response (ADR 0002), and a
+field the engine adds stays out of the API until someone adds it here on
+purpose. In a request, a field that is missing or of the wrong type turns the
+request down before any endpoint sees it.
 
 The shapes and names follow the engine's player view, so the types of the
 browser read like the engine's. Players are known by their index, 0 or 1, as
@@ -16,6 +18,7 @@ other field.
 """
 
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -187,6 +190,22 @@ class PlayerView(Schema):
     legal_actions: tuple[Action, ...]
     match_over: bool
     winner: int | None
+
+
+class NewMatch(Schema):
+    """What the player sends to start a match: the id of their deck."""
+
+    deck: str
+
+
+class Match(Schema):
+    """A match as the player may see it: its id and the player's view of it.
+
+    The id is all it takes to see the match, so only its player gets it.
+    """
+
+    id: UUID
+    view: PlayerView
 
 
 def from_view(view: engine.PlayerView) -> PlayerView:
