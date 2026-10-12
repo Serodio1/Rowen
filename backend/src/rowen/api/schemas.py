@@ -8,13 +8,18 @@ response (ADR 0002), and a field the engine adds stays out of the API until
 someone adds it here on purpose. In a request, a field that is missing or of
 the wrong type turns the request down before any endpoint sees it.
 
-The shapes and names follow the engine's player view, so the types of the
-browser read like the engine's. Players are known by their index, 0 or 1, as
-in the engine: ``player`` is the index of the player whose view it is.
+The shapes and names follow the engine's player view and events, so the types
+of the browser read like the engine's. Players are known by their index, 0 or
+1, as in the engine: in ``PlayerView``, ``player`` is the index of the player
+whose view it is, and in an event, of the player it is about.
 
-Each kind of card and of action carries a ``type``, such as ``"pass"``: that
-is how the browser tells them apart, since ``Pass`` and ``EndRedraw`` have no
-other field.
+``from_events`` does the same as ``from_view`` for the events of an action. It
+calls ``player_events`` itself, so the cards the opponent drew or swapped stay
+hidden: an endpoint gives it the events as ``apply`` returned them.
+
+Each kind of card, of action and of event carries a ``type``, such as
+``"pass"``: that is how the browser tells them apart, since ``Pass`` and
+``EndRedraw`` have no other field.
 """
 
 from typing import Annotated, Literal
@@ -130,6 +135,181 @@ type Action = Annotated[
     | Revive
     | Redraw
     | EndRedraw,
+    Field(discriminator="type"),
+]
+
+
+class UnitPlayed(Schema):
+    """A player played a unit from their hand: ``engine.UnitPlayed``."""
+
+    type: Literal["unit_played"]
+    player: int
+    card: str
+    row: Row
+    side: int
+
+
+class UnitRevived(Schema):
+    """A player revived a unit with a Medic: ``engine.UnitRevived``."""
+
+    type: Literal["unit_revived"]
+    player: int
+    card: str
+    row: Row
+    side: int
+
+
+class UnitMustered(Schema):
+    """A Muster called a unit from the deck or hand: ``engine.UnitMustered``."""
+
+    type: Literal["unit_mustered"]
+    player: int
+    card: str
+    row: Row
+    from_hand: bool
+
+
+class CardsDrawn(Schema):
+    """The player drew cards: ``engine.CardsDrawn``.
+
+    The player only gets this for their own cards. For the opponent's, they get
+    ``OpponentDrew``.
+    """
+
+    type: Literal["cards_drawn"]
+    player: int
+    cards: tuple[str, ...]
+
+
+class WeatherPlayed(Schema):
+    """A player played a weather card: ``engine.WeatherPlayed``."""
+
+    type: Literal["weather_played"]
+    player: int
+    card: str
+    row: Row
+
+
+class WeatherCleared(Schema):
+    """A player played Clear Skies: ``engine.WeatherCleared``."""
+
+    type: Literal["weather_cleared"]
+    player: int
+    card: str
+
+
+class HornPlayed(Schema):
+    """A player played a War Horn: ``engine.HornPlayed``."""
+
+    type: Literal["horn_played"]
+    player: int
+    card: str
+    row: Row
+
+
+class ScarecrowPlayed(Schema):
+    """A player swapped a Scarecrow for a unit: ``engine.ScarecrowPlayed``."""
+
+    type: Literal["scarecrow_played"]
+    player: int
+    card: str
+    row: Row
+    unit: str
+
+
+class WildfirePlayed(Schema):
+    """A player played Wildfire: ``engine.WildfirePlayed``."""
+
+    type: Literal["wildfire_played"]
+    player: int
+    card: str
+
+
+class UnitDestroyed(Schema):
+    """A unit was destroyed: ``engine.UnitDestroyed``."""
+
+    type: Literal["unit_destroyed"]
+    side: int
+    row: Row
+    card: str
+
+
+class PlayerPassed(Schema):
+    """A player passed: ``engine.PlayerPassed``."""
+
+    type: Literal["player_passed"]
+    player: int
+
+
+class RoundEnded(Schema):
+    """Both players passed and the round was scored: ``engine.RoundEnded``."""
+
+    type: Literal["round_ended"]
+    scores: tuple[int, int]
+    winner: int | None
+
+
+class MatchEnded(Schema):
+    """A player has no lives left: ``engine.MatchEnded``."""
+
+    type: Literal["match_ended"]
+    winner: int | None
+
+
+class CardRedrawn(Schema):
+    """The player swapped a card before round 1: ``engine.CardRedrawn``.
+
+    The player only gets this for their own cards. For the opponent's, they get
+    ``OpponentRedrew``.
+    """
+
+    type: Literal["card_redrawn"]
+    player: int
+    card: str
+    drawn: str
+
+
+class RedrawEnded(Schema):
+    """A player is done redrawing: ``engine.RedrawEnded``."""
+
+    type: Literal["redraw_ended"]
+    player: int
+
+
+class OpponentDrew(Schema):
+    """The opponent drew cards, but not which: ``engine.OpponentDrew``."""
+
+    type: Literal["opponent_drew"]
+    player: int
+    count: int
+
+
+class OpponentRedrew(Schema):
+    """The opponent swapped a card, but not which: ``engine.OpponentRedrew``."""
+
+    type: Literal["opponent_redrew"]
+    player: int
+
+
+# Any event, as the player may see it. Its "type" says which.
+type EventView = Annotated[
+    UnitPlayed
+    | UnitRevived
+    | UnitMustered
+    | CardsDrawn
+    | WeatherPlayed
+    | WeatherCleared
+    | HornPlayed
+    | ScarecrowPlayed
+    | WildfirePlayed
+    | UnitDestroyed
+    | PlayerPassed
+    | RoundEnded
+    | MatchEnded
+    | CardRedrawn
+    | RedrawEnded
+    | OpponentDrew
+    | OpponentRedrew,
     Field(discriminator="type"),
 ]
 
@@ -314,3 +494,112 @@ def _action(action: engine.Action) -> Action:
         # The last kind left, so the match never falls through.
         case engine.EndRedraw():  # pragma: no branch
             return EndRedraw(type="end_redraw")
+
+
+def from_events(events: tuple[engine.Event, ...], player: int) -> tuple[EventView, ...]:
+    """Return the events of an action as ``player`` may see them, as the API sends them.
+
+    First, ``engine.player_events`` hides the cards the opponent drew or
+    swapped. It is called here, and not left to the endpoint, because mypy
+    would not catch an endpoint that forgot it. ``from_view`` can't be given
+    the state, since the state isn't a view. But every event ``apply`` returns
+    is also an ``engine.EventView``, so mypy would let the events from before
+    ``player_events`` through where the ones from after it are expected.
+
+    Args:
+        events: The events, as ``engine.apply`` returned them.
+        player: The player's index, 0 or 1.
+    """
+    return tuple(_event(event) for event in engine.player_events(events, player))
+
+
+def _event(event: engine.EventView) -> EventView:
+    """Return an event, as a player may see it, as the API sends it.
+
+    Every kind of event is here, so mypy reports a missing return when a new
+    kind has no shape yet.
+    """
+    match event:
+        case engine.UnitPlayed():
+            return UnitPlayed(
+                type="unit_played",
+                player=event.player,
+                card=event.card,
+                row=event.row,
+                side=event.side,
+            )
+        case engine.UnitRevived():
+            return UnitRevived(
+                type="unit_revived",
+                player=event.player,
+                card=event.card,
+                row=event.row,
+                side=event.side,
+            )
+        case engine.UnitMustered():
+            return UnitMustered(
+                type="unit_mustered",
+                player=event.player,
+                card=event.card,
+                row=event.row,
+                from_hand=event.from_hand,
+            )
+        case engine.CardsDrawn():
+            return CardsDrawn(
+                type="cards_drawn", player=event.player, cards=event.cards
+            )
+        case engine.WeatherPlayed():
+            return WeatherPlayed(
+                type="weather_played",
+                player=event.player,
+                card=event.card,
+                row=event.row,
+            )
+        case engine.WeatherCleared():
+            return WeatherCleared(
+                type="weather_cleared", player=event.player, card=event.card
+            )
+        case engine.HornPlayed():
+            return HornPlayed(
+                type="horn_played", player=event.player, card=event.card, row=event.row
+            )
+        case engine.ScarecrowPlayed():
+            return ScarecrowPlayed(
+                type="scarecrow_played",
+                player=event.player,
+                card=event.card,
+                row=event.row,
+                unit=event.unit,
+            )
+        case engine.WildfirePlayed():
+            return WildfirePlayed(
+                type="wildfire_played", player=event.player, card=event.card
+            )
+        case engine.UnitDestroyed():
+            return UnitDestroyed(
+                type="unit_destroyed", side=event.side, row=event.row, card=event.card
+            )
+        case engine.PlayerPassed():
+            return PlayerPassed(type="player_passed", player=event.player)
+        case engine.RoundEnded():
+            return RoundEnded(
+                type="round_ended", scores=event.scores, winner=event.winner
+            )
+        case engine.MatchEnded():
+            return MatchEnded(type="match_ended", winner=event.winner)
+        case engine.CardRedrawn():
+            return CardRedrawn(
+                type="card_redrawn",
+                player=event.player,
+                card=event.card,
+                drawn=event.drawn,
+            )
+        case engine.RedrawEnded():
+            return RedrawEnded(type="redraw_ended", player=event.player)
+        case engine.OpponentDrew():
+            return OpponentDrew(
+                type="opponent_drew", player=event.player, count=event.count
+            )
+        # The last kind left, so the match never falls through.
+        case engine.OpponentRedrew():  # pragma: no branch
+            return OpponentRedrew(type="opponent_redrew", player=event.player)
