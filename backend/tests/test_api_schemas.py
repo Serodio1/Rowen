@@ -1,10 +1,11 @@
-"""Tests for what the web API sends as JSON: the player view in shapes of its own."""
+"""Tests for what the web API sends as JSON: the player view and the events."""
 
 import json
 from dataclasses import asdict, replace
 from typing import Any
 
 import pytest
+from pydantic import TypeAdapter
 
 from rowen.api import schemas
 from rowen.data import deck_ids, load_deck
@@ -92,6 +93,8 @@ EMPTY_VIEW = engine.PlayerView(
     winner=None,
 )
 
+# The events of an action, as a response holds them.
+EVENTS = TypeAdapter(tuple[schemas.EventView, ...])
 
 DECKS = tuple(load_deck(deck_id) for deck_id in deck_ids())
 
@@ -281,10 +284,11 @@ def test_a_view_after_a_medic_says_the_player_is_reviving() -> None:
 
 
 @pytest.mark.parametrize(
-    ("union", "types"),
+    ("shape", "union", "types"),
     [
-        ("Card", {"unit", "special"}),
+        (schemas.PlayerView, "Card", {"unit", "special"}),
         (
+            schemas.PlayerView,
             "Action",
             {
                 "play_unit",
@@ -297,23 +301,47 @@ def test_a_view_after_a_medic_says_the_player_is_reviving() -> None:
                 "end_redraw",
             },
         ),
+        (
+            tuple[schemas.EventView, ...],
+            "EventView",
+            {
+                "unit_played",
+                "unit_revived",
+                "unit_mustered",
+                "cards_drawn",
+                "weather_played",
+                "weather_cleared",
+                "horn_played",
+                "scarecrow_played",
+                "wildfire_played",
+                "unit_destroyed",
+                "player_passed",
+                "round_ended",
+                "match_ended",
+                "card_redrawn",
+                "redraw_ended",
+                "opponent_drew",
+                "opponent_redrew",
+            },
+        ),
     ],
 )
 def test_the_json_schema_tells_each_kind_apart_by_its_type(
-    union: str, types: set[str]
+    shape: Any, union: str, types: set[str]
 ) -> None:
     # The browser's types are built from this schema (OpenAPI).
-    schema = schemas.PlayerView.model_json_schema(mode="serialization")
+    schema = TypeAdapter(shape).json_schema(mode="serialization")
 
     discriminator = schema["$defs"][union]["discriminator"]
     assert discriminator["propertyName"] == "type"
     assert set(discriminator["mapping"]) == types
 
 
-def test_every_field_is_always_sent() -> None:
+@pytest.mark.parametrize("shape", [schemas.Match, tuple[schemas.EventView, ...]])
+def test_every_field_is_always_sent(shape: Any) -> None:
     # So the browser's types have no optional fields: a field that may be empty
     # is sent as null or as an empty list, never left out.
-    schema = schemas.Match.model_json_schema(mode="serialization")
+    schema = TypeAdapter(shape).json_schema(mode="serialization")
     shapes = [schema, *schema["$defs"].values()]
 
     for shape in shapes:
@@ -341,6 +369,137 @@ def test_every_view_of_a_match_is_sent_as_it_is(seed: int) -> None:
         assert schemas.PlayerView.model_validate_json(text) == sent
 
 
+@pytest.mark.parametrize(
+    ("event", "expected"),
+    [
+        (
+            engine.UnitPlayed(player=0, card="spy", row=MELEE, side=1),
+            {
+                "type": "unit_played",
+                "player": 0,
+                "card": "spy",
+                "row": "melee",
+                "side": 1,
+            },
+        ),
+        (
+            engine.UnitRevived(player=0, card="spy", row=MELEE, side=1),
+            {
+                "type": "unit_revived",
+                "player": 0,
+                "card": "spy",
+                "row": "melee",
+                "side": 1,
+            },
+        ),
+        (
+            engine.UnitMustered(player=1, card="soldier", row=MELEE, from_hand=True),
+            {
+                "type": "unit_mustered",
+                "player": 1,
+                "card": "soldier",
+                "row": "melee",
+                "from_hand": True,
+            },
+        ),
+        (
+            engine.CardsDrawn(player=0, cards=("sniper", "soldier")),
+            {"type": "cards_drawn", "player": 0, "cards": ["sniper", "soldier"]},
+        ),
+        (
+            engine.WeatherPlayed(player=1, card="thick-fog", row=RANGED),
+            {
+                "type": "weather_played",
+                "player": 1,
+                "card": "thick-fog",
+                "row": "ranged",
+            },
+        ),
+        (
+            engine.WeatherCleared(player=0, card="clear-skies"),
+            {"type": "weather_cleared", "player": 0, "card": "clear-skies"},
+        ),
+        (
+            engine.HornPlayed(player=0, card="war-horn", row=SIEGE),
+            {"type": "horn_played", "player": 0, "card": "war-horn", "row": "siege"},
+        ),
+        (
+            engine.ScarecrowPlayed(
+                player=0, card="scarecrow", row=RANGED, unit="sniper"
+            ),
+            {
+                "type": "scarecrow_played",
+                "player": 0,
+                "card": "scarecrow",
+                "row": "ranged",
+                "unit": "sniper",
+            },
+        ),
+        (
+            engine.WildfirePlayed(player=1, card="wildfire"),
+            {"type": "wildfire_played", "player": 1, "card": "wildfire"},
+        ),
+        (
+            engine.UnitDestroyed(side=0, row=RANGED, card="sniper"),
+            {"type": "unit_destroyed", "side": 0, "row": "ranged", "card": "sniper"},
+        ),
+        (engine.PlayerPassed(player=1), {"type": "player_passed", "player": 1}),
+        (
+            engine.RoundEnded(scores=(12, 9), winner=0),
+            {"type": "round_ended", "scores": [12, 9], "winner": 0},
+        ),
+        (engine.MatchEnded(winner=None), {"type": "match_ended", "winner": None}),
+        (
+            engine.CardRedrawn(player=0, card="sniper", drawn="soldier"),
+            {
+                "type": "card_redrawn",
+                "player": 0,
+                "card": "sniper",
+                "drawn": "soldier",
+            },
+        ),
+        (engine.RedrawEnded(player=1), {"type": "redraw_ended", "player": 1}),
+        # The opponent's cards are hidden: only how many they drew.
+        (
+            engine.CardsDrawn(player=1, cards=("sniper", "soldier")),
+            {"type": "opponent_drew", "player": 1, "count": 2},
+        ),
+        (
+            engine.CardRedrawn(player=1, card="sniper", drawn="soldier"),
+            {"type": "opponent_redrew", "player": 1},
+        ),
+    ],
+)
+def test_each_kind_of_event_is_sent_with_its_type(
+    event: engine.Event, expected: dict[str, Any]
+) -> None:
+    # As apply returns it, and as player 0 sees it.
+    sent = EVENTS.dump_json(schemas.from_events((event,), player=0))
+
+    assert as_text(json.loads(sent)) == as_text([expected])
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_every_event_of_a_match_is_sent_as_the_player_sees_it(seed: int) -> None:
+    # Each player plays the first legal action in their own view, to the end.
+    state = engine.start_match((DECKS[0], DECKS[1]), seed=seed)
+    view = engine.player_view(state, 0)
+    while not view.match_over:
+        mover = engine.player_view(state, view.current)
+        state, events = engine.apply(state, mover.legal_actions[0])
+        view = engine.player_view(state, 0)
+
+        for player in (0, 1):
+            sent = schemas.from_events(events, player)
+            text = EVENTS.dump_json(sent)
+            # Field by field, the JSON is each event as player_events lets the
+            # player see it, with a "type".
+            seen = [asdict(event) for event in engine.player_events(events, player)]
+            assert as_text(without_types(json.loads(text))) == as_text(seen)
+            # And what the JSON reads back as is what was sent.
+            assert EVENTS.validate_json(text) == sent
+
+
 def as_text(value: Any) -> str:
     """Return a value as JSON text, to compare it with JSON the API sent.
 
@@ -351,7 +510,7 @@ def as_text(value: Any) -> str:
 
 
 def without_types(value: Any) -> Any:
-    """Return JSON without the "type" of each card and action."""
+    """Return JSON without the "type" of each card, action and event."""
     if isinstance(value, dict):
         return {
             key: without_types(item) for key, item in value.items() if key != "type"
