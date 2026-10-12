@@ -4,14 +4,17 @@ A client, such as the CLI or the web API, shows a match to a player and
 passes their moves on to the engine. For that it needs four functions:
 ``start_match`` and ``apply`` to play, and ``player_view`` and
 ``player_events`` to see what one player may see. It also needs the types
-those functions take and return: actions, events, cards and the player view.
+they work with: actions, events, cards and the player view.
 
 The rest of the engine holds the rules, such as ``legal_actions``, which a
 client must not work out for itself (ADR 0002): the legal actions, the scores
 and the winner all come in the player view. So a client imports this module
-and nothing else from the engine, and import-linter checks it (see
-``pyproject.toml``). A client keeps the state that ``start_match`` and
-``apply`` return, to give it back to them, but never looks inside it.
+and nothing else from the engine. import-linter checks it for each client
+with a contract in ``pyproject.toml``: today, the CLI.
+
+A client keeps the match state that ``start_match`` and ``apply`` return, to
+give it back to ``apply`` and ``player_view``, but never looks inside it. So
+it doesn't even need the name of its type.
 
 Everything here is defined elsewhere in the engine: this module only brings it
 together. ``__all__`` is the list of what it offers, and mypy rejects

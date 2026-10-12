@@ -106,16 +106,20 @@ pyproject.toml."""
 # ADR 0002: the CLI holds no rules. It shows the player view and passes the
 # player's choice to the engine. So the only part of the engine it may import
 # is rowen.engine.public, the engine's public face, which leaves the rules,
-# such as legal_actions, out. The CLI still keeps the match state, to give it
-# back to apply; no import contract can see it look inside, so that is left
-# to review. The CLI may also import the AI and the card data, which use the
-# engine themselves. The standard library and third-party packages are fine:
-# reading and printing is the CLI's job.
+# such as legal_actions, out. Two things are left to review, because they are
+# not imports and no import contract sees them: looking inside the match
+# state, which the CLI keeps to give back to apply and player_view, and
+# reaching another engine module through the package, such as
+# rowen.engine.game after importing rowen.engine.public. The CLI may also
+# import the AI and the card data, which use the engine themselves. The
+# standard library and third-party packages are fine: reading and printing is
+# the CLI's job.
 [[tool.importlinter.contracts]]
 name = "The CLI only imports the engine's public module"
 type = "forbidden"
 source_modules = ["rowen.cli"]
-forbidden_modules = ["rowen.engine.*"]
+# The whole engine: the package and every module in it.
+forbidden_modules = ["rowen.engine"]
 # The allowed imports, written as imports to ignore, as above. What an allowed
 # module imports doesn't count against the CLI.
 ignore_imports = [
