@@ -8,12 +8,14 @@ response (ADR 0002), and a field the engine adds stays out of the API until
 someone adds it here on purpose. In a request, a field that is missing or of
 the wrong type turns the request down before any endpoint sees it.
 
-The shapes and names follow the engine's player view, so the types of the
-browser read like the engine's. Players are known by their index, 0 or 1, as
-in the engine: ``player`` is the index of the player whose view it is.
+The shapes and names follow the engine's player view and events, so the types
+of the browser read like the engine's. Players are known by their index, 0 or
+1, as in the engine: in ``PlayerView``, ``player`` is the index of the player
+whose view it is, and in an event, of the player it is about.
 
-``from_events`` does the same for the events of an action, after
-``player_events`` has hidden the cards the opponent drew or swapped.
+``from_events`` does the same as ``from_view`` for the events of an action. It
+calls ``player_events`` itself, so the cards the opponent drew or swapped stay
+hidden: an endpoint gives it the events as ``apply`` returned them.
 
 Each kind of card, of action and of event carries a ``type``, such as
 ``"pass"``: that is how the browser tells them apart, since ``Pass`` and
@@ -497,11 +499,12 @@ def _action(action: engine.Action) -> Action:
 def from_events(events: tuple[engine.Event, ...], player: int) -> tuple[EventView, ...]:
     """Return the events of an action as ``player`` may see them, as the API sends them.
 
-    ``engine.player_events`` hides first the cards the opponent drew or swapped.
-    It is called here, and not left to the endpoint, because nothing would catch
-    an endpoint that forgot it: unlike the state and the view, the events it
-    hides and the ones it sends have the same type, so mypy can't tell them
-    apart.
+    First, ``engine.player_events`` hides the cards the opponent drew or
+    swapped. It is called here, and not left to the endpoint, because mypy
+    would not catch an endpoint that forgot it. ``from_view`` can't be given
+    the state, since the state isn't a view. But every event ``apply`` returns
+    is also an ``engine.EventView``, so mypy would let the events from before
+    ``player_events`` through where the ones from after it are expected.
 
     Args:
         events: The events, as ``engine.apply`` returned them.

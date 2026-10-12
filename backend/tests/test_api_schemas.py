@@ -284,7 +284,7 @@ def test_a_view_after_a_medic_says_the_player_is_reviving() -> None:
 
 
 @pytest.mark.parametrize(
-    ("shape", "union", "types"),
+    ("sent", "union", "types"),
     [
         (schemas.PlayerView, "Card", {"unit", "special"}),
         (
@@ -327,21 +327,23 @@ def test_a_view_after_a_medic_says_the_player_is_reviving() -> None:
     ],
 )
 def test_the_json_schema_tells_each_kind_apart_by_its_type(
-    shape: Any, union: str, types: set[str]
+    sent: Any, union: str, types: set[str]
 ) -> None:
     # The browser's types are built from this schema (OpenAPI).
-    schema = TypeAdapter(shape).json_schema(mode="serialization")
+    schema = TypeAdapter(sent).json_schema(mode="serialization")
 
     discriminator = schema["$defs"][union]["discriminator"]
     assert discriminator["propertyName"] == "type"
     assert set(discriminator["mapping"]) == types
 
 
-@pytest.mark.parametrize("shape", [schemas.Match, tuple[schemas.EventView, ...]])
-def test_every_field_is_always_sent(shape: Any) -> None:
+@pytest.mark.parametrize(
+    "sent", [schemas.Match, tuple[schemas.EventView, ...]], ids=["match", "events"]
+)
+def test_every_field_is_always_sent(sent: Any) -> None:
     # So the browser's types have no optional fields: a field that may be empty
     # is sent as null or as an empty list, never left out.
-    schema = TypeAdapter(shape).json_schema(mode="serialization")
+    schema = TypeAdapter(sent).json_schema(mode="serialization")
     shapes = [schema, *schema["$defs"].values()]
 
     for shape in shapes:
@@ -389,6 +391,17 @@ def test_every_view_of_a_match_is_sent_as_it_is(seed: int) -> None:
                 "player": 0,
                 "card": "spy",
                 "row": "melee",
+                "side": 1,
+            },
+        ),
+        # No full match below revives a unit, so a second one: not a Spy.
+        (
+            engine.UnitRevived(player=1, card="sniper", row=RANGED, side=1),
+            {
+                "type": "unit_revived",
+                "player": 1,
+                "card": "sniper",
+                "row": "ranged",
                 "side": 1,
             },
         ),
@@ -459,10 +472,11 @@ def test_every_view_of_a_match_is_sent_as_it_is(seed: int) -> None:
             },
         ),
         (engine.RedrawEnded(player=1), {"type": "redraw_ended", "player": 1}),
-        # The opponent's cards are hidden: only how many they drew.
+        # The opponent's cards are hidden: only how many they drew. A Spy draws
+        # one card when only one is left in the deck.
         (
-            engine.CardsDrawn(player=1, cards=("sniper", "soldier")),
-            {"type": "opponent_drew", "player": 1, "count": 2},
+            engine.CardsDrawn(player=1, cards=("sniper",)),
+            {"type": "opponent_drew", "player": 1, "count": 1},
         ),
         (
             engine.CardRedrawn(player=1, card="sniper", drawn="soldier"),
