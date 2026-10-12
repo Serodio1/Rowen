@@ -131,7 +131,11 @@ def test_a_view_is_sent_field_by_field() -> None:
                 total=1,
             ),
             engine.SideView(
-                rows={MELEE: EMPTY_ROW, RANGED: EMPTY_ROW, SIEGE: EMPTY_ROW},
+                rows={
+                    MELEE: EMPTY_ROW,
+                    RANGED: replace(EMPTY_ROW, weathered=True),
+                    SIEGE: EMPTY_ROW,
+                },
                 weather=(THICK_FOG,),
                 discard=(SNIPER,),
                 lives=1,
@@ -155,65 +159,69 @@ def test_a_view_is_sent_field_by_field() -> None:
         winner=None,
     )
 
-    assert schemas.from_view(view).model_dump(mode="json") == {
-        "player": 0,
-        "hand": [SOLDIER_JSON, THICK_FOG_JSON],
-        "players": [
-            {
-                "rows": {
-                    "melee": EMPTY_ROW_JSON,
-                    "ranged": {
-                        "units": [{"card": SNIPER_JSON, "strength": 1}],
-                        "horn": None,
-                        "scarecrows": [],
-                        "weathered": True,
-                        "score": 1,
+    sent = json.loads(schemas.from_view(view).model_dump_json())
+
+    assert as_text(sent) == as_text(
+        {
+            "player": 0,
+            "hand": [SOLDIER_JSON, THICK_FOG_JSON],
+            "players": [
+                {
+                    "rows": {
+                        "melee": EMPTY_ROW_JSON,
+                        "ranged": {
+                            "units": [{"card": SNIPER_JSON, "strength": 1}],
+                            "horn": None,
+                            "scarecrows": [],
+                            "weathered": True,
+                            "score": 1,
+                        },
+                        "siege": {
+                            "units": [],
+                            "horn": WAR_HORN_JSON,
+                            "scarecrows": [],
+                            "weathered": False,
+                            "score": 0,
+                        },
                     },
-                    "siege": {
-                        "units": [],
-                        "horn": WAR_HORN_JSON,
-                        "scarecrows": [],
-                        "weathered": False,
-                        "score": 0,
+                    "weather": [],
+                    "discard": [],
+                    "lives": 2,
+                    "passed": False,
+                    "redraws_left": 0,
+                    "hand_size": 2,
+                    "deck_size": 12,
+                    "total": 1,
+                },
+                {
+                    "rows": {
+                        "melee": EMPTY_ROW_JSON,
+                        "ranged": {**EMPTY_ROW_JSON, "weathered": True},
+                        "siege": EMPTY_ROW_JSON,
                     },
+                    "weather": [THICK_FOG_JSON],
+                    "discard": [SNIPER_JSON],
+                    "lives": 1,
+                    "passed": True,
+                    "redraws_left": 0,
+                    "hand_size": 7,
+                    "deck_size": 11,
+                    "total": 0,
                 },
-                "weather": [],
-                "discard": [],
-                "lives": 2,
-                "passed": False,
-                "redraws_left": 0,
-                "hand_size": 2,
-                "deck_size": 12,
-                "total": 1,
-            },
-            {
-                "rows": {
-                    "melee": EMPTY_ROW_JSON,
-                    "ranged": EMPTY_ROW_JSON,
-                    "siege": EMPTY_ROW_JSON,
-                },
-                "weather": [THICK_FOG_JSON],
-                "discard": [SNIPER_JSON],
-                "lives": 1,
-                "passed": True,
-                "redraws_left": 0,
-                "hand_size": 7,
-                "deck_size": 11,
-                "total": 0,
-            },
-        ],
-        "current": 0,
-        "round": 2,
-        "reviving": False,
-        "legal_actions": [
-            {"type": "play_unit", "card": "soldier", "row": "melee"},
-            {"type": "play_unit", "card": "soldier", "row": "ranged"},
-            {"type": "play_special", "card": "thick-fog"},
-            {"type": "pass"},
-        ],
-        "match_over": False,
-        "winner": None,
-    }
+            ],
+            "current": 0,
+            "round": 2,
+            "reviving": False,
+            "legal_actions": [
+                {"type": "play_unit", "card": "soldier", "row": "melee"},
+                {"type": "play_unit", "card": "soldier", "row": "ranged"},
+                {"type": "play_special", "card": "thick-fog"},
+                {"type": "pass"},
+            ],
+            "match_over": False,
+            "winner": None,
+        }
+    )
 
 
 @pytest.mark.parametrize(
@@ -302,6 +310,17 @@ def test_the_json_schema_tells_each_kind_apart_by_its_type(
     assert set(discriminator["mapping"]) == types
 
 
+def test_every_field_is_always_sent() -> None:
+    # So the browser's types have no optional fields: a field that may be empty
+    # is sent as null or as an empty list, never left out.
+    schema = schemas.PlayerView.model_json_schema(mode="serialization")
+    shapes = [schema, *schema["$defs"].values()]
+
+    for shape in shapes:
+        if shape.get("type") == "object":
+            assert set(shape["required"]) == set(shape["properties"]), shape["title"]
+
+
 @pytest.mark.parametrize("seed", range(4))
 def test_every_view_of_a_match_is_sent_as_it_is(seed: int) -> None:
     # Each player plays the first legal action in their own view, to the end.
@@ -317,10 +336,18 @@ def test_every_view_of_a_match_is_sent_as_it_is(seed: int) -> None:
         text = sent.model_dump_json()
         # Field by field, the JSON is the view, with a "type" on each card and
         # action.
-        view_json = json.loads(json.dumps(asdict(view)))
-        assert without_types(json.loads(text)) == view_json
+        assert as_text(without_types(json.loads(text))) == as_text(asdict(view))
         # And what the JSON reads back as is what was sent.
         assert schemas.PlayerView.model_validate_json(text) == sent
+
+
+def as_text(value: Any) -> str:
+    """Return a value as JSON text, to compare it with JSON the API sent.
+
+    Comparing text, not Python values, tells ``false`` from ``0``: in Python,
+    ``False == 0``.
+    """
+    return json.dumps(value, sort_keys=True, indent=2)
 
 
 def without_types(value: Any) -> Any:

@@ -10,7 +10,7 @@ The rest of the engine holds the rules, such as ``legal_actions``, which a
 client must not work out for itself (ADR 0002): the legal actions, the scores
 and the winner all come in the player view. So a client imports this module
 and nothing else from the engine. import-linter checks it for each client
-with a contract in ``pyproject.toml``: today, the CLI.
+with a contract in ``pyproject.toml``: today, the CLI and the web API.
 
 A client keeps the match state that ``start_match`` and ``apply`` return, to
 give it back to ``apply`` and ``player_view``, but never looks inside it. So

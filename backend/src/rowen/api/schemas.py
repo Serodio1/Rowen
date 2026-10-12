@@ -15,7 +15,6 @@ is how the browser tells them apart, since ``Pass`` and ``EndRedraw`` have no
 other field.
 """
 
-from collections.abc import Mapping
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -149,10 +148,23 @@ class RowView(Schema):
     score: int
 
 
+class RowsView(Schema):
+    """One side of the board: its three rows, by name.
+
+    The engine keeps them in a mapping from each ``Row``. Here each row has a
+    field of its own, so the JSON is the same, but the JSON schema says that
+    all three are always there.
+    """
+
+    melee: RowView
+    ranged: RowView
+    siege: RowView
+
+
 class SideView(Schema):
     """What both players see of one player, as ``engine.SideView`` describes it."""
 
-    rows: Mapping[Row, RowView]
+    rows: RowsView
     weather: tuple[SpecialCard, ...]
     discard: tuple[Card, ...]
     lives: int
@@ -193,8 +205,13 @@ def from_view(view: engine.PlayerView) -> PlayerView:
 
 
 def _side(side: engine.SideView) -> SideView:
+    """Return what both players see of one player, as the API sends it."""
     return SideView(
-        rows={row: _row(row_view) for row, row_view in side.rows.items()},
+        rows=RowsView(
+            melee=_row(side.rows[Row.MELEE]),
+            ranged=_row(side.rows[Row.RANGED]),
+            siege=_row(side.rows[Row.SIEGE]),
+        ),
         weather=tuple(_special(card) for card in side.weather),
         discard=tuple(_card(card) for card in side.discard),
         lives=side.lives,
@@ -207,6 +224,7 @@ def _side(side: engine.SideView) -> SideView:
 
 
 def _row(row: engine.RowView) -> RowView:
+    """Return one row on one side of the board, as the API sends it."""
     return RowView(
         units=tuple(
             UnitView(card=_unit(unit.card), strength=unit.strength)
@@ -220,6 +238,7 @@ def _row(row: engine.RowView) -> RowView:
 
 
 def _card(card: engine.Card) -> Card:
+    """Return a card, unit or special, as the API sends it."""
     match card:
         case engine.UnitCard():
             return _unit(card)
@@ -229,6 +248,7 @@ def _card(card: engine.Card) -> Card:
 
 
 def _unit(card: engine.UnitCard) -> UnitCard:
+    """Return a unit as the API sends it."""
     return UnitCard(
         type="unit",
         id=card.id,
@@ -242,6 +262,7 @@ def _unit(card: engine.UnitCard) -> UnitCard:
 
 
 def _special(card: engine.SpecialCard) -> SpecialCard:
+    """Return a special card as the API sends it."""
     return SpecialCard(type="special", id=card.id, name=card.name, kind=card.kind)
 
 
