@@ -13,6 +13,13 @@ The web server handles requests in threads, so two of them can use the store
 at the same time. A lock lets one thread in at a time: without it, one thread
 could push out a match while another is reading it.
 
+Two requests can also play the same match at once, as after a double click:
+each gets the match, plays its action and keeps the result. The lock isn't
+held while they play, since the AI takes a while to think, so ``replace``
+keeps a result only if the match is still the one its request started from.
+The other request finds the match changed and is turned down, instead of
+undoing the first one's action without a word.
+
 PostgreSQL takes its place later in this milestone, behind the same methods,
 so the endpoints don't change.
 """
@@ -64,3 +71,19 @@ class MatchStore:
             if state is not None:
                 self._matches.move_to_end(match_id)
             return state
+
+    def replace(self, match_id: UUID, old: GameState, new: GameState) -> bool:
+        """Replace the state of a match, but only if it is still ``old``.
+
+        Return whether it was replaced. It wasn't if another request replaced
+        it first, or if it was pushed out. ``old`` is the state ``get``
+        returned: the very same object, not just an equal one.
+
+        The match counts as used, so it is the last to be pushed out.
+        """
+        with self._lock:
+            if self._matches.get(match_id) is not old:
+                return False
+            self._matches[match_id] = new
+            self._matches.move_to_end(match_id)
+            return True
