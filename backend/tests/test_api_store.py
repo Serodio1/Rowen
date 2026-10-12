@@ -4,6 +4,8 @@ import sys
 import threading
 from uuid import uuid4
 
+import pytest
+
 from rowen.api.store import MAX_MATCHES, MatchStore
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import GameState, start_match
@@ -67,9 +69,28 @@ def test_a_store_holds_max_matches_by_default() -> None:
     assert all(store.get(match_id) is state for match_id in ids[1:])
 
 
+@pytest.mark.parametrize("method", ["create", "get"])
+def test_a_thread_waits_while_another_one_uses_the_store(method: str) -> None:
+    store = MatchStore()
+    state = new_state()
+    match_id = store.create(state)
+    argument = state if method == "create" else match_id
+    thread = threading.Thread(target=getattr(store, method), args=(argument,))
+
+    # While the test holds the lock, the other thread can't get in.
+    with store._lock:
+        thread.start()
+        thread.join(timeout=0.1)
+        waited = thread.is_alive()
+    thread.join()
+
+    assert waited
+
+
 def test_many_threads_can_use_the_store_at_once() -> None:
     # Threads take turns far more often than usual, so that without the lock
-    # one thread would soon push out a match that another one is reading.
+    # one thread would soon push out a match that another one is reading, for
+    # example in ``get``, between finding the match and moving it to the end.
     store = MatchStore(max_matches=4)
     state = new_state()
     errors: list[Exception] = []

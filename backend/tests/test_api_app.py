@@ -10,10 +10,12 @@ from uuid import UUID, uuid4
 
 import httpx2
 import pytest
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
+from rowen.ai.baseline import choose_action
 from rowen.api import schemas
-from rowen.api.app import AI, HUMAN, SEED_BITS, _ai_plays, app, get_store, new_seed
+from rowen.api.app import AI, HUMAN, _ai_plays, app, get_store, new_seed
 from rowen.api.store import MatchStore
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import GameState, apply, player_view, start_match
@@ -23,6 +25,10 @@ from rowen.engine.public import GameState, apply, player_view, start_match
 # player with the second one.
 AI_STARTS = 12_345_678_901_234_567_890
 PLAYER_STARTS = 12_345_678_901_234_567_891
+
+# With this seed, if the player always plays their first legal action, the AI
+# plays a Medic in round 1 and then has to choose a unit to revive.
+AI_REVIVES = 26
 
 DECKS = {deck_id: load_deck(deck_id) for deck_id in deck_ids()}
 
@@ -105,15 +111,22 @@ def test_the_seed_is_never_sent(client: TestClient, seed: int, method: str) -> N
     assert f"{seed:x}" not in sent
 
 
-def test_the_ai_plays_first_when_it_wins_the_coin_flip(client: TestClient) -> None:
-    decks = (DECKS["humans"], DECKS["robots"])
-    assert player_view(start_match(decks, seed=AI_STARTS), HUMAN).current == AI
+def test_the_ai_plays_first_when_it_wins_the_coin_flip(
+    client: TestClient, store: MatchStore
+) -> None:
+    state = start_match((DECKS["humans"], DECKS["robots"]), seed=AI_STARTS)
+    assert player_view(state, HUMAN).current == AI
+    # The moves the baseline AI chooses from its own view, until it is the
+    # player's turn.
+    while (view := player_view(state, AI)).current == AI:
+        state, _ = apply(state, choose_action(view))
 
-    view = start(client, seed=AI_STARTS).json()["view"]
+    response = start(client, seed=AI_STARTS)
 
+    assert state_of(store, response) == state
     # The AI has done its redraw, and now it's the player's turn.
-    assert view["players"][AI]["redraws_left"] == 0
-    assert view["current"] == HUMAN
+    assert response.json()["view"]["players"][AI]["redraws_left"] == 0
+    assert response.json()["view"]["current"] == HUMAN
 
 
 def test_the_ai_waits_when_the_player_wins_the_coin_flip(
@@ -213,14 +226,21 @@ def test_seeds_are_big_and_random() -> None:
     seeds = {new_seed() for _ in range(100)}
 
     assert len(seeds) == 100
-    assert all(0 <= seed < 2**SEED_BITS for seed in seeds)
-    # A random seed of 64 bits is below 2**60 once in 16, so all 100 of them
-    # are below it only if they are far smaller than they should be.
-    assert max(seeds) >= 2**60
+    assert all(0 <= seed < 2**64 for seed in seeds)
+    # A seed of 64 random bits is below 2**63 half the time, so all 100 of
+    # them are below it once in 2**100: only if they have fewer bits.
+    assert max(seeds) >= 2**63
 
 
-def test_every_request_gets_the_same_store() -> None:
-    assert get_store() is get_store()
+def test_the_app_keeps_its_matches_in_a_store_of_its_own() -> None:
+    # No overrides: the app's own store, and seeds chosen at random.
+    client = TestClient(app)
+    started = client.post("/matches", json={"deck": "humans"})
+    client.post("/matches", json={"deck": "robots"})
+
+    response = client.get(started.headers["Location"])
+
+    assert response.text == started.text
 
 
 def test_the_ai_doesnt_play_once_the_match_is_over() -> None:
@@ -234,6 +254,38 @@ def test_the_ai_doesnt_play_once_the_match_is_over() -> None:
     assert view.current == AI
 
     assert _ai_plays(state) is state
+
+
+def test_the_ai_finishes_its_turn_after_a_medic() -> None:
+    state = start_match((DECKS["humans"], DECKS["robots"]), seed=AI_REVIVES)
+    while not (view := player_view(state, AI)).reviving:
+        if view.current == AI:
+            action = choose_action(view)
+        else:
+            action = player_view(state, HUMAN).legal_actions[0]
+        state, _ = apply(state, action)
+    assert view.current == AI
+
+    # The AI chooses a unit to revive, and only then does its turn end.
+    view = player_view(_ai_plays(state), HUMAN)
+
+    assert view.current == HUMAN
+    assert not view.reviving
+
+
+def test_every_endpoint_sends_only_the_apis_own_models() -> None:
+    # FastAPI sends what an endpoint returns through its response model, which
+    # is its return type. An endpoint returning "GameState", "Any" or a dict,
+    # or with no return type, could send the seed.
+    docs = {app.openapi_url, app.docs_url, app.redoc_url}
+    docs.add(app.swagger_ui_oauth2_redirect_url)
+    routes = [route for route in app.routes if getattr(route, "path", "") not in docs]
+
+    assert routes
+    for route in routes:
+        assert isinstance(route, APIRoute), route
+        assert isinstance(route.response_model, type), route.path
+        assert issubclass(route.response_model, schemas.Schema), route.path
 
 
 def test_the_openapi_schema_lists_the_endpoints(client: TestClient) -> None:
