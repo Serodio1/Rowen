@@ -56,6 +56,21 @@ code in `src` changes.
 Matches are kept in memory for now, so they are lost when the server stops or
 restarts.
 
+## Run the frontend
+
+The browser interface is a React app in `frontend/`. It needs
+[Node.js](https://nodejs.org/) 24 (the LTS version), which comes with npm:
+
+```sh
+cd frontend
+npm ci          # install the exact versions in package-lock.json
+npm run dev     # start the development server
+```
+
+Then open <http://localhost:5173>. For now the page only shows the name of the
+game: the next step connects it to the web API. The development server reloads
+the page whenever the code changes.
+
 ## Development
 
 The backend needs [uv](https://docs.astral.sh/uv/), which also installs the
@@ -70,6 +85,22 @@ uv run ruff format      # format the code
 uv run mypy             # type-check
 uv run lint-imports     # check which modules may import which
 ```
+
+The frontend has the same kind of checks, run with npm:
+
+```sh
+cd frontend
+npm run lint            # lint with ESLint
+npm run format          # format the code with Prettier
+npm run typecheck       # type-check with TypeScript
+npm test                # run the tests with Vitest
+npm run build           # build the production files into dist/
+```
+
+To install a new package, use `npm install <package>`, which also updates
+`package-lock.json`. npm only installs versions published at least 14 days ago
+(see `frontend/.npmrc`), so a release that turns out to be malicious is
+usually found and removed before it can reach the project.
 
 Every push and pull request runs the same checks on GitHub Actions.
 
