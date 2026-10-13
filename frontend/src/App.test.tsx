@@ -100,21 +100,16 @@ test("no deck can be chosen while a match starts", async () => {
   await screen.findByRole("heading", { name: "Round 1" });
 });
 
-test("when the API turns a match down, the page shows why, and the decks can be chosen again", async () => {
+test("when the API turns a match down, the page shows why, and the player can try again", async () => {
   const turnedDown = {
     code: "unknown_deck",
     message: "There is no such deck.",
   };
-  render(
-    <App
-      api={
-        fakeApi({
-          ...THE_DECKS,
-          "POST /api/matches": { status: 422, body: turnedDown },
-        }).api
-      }
-    />,
-  );
+  const answers: Record<string, Answer> = {
+    ...THE_DECKS,
+    "POST /api/matches": { status: 422, body: turnedDown },
+  };
+  render(<App api={fakeApi(answers).api} />);
 
   fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
 
@@ -122,6 +117,12 @@ test("when the API turns a match down, the page shows why, and the decks can be 
     "There is no such deck.",
   );
   expect(screen.getByRole("button", { name: "Humans" })).toBeEnabled();
+
+  answers["POST /api/matches"] = A_MATCH["POST /api/matches"];
+  fireEvent.click(screen.getByRole("button", { name: "Humans" }));
+
+  await screen.findByRole("heading", { name: "Round 1" });
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 test.each<[string, Answer | undefined]>([
