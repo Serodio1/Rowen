@@ -58,7 +58,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Also turns ESLint and TypeScript errors into annotations on the PR.
+      # Also turns ESLint errors into annotations on the PR. TypeScript errors
+      # are only in the log: tsc prints paths relative to frontend/, which
+      # GitHub cannot place in the files.
       - uses: actions/setup-node@v7
         with:
           node-version-file: frontend/.nvmrc

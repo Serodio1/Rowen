@@ -19,7 +19,7 @@ plus a section on the alternatives that were considered.
 | [0004](0004-monorepo-with-uv.md) | Use a monorepo and manage the backend with uv | Accepted |
 | [0005](0005-ai-tries-moves-in-the-engine.md) | Let the AI judge each move by trying it in the engine | Superseded by ADR 0006 |
 | [0006](0006-ai-plays-out-passed-rounds.md) | Let the AI try moves in the engine, and play out passed rounds | Accepted |
-| [0007](0007-frontend-tooling.md) | Use npm, ESLint and Prettier for the frontend, with a 14-day minimum release age | Accepted |
+| [0007](0007-frontend-tooling.md) | Use npm, ESLint and Prettier for the frontend, and guard against malicious packages | Accepted |
 
 ## Writing a new ADR
 
