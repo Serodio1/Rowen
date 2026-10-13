@@ -57,7 +57,7 @@ Principles:
 | Frontend | React, TypeScript (strict), Vite, TanStack Query, Tailwind CSS |
 | Frontend tests | Vitest, React Testing Library, Playwright (end-to-end) |
 | Frontend quality | ESLint (typescript-eslint, strict type-checked), Prettier |
-| API contract | OpenAPI → generated TypeScript types |
+| API contract | OpenAPI → generated TypeScript types (openapi-typescript), typed client (openapi-fetch) |
 | Infra | Docker, Docker Compose, GitHub Actions (CI + CD) |
 | Hosting | Decided in Phase 2 (recorded as an ADR) |
 

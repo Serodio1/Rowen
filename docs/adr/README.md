@@ -20,6 +20,7 @@ plus a section on the alternatives that were considered.
 | [0005](0005-ai-tries-moves-in-the-engine.md) | Let the AI judge each move by trying it in the engine | Superseded by ADR 0006 |
 | [0006](0006-ai-plays-out-passed-rounds.md) | Let the AI try moves in the engine, and play out passed rounds | Accepted |
 | [0007](0007-frontend-tooling.md) | Use npm, ESLint and Prettier for the frontend, and guard against malicious packages | Accepted |
+| [0008](0008-generated-api-types.md) | Keep the OpenAPI document and the generated API types in the repository | Accepted |
 
 ## Writing a new ADR
 
