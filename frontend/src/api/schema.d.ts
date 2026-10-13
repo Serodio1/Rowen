@@ -4,6 +4,28 @@
  */
 
 export interface paths {
+  "/decks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Decks
+     * @description Return the decks the player can choose from to start a match.
+     *
+     *     The AI plays another one of them.
+     */
+    get: operations["list_decks"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/matches": {
     parameters: {
       query?: never;
@@ -130,6 +152,27 @@ export interface components {
       player: number;
       /** Cards */
       cards: string[];
+    };
+    /**
+     * DeckSummary
+     * @description A deck the player can choose: its id, to start a match, and its name.
+     */
+    DeckSummary: {
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+    };
+    /**
+     * Decks
+     * @description The decks a player can choose from, in alphabetical order of their ids.
+     *
+     *     The answer is an object with a list in it, not a bare list, like every
+     *     other answer of the API, so it can get more fields later.
+     */
+    Decks: {
+      /** Decks */
+      decks: components["schemas"]["DeckSummary"][];
     };
     /**
      * EndRedraw
@@ -707,6 +750,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  list_decks: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Decks"];
+        };
+      };
+    };
+  };
   create_match: {
     parameters: {
       query?: never;
