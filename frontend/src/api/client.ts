@@ -1,8 +1,27 @@
-import createClient, { type Client } from "openapi-fetch";
+import createClient, { type Client, type MethodResponse } from "openapi-fetch";
 import type { paths } from "./schema";
 
 /** A client for the web API: one method per HTTP method, such as `POST`. */
 export type Api = Client<paths>;
+
+// The types of what the API sends, as the client gives them. They are not
+// the schema's own types, `components["schemas"]`: the client turns pairs,
+// such as the two `players` of a view, into lists (ADR 0008).
+
+/** A deck the player can choose: its id, to start a match, and its name. */
+export type Deck = MethodResponse<Api, "get", "/decks">["decks"][number];
+
+/** A match: its id and the player's view of it. */
+export type Match = MethodResponse<Api, "get", "/matches/{match_id}">;
+
+/** What the player may see of a match. */
+export type View = Match["view"];
+
+/** A card, such as one in the player's hand. */
+export type Card = View["hand"][number];
+
+/** One of the moves the player can make, as the view lists them. */
+export type Action = View["legal_actions"][number];
 
 /**
  * Make a client for the web API, typed from its OpenAPI document: a wrong

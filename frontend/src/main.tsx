@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
+import { createApi } from "./api/client.ts";
 
 const root = document.getElementById("root");
 if (root === null) {
@@ -9,6 +10,6 @@ if (root === null) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <App api={createApi()} />
   </StrictMode>,
 );
