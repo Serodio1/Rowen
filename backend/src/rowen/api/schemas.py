@@ -651,7 +651,7 @@ def to_action(action: Action) -> engine.Action:
     """Return the action the player sent as the engine's own.
 
     It is the other way round from ``_action``. Whether the action is legal is
-    for the engine to say, when it is applied.
+    for the engine to say: it works out the legal actions of each view.
     """
     match action:
         case PlayUnit():

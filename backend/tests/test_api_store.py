@@ -81,8 +81,8 @@ def test_a_match_is_replaced_if_it_is_still_the_old_one() -> None:
 
 
 def test_a_match_another_request_replaced_first_is_not_replaced() -> None:
-    # Two requests got the same match, as after a double click. The first one
-    # has already kept its result.
+    # Two requests got the same match at once. The first one has already kept
+    # its result.
     store = MatchStore()
     old, first, second = new_state(0), new_state(1), new_state(2)
     match_id = store.create(old)

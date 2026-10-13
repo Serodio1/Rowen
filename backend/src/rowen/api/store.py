@@ -13,15 +13,18 @@ The web server handles requests in threads, so two of them can use the store
 at the same time. A lock lets one thread in at a time: without it, one thread
 could push out a match while another is reading it.
 
-Two requests can also play the same match at once, as after a double click:
-each gets the match, plays its action and keeps the result. The lock isn't
-held while they play, since the AI takes a while to think, so ``replace``
-keeps a result only if the match is still the one its request started from.
-The other request finds the match changed and is turned down, instead of
-undoing the first one's action without a word.
+Two requests can also play the same match at once: each gets the match,
+plays its action and keeps the result. The lock isn't held while they play,
+since the AI takes a while to think, so ``replace`` keeps a result only if the
+match is still the one its request started from. The other request finds the
+match changed and is turned down, instead of undoing the first one's action
+without a word. A request that comes once the first one's result is kept, as
+the second click of a double click does, plays on the new match: only the
+browser can tell a double click from two clicks.
 
 PostgreSQL takes its place later in this milestone, behind the same methods,
-so the endpoints don't change.
+so the endpoints don't change. There, ``replace`` will compare a version
+number of the match instead of the very same object.
 """
 
 import threading

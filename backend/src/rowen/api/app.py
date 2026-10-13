@@ -48,7 +48,6 @@ from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
     Event,
     GameState,
-    IllegalActionError,
     apply,
     player_view,
     start_match,
@@ -160,20 +159,23 @@ def play(match_id: UUID, action: Action, store: Store) -> Played:
 
     The action is one of the legal actions in the player's view, sent back as
     it is. If it isn't legal now, the answer is a 409 and the match doesn't
-    change. If the match changed while the action was played, for example
-    because the same action was sent twice at once, the answer is a 409 too:
-    get the match again to see where it is.
+    change. If another request for the same match kept its result while this
+    action was played, the answer is a 409 too: get the match again to see
+    where it is.
     """
     old = _state(store, match_id)
-    try:
-        state, events = apply(old, to_action(action))
-    except IllegalActionError:
+    played = to_action(action)
+    # The engine works out the legal actions of the player's view. When it
+    # isn't the player's turn there are none, so the player can never make a
+    # move of the AI's.
+    if played not in player_view(old, HUMAN).legal_actions:
         raise ApiError(
             status.HTTP_409_CONFLICT,
             "illegal_action",
             "This action isn't legal now: it isn't one of the legal actions in "
             "the view.",
-        ) from None
+        )
+    state, events = apply(old, played)
     state, answer = _ai_plays(state)
     if not store.replace(match_id, old, state):
         raise ApiError(

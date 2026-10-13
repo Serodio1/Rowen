@@ -494,6 +494,26 @@ def test_an_illegal_action_is_turned_down_and_changes_nothing(
     assert state_of(store, response) is before
 
 
+def test_the_player_can_never_make_a_move_of_the_ais(
+    client: TestClient, store: MatchStore
+) -> None:
+    # A match kept on the AI's turn, which the server never does: with this
+    # seed the AI wins the coin flip, and nobody lets it play.
+    state = start_match((DECKS["humans"], DECKS["robots"]), seed=AI_STARTS)
+    assert player_view(state, HUMAN).legal_actions == ()
+    match_id = store.create(state)
+    ai_view = schemas.from_view(player_view(state, AI)).model_dump(mode="json")
+
+    for move in ai_view["legal_actions"]:
+        response = client.post(f"/matches/{match_id}/actions", json=move)
+
+        # Otherwise 200 and 409 would also tell the player the AI's cards.
+        assert response.status_code == 409
+        assert response.json()["code"] == "illegal_action"
+    assert ai_view["legal_actions"]
+    assert store.get(match_id) is state
+
+
 @pytest.mark.parametrize(
     "action",
     [
@@ -545,8 +565,8 @@ def test_an_action_for_an_unknown_match_is_turned_down(client: TestClient) -> No
 def test_an_action_on_a_match_that_changed_meanwhile_is_turned_down(
     client: TestClient, store: MatchStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # As after a double click: two requests get the same match, and the other
-    # one keeps its result first, while this one plays its action.
+    # Two requests get the same match at once, and the other one keeps its
+    # result first, while this one plays its action.
     response = start(client)
     match_id = UUID(response.json()["id"])
     other = start_match((DECKS["humans"], DECKS["robots"]), seed=1)
