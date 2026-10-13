@@ -1,0 +1,1484 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Rowen",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/matches": {
+      "post": {
+        "summary": "Create Match",
+        "description": "Start a match against the AI, which plays another deck.\n\nThe ``Location`` header of the response holds the address of the match.",
+        "operationId": "create_match",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Match"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/matches/{match_id}": {
+      "get": {
+        "summary": "Get Match",
+        "description": "Return a match as the player may see it.",
+        "operationId": "get_match",
+        "parameters": [
+          {
+            "name": "match_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Match Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Match"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/matches/{match_id}/actions": {
+      "post": {
+        "summary": "Play",
+        "description": "Play the player's action, and then let the AI answer.\n\nThe action is one of the legal actions in the player's view, sent back as\nit is. If it isn't legal now, the answer is a 409 and the match doesn't\nchange. If another request for the same match kept its result while this\naction was played, the answer is a 409 too: get the match again to see\nwhere it is.",
+        "operationId": "play",
+        "parameters": [
+          {
+            "name": "match_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Match Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/PlayUnit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PlaySpecial"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PlayHorn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PlayScarecrow"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Pass"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Revive"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Redraw"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EndRedraw"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "type",
+                  "mapping": {
+                    "play_unit": "#/components/schemas/PlayUnit",
+                    "play_special": "#/components/schemas/PlaySpecial",
+                    "play_horn": "#/components/schemas/PlayHorn",
+                    "play_scarecrow": "#/components/schemas/PlayScarecrow",
+                    "pass": "#/components/schemas/Pass",
+                    "revive": "#/components/schemas/Revive",
+                    "redraw": "#/components/schemas/Redraw",
+                    "end_redraw": "#/components/schemas/EndRedraw"
+                  }
+                },
+                "title": "Action"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Played"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Ability": {
+        "type": "string",
+        "enum": [
+          "agile",
+          "spy",
+          "medic",
+          "muster",
+          "bond",
+          "inspire"
+        ],
+        "title": "Ability",
+        "description": "A unit ability (rules, section 7). A unit has at most one."
+      },
+      "Action": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PlayUnit"
+          },
+          {
+            "$ref": "#/components/schemas/PlaySpecial"
+          },
+          {
+            "$ref": "#/components/schemas/PlayHorn"
+          },
+          {
+            "$ref": "#/components/schemas/PlayScarecrow"
+          },
+          {
+            "$ref": "#/components/schemas/Pass"
+          },
+          {
+            "$ref": "#/components/schemas/Revive"
+          },
+          {
+            "$ref": "#/components/schemas/Redraw"
+          },
+          {
+            "$ref": "#/components/schemas/EndRedraw"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "end_redraw": "#/components/schemas/EndRedraw",
+            "pass": "#/components/schemas/Pass",
+            "play_horn": "#/components/schemas/PlayHorn",
+            "play_scarecrow": "#/components/schemas/PlayScarecrow",
+            "play_special": "#/components/schemas/PlaySpecial",
+            "play_unit": "#/components/schemas/PlayUnit",
+            "redraw": "#/components/schemas/Redraw",
+            "revive": "#/components/schemas/Revive"
+          }
+        }
+      },
+      "Card": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/UnitCard"
+          },
+          {
+            "$ref": "#/components/schemas/SpecialCard"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "special": "#/components/schemas/SpecialCard",
+            "unit": "#/components/schemas/UnitCard"
+          }
+        }
+      },
+      "CardRedrawn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "card_redrawn",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "drawn": {
+            "type": "string",
+            "title": "Drawn"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "card",
+          "drawn"
+        ],
+        "title": "CardRedrawn",
+        "description": "The player swapped a card before round 1: ``engine.CardRedrawn``.\n\nThe player only gets this for their own cards. For the opponent's, they get\n``OpponentRedrew``."
+      },
+      "CardsDrawn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "cards_drawn",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "cards": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cards"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "cards"
+        ],
+        "title": "CardsDrawn",
+        "description": "The player drew cards: ``engine.CardsDrawn``.\n\nThe player only gets this for their own cards. For the opponent's, they get\n``OpponentDrew``."
+      },
+      "EndRedraw": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "end_redraw",
+            "title": "Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "EndRedraw",
+        "description": "Swap no more cards: ``engine.EndRedraw``."
+      },
+      "Error": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "Error",
+        "description": "What the API sends when it turns a request down.\n\n``code`` says what went wrong, for the browser, and ``message`` says it in\nwords, for a person. A message may say where in the request the mistake\nis, even with the name of a field the API doesn't know, but it never holds\na value from the request: a value can be nested too deep to send back. How\nbig a request may be is for #54."
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "invalid_request",
+          "unknown_deck",
+          "match_not_found",
+          "illegal_action",
+          "match_changed",
+          "not_found",
+          "method_not_allowed",
+          "server_error"
+        ]
+      },
+      "EventView": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/UnitPlayed"
+          },
+          {
+            "$ref": "#/components/schemas/UnitRevived"
+          },
+          {
+            "$ref": "#/components/schemas/UnitMustered"
+          },
+          {
+            "$ref": "#/components/schemas/CardsDrawn"
+          },
+          {
+            "$ref": "#/components/schemas/WeatherPlayed"
+          },
+          {
+            "$ref": "#/components/schemas/WeatherCleared"
+          },
+          {
+            "$ref": "#/components/schemas/HornPlayed"
+          },
+          {
+            "$ref": "#/components/schemas/ScarecrowPlayed"
+          },
+          {
+            "$ref": "#/components/schemas/WildfirePlayed"
+          },
+          {
+            "$ref": "#/components/schemas/UnitDestroyed"
+          },
+          {
+            "$ref": "#/components/schemas/PlayerPassed"
+          },
+          {
+            "$ref": "#/components/schemas/RoundEnded"
+          },
+          {
+            "$ref": "#/components/schemas/MatchEnded"
+          },
+          {
+            "$ref": "#/components/schemas/CardRedrawn"
+          },
+          {
+            "$ref": "#/components/schemas/RedrawEnded"
+          },
+          {
+            "$ref": "#/components/schemas/OpponentDrew"
+          },
+          {
+            "$ref": "#/components/schemas/OpponentRedrew"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "card_redrawn": "#/components/schemas/CardRedrawn",
+            "cards_drawn": "#/components/schemas/CardsDrawn",
+            "horn_played": "#/components/schemas/HornPlayed",
+            "match_ended": "#/components/schemas/MatchEnded",
+            "opponent_drew": "#/components/schemas/OpponentDrew",
+            "opponent_redrew": "#/components/schemas/OpponentRedrew",
+            "player_passed": "#/components/schemas/PlayerPassed",
+            "redraw_ended": "#/components/schemas/RedrawEnded",
+            "round_ended": "#/components/schemas/RoundEnded",
+            "scarecrow_played": "#/components/schemas/ScarecrowPlayed",
+            "unit_destroyed": "#/components/schemas/UnitDestroyed",
+            "unit_mustered": "#/components/schemas/UnitMustered",
+            "unit_played": "#/components/schemas/UnitPlayed",
+            "unit_revived": "#/components/schemas/UnitRevived",
+            "weather_cleared": "#/components/schemas/WeatherCleared",
+            "weather_played": "#/components/schemas/WeatherPlayed",
+            "wildfire_played": "#/components/schemas/WildfirePlayed"
+          }
+        }
+      },
+      "HornPlayed": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "horn_played",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "card",
+          "row"
+        ],
+        "title": "HornPlayed",
+        "description": "A player played a War Horn: ``engine.HornPlayed``."
+      },
+      "Match": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "view": {
+            "$ref": "#/components/schemas/PlayerView"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "view"
+        ],
+        "title": "Match",
+        "description": "A match as the player may see it: its id and the player's view of it.\n\nThe id is all it takes to see and play the match, so only its player gets\nit."
+      },
+      "MatchEnded": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "match_ended",
+            "title": "Type"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "winner"
+        ],
+        "title": "MatchEnded",
+        "description": "A player has no lives left: ``engine.MatchEnded``."
+      },
+      "NewMatch": {
+        "properties": {
+          "deck": {
+            "type": "string",
+            "title": "Deck"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "deck"
+        ],
+        "title": "NewMatch",
+        "description": "What the player sends to start a match: the id of their deck."
+      },
+      "OpponentDrew": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "opponent_drew",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "count"
+        ],
+        "title": "OpponentDrew",
+        "description": "The opponent drew cards, but not which: ``engine.OpponentDrew``."
+      },
+      "OpponentRedrew": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "opponent_redrew",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player"
+        ],
+        "title": "OpponentRedrew",
+        "description": "The opponent swapped a card, but not which: ``engine.OpponentRedrew``."
+      },
+      "Pass": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "pass",
+            "title": "Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "Pass",
+        "description": "Take no more turns this round: ``engine.Pass``."
+      },
+      "PlayHorn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "play_horn",
+            "title": "Type"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "card",
+          "row"
+        ],
+        "title": "PlayHorn",
+        "description": "Play a War Horn: ``engine.PlayHorn``."
+      },
+      "PlayScarecrow": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "play_scarecrow",
+            "title": "Type"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "card",
+          "row",
+          "unit"
+        ],
+        "title": "PlayScarecrow",
+        "description": "Play a Scarecrow in place of a unit: ``engine.PlayScarecrow``."
+      },
+      "PlaySpecial": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "play_special",
+            "title": "Type"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "card"
+        ],
+        "title": "PlaySpecial",
+        "description": "Play a special card that needs no choice: ``engine.PlaySpecial``."
+      },
+      "PlayUnit": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "play_unit",
+            "title": "Type"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "card",
+          "row"
+        ],
+        "title": "PlayUnit",
+        "description": "Play a unit from the hand: ``engine.PlayUnit``."
+      },
+      "Played": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "view": {
+            "$ref": "#/components/schemas/PlayerView"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "view",
+          "events"
+        ],
+        "title": "Played",
+        "description": "A match after the player's action, and what happened in it.\n\n``events`` holds the events of the player's action and then those of the\nAI's answer, in order, as the player may see them."
+      },
+      "PlayerPassed": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "player_passed",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player"
+        ],
+        "title": "PlayerPassed",
+        "description": "A player passed: ``engine.PlayerPassed``."
+      },
+      "PlayerView": {
+        "properties": {
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "hand": {
+            "items": {
+              "$ref": "#/components/schemas/Card"
+            },
+            "type": "array",
+            "title": "Hand"
+          },
+          "players": {
+            "prefixItems": [
+              {
+                "$ref": "#/components/schemas/SideView"
+              },
+              {
+                "$ref": "#/components/schemas/SideView"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Players"
+          },
+          "current": {
+            "type": "integer",
+            "title": "Current"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "reviving": {
+            "type": "boolean",
+            "title": "Reviving"
+          },
+          "legal_actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Legal Actions"
+          },
+          "match_over": {
+            "type": "boolean",
+            "title": "Match Over"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "player",
+          "hand",
+          "players",
+          "current",
+          "round",
+          "reviving",
+          "legal_actions",
+          "match_over",
+          "winner"
+        ],
+        "title": "PlayerView",
+        "description": "What one player may see of a match, as ``engine.PlayerView`` describes it."
+      },
+      "Redraw": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "redraw",
+            "title": "Type"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "card"
+        ],
+        "title": "Redraw",
+        "description": "Swap a card before round 1: ``engine.Redraw``."
+      },
+      "RedrawEnded": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "redraw_ended",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player"
+        ],
+        "title": "RedrawEnded",
+        "description": "A player is done redrawing: ``engine.RedrawEnded``."
+      },
+      "Revive": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "revive",
+            "title": "Type"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "card",
+          "row"
+        ],
+        "title": "Revive",
+        "description": "Revive a unit after a Medic: ``engine.Revive``."
+      },
+      "RoundEnded": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "round_ended",
+            "title": "Type"
+          },
+          "scores": {
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Scores"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "scores",
+          "winner"
+        ],
+        "title": "RoundEnded",
+        "description": "Both players passed and the round was scored: ``engine.RoundEnded``."
+      },
+      "Row": {
+        "type": "string",
+        "enum": [
+          "melee",
+          "ranged",
+          "siege"
+        ],
+        "title": "Row",
+        "description": "A row of the board (rules, section 2)."
+      },
+      "RowView": {
+        "properties": {
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitView"
+            },
+            "type": "array",
+            "title": "Units"
+          },
+          "horn": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpecialCard"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scarecrows": {
+            "items": {
+              "$ref": "#/components/schemas/SpecialCard"
+            },
+            "type": "array",
+            "title": "Scarecrows"
+          },
+          "weathered": {
+            "type": "boolean",
+            "title": "Weathered"
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "units",
+          "horn",
+          "scarecrows",
+          "weathered",
+          "score"
+        ],
+        "title": "RowView",
+        "description": "One row on one side of the board, as ``engine.RowView`` describes it."
+      },
+      "RowsView": {
+        "properties": {
+          "melee": {
+            "$ref": "#/components/schemas/RowView"
+          },
+          "ranged": {
+            "$ref": "#/components/schemas/RowView"
+          },
+          "siege": {
+            "$ref": "#/components/schemas/RowView"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "melee",
+          "ranged",
+          "siege"
+        ],
+        "title": "RowsView",
+        "description": "One side of the board: its three rows, by name.\n\nThe engine keeps them in a mapping from each ``Row``. Here each row has a\nfield of its own, so the JSON is the same, but the JSON schema says that\nall three are always there."
+      },
+      "ScarecrowPlayed": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "scarecrow_played",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "card",
+          "row",
+          "unit"
+        ],
+        "title": "ScarecrowPlayed",
+        "description": "A player swapped a Scarecrow for a unit: ``engine.ScarecrowPlayed``."
+      },
+      "SideView": {
+        "properties": {
+          "rows": {
+            "$ref": "#/components/schemas/RowsView"
+          },
+          "weather": {
+            "items": {
+              "$ref": "#/components/schemas/SpecialCard"
+            },
+            "type": "array",
+            "title": "Weather"
+          },
+          "discard": {
+            "items": {
+              "$ref": "#/components/schemas/Card"
+            },
+            "type": "array",
+            "title": "Discard"
+          },
+          "lives": {
+            "type": "integer",
+            "title": "Lives"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "redraws_left": {
+            "type": "integer",
+            "title": "Redraws Left"
+          },
+          "hand_size": {
+            "type": "integer",
+            "title": "Hand Size"
+          },
+          "deck_size": {
+            "type": "integer",
+            "title": "Deck Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows",
+          "weather",
+          "discard",
+          "lives",
+          "passed",
+          "redraws_left",
+          "hand_size",
+          "deck_size",
+          "total"
+        ],
+        "title": "SideView",
+        "description": "What both players see of one player, as ``engine.SideView`` describes it."
+      },
+      "SpecialCard": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "special",
+            "title": "Type"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SpecialKind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "name",
+          "kind"
+        ],
+        "title": "SpecialCard",
+        "description": "A special card, as ``engine.SpecialCard`` describes it."
+      },
+      "SpecialKind": {
+        "type": "string",
+        "enum": [
+          "hoarfrost",
+          "thick-fog",
+          "downpour",
+          "clear-skies",
+          "war-horn",
+          "wildfire",
+          "scarecrow"
+        ],
+        "title": "SpecialKind",
+        "description": "The effect of a special card (rules, section 8)."
+      },
+      "UnitCard": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "unit",
+            "title": "Type"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/Row"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "strength": {
+            "type": "integer",
+            "title": "Strength"
+          },
+          "ability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ability"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "legend": {
+            "type": "boolean",
+            "title": "Legend"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "name",
+          "rows",
+          "strength",
+          "ability",
+          "group",
+          "legend"
+        ],
+        "title": "UnitCard",
+        "description": "A unit, as ``engine.UnitCard`` describes it."
+      },
+      "UnitDestroyed": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "unit_destroyed",
+            "title": "Type"
+          },
+          "side": {
+            "type": "integer",
+            "title": "Side"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "side",
+          "row",
+          "card"
+        ],
+        "title": "UnitDestroyed",
+        "description": "A unit was destroyed: ``engine.UnitDestroyed``."
+      },
+      "UnitMustered": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "unit_mustered",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          },
+          "from_hand": {
+            "type": "boolean",
+            "title": "From Hand"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "card",
+          "row",
+          "from_hand"
+        ],
+        "title": "UnitMustered",
+        "description": "A Muster called a unit from the deck or hand: ``engine.UnitMustered``."
+      },
+      "UnitPlayed": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "unit_played",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          },
+          "side": {
+            "type": "integer",
+            "title": "Side"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "card",
+          "row",
+          "side"
+        ],
+        "title": "UnitPlayed",
+        "description": "A player played a unit from their hand: ``engine.UnitPlayed``."
+      },
+      "UnitRevived": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "unit_revived",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          },
+          "side": {
+            "type": "integer",
+            "title": "Side"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "card",
+          "row",
+          "side"
+        ],
+        "title": "UnitRevived",
+        "description": "A player revived a unit with a Medic: ``engine.UnitRevived``."
+      },
+      "UnitView": {
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/UnitCard"
+          },
+          "strength": {
+            "type": "integer",
+            "title": "Strength"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "card",
+          "strength"
+        ],
+        "title": "UnitView",
+        "description": "A unit on the board, as ``engine.UnitView`` describes it."
+      },
+      "WeatherCleared": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "weather_cleared",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "card"
+        ],
+        "title": "WeatherCleared",
+        "description": "A player played Clear Skies: ``engine.WeatherCleared``."
+      },
+      "WeatherPlayed": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "weather_played",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "card",
+          "row"
+        ],
+        "title": "WeatherPlayed",
+        "description": "A player played a weather card: ``engine.WeatherPlayed``."
+      },
+      "WildfirePlayed": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "wildfire_played",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "card"
+        ],
+        "title": "WildfirePlayed",
+        "description": "A player played Wildfire: ``engine.WildfirePlayed``."
+      }
+    }
+  }
+}

@@ -72,6 +72,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The API's types must be the ones generated from backend/openapi.json,
+      # which a backend test checks against the API. The generator writes the
+      # file again even if it was deleted, so first check that git has it.
+      - name: Check API types
+        run: |
+          git ls-files --error-unmatch src/api/schema.d.ts
+          npm run generate:api
+          git diff --exit-code src/api/schema.d.ts
+
       - name: Lint
         run: npm run lint
 

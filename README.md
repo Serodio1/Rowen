@@ -111,6 +111,21 @@ the project. `npm ci` installs exactly what `package-lock.json` says. If
 `npm install <package>@<version>` seems stuck, stop it and check with
 `npm view <package> time` that the version exists and is at least 14 days old.
 
+When the API changes, its OpenAPI document and the frontend's types, which
+are generated from it, change too ([ADR 0008](docs/adr/0008-generated-api-types.md)).
+Write both again and commit them with the change:
+
+```sh
+cd backend
+uv run python -m rowen.api.openapi   # write backend/openapi.json
+cd ../frontend
+npm run generate:api                 # generate src/api/schema.d.ts from it
+```
+
+A backend test fails while `openapi.json` is out of date, and CI checks the
+types. A new version number of the project, or a FastAPI or Pydantic upgrade,
+can also change `openapi.json`: then run the first command again.
+
 Every push and pull request runs the same checks on GitHub Actions.
 
 ## License

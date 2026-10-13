@@ -8,3 +8,8 @@
 *.jpeg binary
 *.webp binary
 *.ico binary
+
+# Generated files: GitHub collapses them in diffs and leaves them out of the
+# language statistics.
+backend/openapi.json linguist-generated=true
+frontend/src/api/schema.d.ts linguist-generated=true
