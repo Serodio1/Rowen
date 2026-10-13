@@ -56,6 +56,25 @@ code in `src` changes.
 Matches are kept in memory for now, so they are lost when the server stops or
 restarts.
 
+## Run the frontend
+
+The browser interface is a React app in `frontend/`. It needs
+[Node.js](https://nodejs.org/) 24.14.1 or later, which comes with npm 11.10 or
+later:
+
+```sh
+cd frontend
+npm ci          # install the exact versions in package-lock.json
+npm run dev     # start the development server
+```
+
+Then open <http://localhost:5173>. For now the page only shows the name of the
+game: the next step connects it to the web API. The development server updates
+the page whenever the code changes.
+
+On Windows, if PowerShell says that running scripts is disabled, run
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
+
 ## Development
 
 The backend needs [uv](https://docs.astral.sh/uv/), which also installs the
@@ -70,6 +89,27 @@ uv run ruff format      # format the code
 uv run mypy             # type-check
 uv run lint-imports     # check which modules may import which
 ```
+
+The frontend has the same kind of checks, run with npm:
+
+```sh
+cd frontend
+npm ci                  # install the dependencies (again after package-lock.json changes)
+npm run lint            # lint with ESLint
+npm run format          # format the code with Prettier
+npm run typecheck       # type-check with TypeScript
+npm test                # run the tests with Vitest
+npm run build           # build the production files into dist/
+```
+
+To install a new package, use `npm install <package>`, which also updates
+`package-lock.json`. In `frontend/`, npm only picks versions published at least
+14 days earlier, and never runs the install scripts of packages (see
+`frontend/.npmrc` and [ADR 0007](docs/adr/0007-frontend-tooling.md)): a release
+that turns out to be malicious is usually found and removed before it can reach
+the project. `npm ci` installs exactly what `package-lock.json` says. If
+`npm install <package>@<version>` seems stuck, stop it and check with
+`npm view <package> time` that the version exists and is at least 14 days old.
 
 Every push and pull request runs the same checks on GitHub Actions.
 

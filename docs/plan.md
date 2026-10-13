@@ -49,13 +49,14 @@ Principles:
 | Area | Choice |
 |---|---|
 | Language (backend) | Python 3.14 |
-| Package/env manager | uv |
+| Package/env manager | uv (backend), npm (frontend) |
 | Web API | FastAPI + Pydantic |
 | Database | PostgreSQL, SQLAlchemy 2 (typed ORM), Alembic (migrations) |
 | Backend tests | pytest, Hypothesis (property-based), pytest-cov |
 | Backend quality | ruff (lint + format), mypy `--strict`, import-linter |
 | Frontend | React, TypeScript (strict), Vite, TanStack Query, Tailwind CSS |
 | Frontend tests | Vitest, React Testing Library, Playwright (end-to-end) |
+| Frontend quality | ESLint (typescript-eslint, strict type-checked), Prettier |
 | API contract | OpenAPI → generated TypeScript types |
 | Infra | Docker, Docker Compose, GitHub Actions (CI + CD) |
 | Hosting | Decided in Phase 2 (recorded as an ADR) |
