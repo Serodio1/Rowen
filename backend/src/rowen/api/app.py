@@ -9,7 +9,8 @@ the server answers, so the player always gets the match on their turn, unless
 the match is over.
 
 When the API turns a request down, it always answers with the same shape, an
-``Error``: a ``code`` for the browser and a ``message`` for a person.
+``Error``: a ``code`` for the browser and a ``message`` for a person. So does
+it when a bug on the server makes a request fail.
 
 Endpoints get the match store and the seed of a new match from ``get_store``
 and ``new_seed``, through FastAPI's ``Depends``. The tests replace both with
@@ -257,6 +258,19 @@ def _http_error(request: Request, error: HTTPException) -> JSONResponse:
         case _:
             found = Error(code="invalid_request", message="The request isn't valid.")
     return _error(error.status_code, found, error.headers)
+
+
+@app.exception_handler(Exception)
+def _server_error(request: Request, error: Exception) -> JSONResponse:
+    """Answer a request that failed because of a bug on the server.
+
+    The answer says nothing about the error, which could hold the state of the
+    match. The error itself still goes to the server's log.
+    """
+    return _error(
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        Error(code="server_error", message="Something went wrong on the server."),
+    )
 
 
 def _error(

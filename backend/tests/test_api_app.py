@@ -21,8 +21,10 @@ from rowen.api.app import AI, HUMAN, _ai_plays, app, get_store, new_seed
 from rowen.api.store import MatchStore
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
+    Action,
     Event,
     GameState,
+    PlayerView,
     apply,
     player_view,
     start_match,
@@ -518,6 +520,21 @@ def test_an_action_of_the_wrong_shape_is_turned_down(
     assert state_of(store, response) is before
 
 
+def test_a_request_turned_down_says_where_its_first_mistake_is(
+    client: TestClient,
+) -> None:
+    response = start(client)
+
+    # Two mistakes: the card isn't a string, and there is no such row.
+    action = {"type": "play_unit", "card": 1, "row": "sky"}
+    turned_down = play(client, response, action)
+
+    assert turned_down.json() == {
+        "code": "invalid_request",
+        "message": "The request isn't valid at body.play_unit.card: string_type.",
+    }
+
+
 def test_an_action_for_an_unknown_match_is_turned_down(client: TestClient) -> None:
     response = client.post(f"/matches/{uuid4()}/actions", json={"type": "pass"})
 
@@ -580,6 +597,26 @@ def test_a_value_nested_very_deep_is_turned_down(client: TestClient) -> None:
 
     assert response.status_code == 422
     assert response.json()["code"] == "invalid_request"
+
+
+def test_a_bug_on_the_server_is_answered_with_an_error_too(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The AI fails as it plays the first move of the match.
+    def choose_action(view: PlayerView) -> Action:
+        raise RuntimeError("SECRET")
+
+    monkeypatch.setattr("rowen.api.app.choose_action", choose_action)
+    # Unless told not to, the test client raises the errors of the server.
+    server = TestClient(app, raise_server_exceptions=False)
+
+    response = start(server, seed=AI_STARTS)
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "code": "server_error",
+        "message": "Something went wrong on the server.",
+    }
 
 
 def test_an_unknown_address_is_turned_down(client: TestClient) -> None:

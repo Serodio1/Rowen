@@ -413,6 +413,7 @@ type ErrorCode = Literal[
     "match_changed",
     "not_found",
     "method_not_allowed",
+    "server_error",
 ]
 
 
