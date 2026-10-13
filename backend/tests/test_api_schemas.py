@@ -5,9 +5,11 @@ from dataclasses import asdict, replace
 from typing import Any
 
 import pytest
+from fastapi.routing import APIRoute
 from pydantic import TypeAdapter, ValidationError
 
 from rowen.api import schemas
+from rowen.api.app import app
 from rowen.data import deck_ids, load_deck
 from rowen.engine import public as engine
 
@@ -369,16 +371,21 @@ def test_the_json_schema_tells_each_kind_apart_by_its_type(
     assert set(discriminator["mapping"]) == types
 
 
-@pytest.mark.parametrize(
-    "sent",
-    [schemas.Match, tuple[schemas.EventView, ...], schemas.Played, schemas.Error],
-    ids=["match", "events", "played", "error"],
-)
+# Everything the API sends: the answer of each endpoint, found in the app so
+# that a new endpoint is checked too, and the error of a request turned down.
+SENT = {
+    route.name: route.response_model
+    for route in app.routes
+    if isinstance(route, APIRoute)
+} | {"error": schemas.Error}
+
+
+@pytest.mark.parametrize("sent", SENT.values(), ids=SENT.keys())
 def test_every_field_is_always_sent(sent: Any) -> None:
     # So the browser's types have no optional fields: a field that may be empty
     # is sent as null or as an empty list, never left out.
     schema = TypeAdapter(sent).json_schema(mode="serialization")
-    shapes = [schema, *schema["$defs"].values()]
+    shapes = [schema, *schema.get("$defs", {}).values()]
 
     for shape in shapes:
         if shape.get("type") == "object":

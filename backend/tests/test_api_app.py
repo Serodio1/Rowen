@@ -4,7 +4,9 @@ The test client sends the app the requests a browser would send and gets the
 same responses, without running a server.
 """
 
+import shutil
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -15,6 +17,7 @@ from fastapi.testclient import TestClient
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from rowen import data
 from rowen.ai.baseline import choose_action
 from rowen.api import schemas
 from rowen.api.app import AI, HUMAN, _ai_plays, app, get_store, new_seed
@@ -111,6 +114,21 @@ def test_the_decks_are_the_ones_in_the_data_files(client: TestClient) -> None:
             {"id": "robots", "name": "Robots"},
         ]
     }
+
+
+def test_the_names_of_the_decks_are_read_from_the_data_files(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A copy of the data files where the humans have another name.
+    shutil.copytree(Path(str(data._DATA)), tmp_path, dirs_exist_ok=True)
+    humans = tmp_path / "decks" / "humans.json"
+    text = humans.read_text(encoding="utf-8")
+    humans.write_text(text.replace('"Humans"', '"The Humans"', 1), encoding="utf-8")
+    monkeypatch.setattr(data, "_DATA", tmp_path)
+
+    decks = client.get("/decks").json()["decks"]
+
+    assert decks[0] == {"id": "humans", "name": "The Humans"}
 
 
 def test_every_deck_in_the_list_can_start_a_match(client: TestClient) -> None:
