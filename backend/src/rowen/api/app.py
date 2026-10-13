@@ -29,6 +29,7 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException
 
 from rowen.ai.baseline import choose_action
@@ -63,7 +64,21 @@ AI = 1
 # cards in the player's hand. 2**64 seeds are far too many to try.
 SEED_BITS = 64
 
-app = FastAPI(title="Rowen", version=version("rowen"))
+
+def _operation_id(route: APIRoute) -> str:
+    """Name each endpoint in the OpenAPI document after its function.
+
+    FastAPI's default adds the path and the method (``create_match_matches_post``),
+    and the frontend's generated types use these names.
+    """
+    return route.name
+
+
+app = FastAPI(
+    title="Rowen",
+    version=version("rowen"),
+    generate_unique_id_function=_operation_id,
+)
 
 # All the server's matches, in the memory of its process. So the server must
 # run as a single process, as uvicorn does unless told otherwise: with several
