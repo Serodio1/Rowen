@@ -98,9 +98,10 @@ npm run build           # build the production files into dist/
 ```
 
 To install a new package, use `npm install <package>`, which also updates
-`package-lock.json`. npm only installs versions published at least 14 days ago
-(see `frontend/.npmrc`), so a release that turns out to be malicious is
-usually found and removed before it can reach the project.
+`package-lock.json`. npm only installs versions published at least 14 days ago,
+and never runs the install scripts of packages (see `frontend/.npmrc` and
+[ADR 0007](docs/adr/0007-frontend-tooling.md)): a release that turns out to be
+malicious is usually found and removed before it can reach the project.
 
 Every push and pull request runs the same checks on GitHub Actions.
 

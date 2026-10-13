@@ -38,6 +38,11 @@ window got them.
   command, with `--min-release-age=0`. This was needed when the frontend was
   created: `npm audit` reported a high-severity issue in `source-map-js`
   1.2.1, used by the build tools, and the fix was 13 days old.
+- **No install scripts** (`ignore-scripts=true` in `frontend/.npmrc`): npm
+  never runs the scripts that packages ask to run when they are installed,
+  which is how malicious releases usually run their code. None of the
+  packages the project uses needs one. The project's own scripts
+  (`npm run lint`, `npm test`, ...) still run.
 - **Vite's `react-ts` template** as the starting point, with TypeScript in
   strict mode plus `noUncheckedIndexedAccess`.
 - **ESLint** with typescript-eslint's `strictTypeChecked` rules (the strictest
@@ -51,9 +56,13 @@ window got them.
 ## Alternatives considered
 
 - **oxlint**, which Vite's template now uses instead of ESLint. It is written
-  in Rust and much faster, but it has fewer rules, and its type-aware rules,
-  the most useful part of a strict setup, are still experimental. ESLint with
-  typescript-eslint is the established standard.
+  in Rust and much faster, and since July 2026 its type-aware rules are
+  stable (59 of typescript-eslint's 61), on top of TypeScript 7. It was not
+  chosen because ESLint with typescript-eslint is still what most projects
+  use, and it comes with a ready-made strict rule set (`strictTypeChecked`),
+  where oxlint's would have to be put together from its rule categories.
+  Each release of oxlint's type-aware engine is also tied to one exact
+  TypeScript version.
 - **TypeScript 7**, the compiler rewritten in Go, which is several times
   faster. typescript-eslint does not support it yet (it requires a TypeScript
   version below 6.1).
@@ -63,6 +72,10 @@ window got them.
 - **No minimum release age.** Simpler, but every install could pick a version
   published minutes earlier, which is exactly the window that the attacks
   above used.
+- **npm's newer approval list for install scripts** (`allowScripts` in
+  `package.json`, with `strict-allow-scripts`) instead of turning them all
+  off. It allows the scripts of chosen packages, but no package here needs
+  one, so turning them all off is simpler.
 
 ## Consequences
 
@@ -74,3 +87,5 @@ window got them.
 - A new package, or an update, arrives at least 14 days after its release. A
   fresh security fix needs a deliberate `--min-release-age=0`, so it has to be
   noticed first (`npm audit`).
+- A package that needs its install script to work will not work until its
+  script is allowed on purpose.
