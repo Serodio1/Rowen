@@ -9,10 +9,11 @@ import tseslint from "typescript-eslint";
 export default defineConfig(
   globalIgnores(["dist"]),
   {
-    files: ["**/*.{ts,tsx}"],
+    files: ["**/*.{js,ts,tsx}"],
     extends: [
       js.configs.recommended,
-      // The strictest rule set, including the rules that use the types.
+      // The strictest of typescript-eslint's recommended sets, including the
+      // rules that use the types.
       tseslint.configs.strictTypeChecked,
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
