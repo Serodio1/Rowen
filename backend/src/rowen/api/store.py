@@ -3,7 +3,7 @@
 A ``MatchStore`` maps the id of each match to its state. The id is a random
 UUID (version 4): 122 random bits from the operating system, so nobody can
 guess the id of a match that isn't theirs. Whoever has the id can see the
-match, so the id is all the player needs.
+match and play it, so the id is all the player needs.
 
 Anyone can start a match, so the store holds at most ``max_matches`` of them:
 otherwise, starting matches without end would fill the server's memory. When
@@ -13,8 +13,21 @@ The web server handles requests in threads, so two of them can use the store
 at the same time. A lock lets one thread in at a time: without it, one thread
 could push out a match while another is reading it.
 
+Two requests can also play the same match at once: each gets the match,
+plays its action and keeps the result. The lock isn't held while they play,
+since the AI takes a while to think, so ``replace`` keeps a result only if the
+match is still the one its request started from. The other request finds the
+match changed and is turned down, instead of undoing the first one's action
+without a word. A request that comes once the first one's result is kept
+plays on the new match, as the second click of a double click usually does:
+the server plays an action in a few milliseconds. A request doesn't say which
+state of the match it was sent from, so the server can't tell a double click
+from two clicks. So the browser must not send an action before the last one
+is answered (#52).
+
 PostgreSQL takes its place later in this milestone, behind the same methods,
-so the endpoints don't change.
+so the endpoints don't change. There, ``replace`` will compare a version
+number of the match instead of the very same object.
 """
 
 import threading
@@ -64,3 +77,19 @@ class MatchStore:
             if state is not None:
                 self._matches.move_to_end(match_id)
             return state
+
+    def replace(self, match_id: UUID, old: GameState, new: GameState) -> bool:
+        """Replace the state of a match, but only if it is still ``old``.
+
+        Return whether it was replaced. It wasn't if another request replaced
+        it first, or if it was pushed out. ``old`` is the state ``get``
+        returned: the very same object, not just an equal one.
+
+        The match counts as used, so it is the last to be pushed out.
+        """
+        with self._lock:
+            if self._matches.get(match_id) is not old:
+                return False
+            self._matches[match_id] = new
+            self._matches.move_to_end(match_id)
+            return True

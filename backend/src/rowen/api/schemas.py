@@ -5,8 +5,8 @@ response. In a response, what isn't in a model isn't sent. ``from_view`` fills
 the models of the player view field by field from the engine's, so they are an
 allow list on top of the view's own: nothing the view hides can reach a
 response (ADR 0002), and a field the engine adds stays out of the API until
-someone adds it here on purpose. In a request, a field that is missing or of
-the wrong type turns the request down before any endpoint sees it.
+someone adds it here on purpose. In a request, a field that is missing, of the
+wrong type or unknown turns the request down before any endpoint sees it.
 
 The shapes and names follow the engine's player view and events, so the types
 of the browser read like the engine's. Players are known by their index, 0 or
@@ -35,9 +35,15 @@ from rowen.engine.public import Ability, Row, SpecialKind
 
 
 class Schema(BaseModel):
-    """What every model here has in common: it can't change once made."""
+    """What every model here has in common.
 
-    model_config = ConfigDict(frozen=True)
+    A model can't change once made, and a request with a field it doesn't know
+    is turned down, instead of the field being left out in silence: sending
+    ``{"deck": "humans", "seed": 1}`` is an error, so nobody thinks they chose
+    the seed.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
 
 class UnitCard(Schema):
@@ -381,11 +387,49 @@ class NewMatch(Schema):
 class Match(Schema):
     """A match as the player may see it: its id and the player's view of it.
 
-    The id is all it takes to see the match, so only its player gets it.
+    The id is all it takes to see and play the match, so only its player gets
+    it.
     """
 
     id: UUID
     view: PlayerView
+
+
+class Played(Match):
+    """A match after the player's action, and what happened in it.
+
+    ``events`` holds the events of the player's action and then those of the
+    AI's answer, in order, as the player may see them.
+    """
+
+    events: tuple[EventView, ...]
+
+
+# What went wrong, for a program to read: the browser can show its own text.
+type ErrorCode = Literal[
+    "invalid_request",
+    "unknown_deck",
+    "match_not_found",
+    "illegal_action",
+    "match_changed",
+    "not_found",
+    "method_not_allowed",
+    "server_error",
+]
+
+
+class Error(Schema):
+    """What the API sends when it turns a request down.
+
+    ``code`` says what went wrong, for the browser, and ``message`` says it in
+    words, for a person. A message may say where in the request the mistake
+    is, even with the name of a field the API doesn't know, but it never holds
+    a value from the request: a value can be nested too deep to send back. How
+    big a request may be is for #54.
+    """
+
+    code: ErrorCode
+    message: str
 
 
 def from_view(view: engine.PlayerView) -> PlayerView:
@@ -603,3 +647,34 @@ def _event(event: engine.EventView) -> EventView:
         # The last kind left, so the match never falls through.
         case engine.OpponentRedrew():  # pragma: no branch
             return OpponentRedrew(type="opponent_redrew", player=event.player)
+
+
+def to_action(action: Action) -> engine.Action:
+    """Return the action the player sent as the engine's own.
+
+    It is the other way round from ``_action``. Whether the action is legal is
+    for the engine to say: it works out the legal actions of each view.
+
+    Every kind of action is here, so mypy reports a missing return when a new
+    kind has no case yet.
+    """
+    match action:
+        case PlayUnit():
+            return engine.PlayUnit(card=action.card, row=action.row)
+        case PlaySpecial():
+            return engine.PlaySpecial(card=action.card)
+        case PlayHorn():
+            return engine.PlayHorn(card=action.card, row=action.row)
+        case PlayScarecrow():
+            return engine.PlayScarecrow(
+                card=action.card, row=action.row, unit=action.unit
+            )
+        case Pass():
+            return engine.Pass()
+        case Revive():
+            return engine.Revive(card=action.card, row=action.row)
+        case Redraw():
+            return engine.Redraw(card=action.card)
+        # The last kind left, so the match never falls through.
+        case EndRedraw():  # pragma: no branch
+            return engine.EndRedraw()

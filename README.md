@@ -37,8 +37,8 @@ choices always give the same match.
 
 ## Run the web API
 
-The web API is what the browser will play through. It can already start a
-match against the AI and show it, as JSON:
+The web API is what the browser will play through. It already lets you play a
+whole match against the AI, as JSON:
 
 ```sh
 cd backend
@@ -46,8 +46,13 @@ uv run uvicorn rowen.api.app:app --reload --reload-dir src
 ```
 
 Then open <http://127.0.0.1:8000/docs>: it lists the endpoints and lets you
-try them, such as `POST /matches` with `{"deck": "humans"}` to start a match.
-`--reload` restarts the server whenever the Python code in `src` changes.
+try them. `POST /matches` with `{"deck": "humans"}` starts a match. To play,
+send one of the `legal_actions` of the view, as it is, to
+`POST /matches/{id}/actions`: if it is then the AI's turn, the AI plays before
+the server responds, and the response holds the new view and what happened.
+When the API turns a request down, it answers with a `code` and a `message`,
+such as `illegal_action`. `--reload` restarts the server whenever the Python
+code in `src` changes.
 Matches are kept in memory for now, so they are lost when the server stops or
 restarts.
 

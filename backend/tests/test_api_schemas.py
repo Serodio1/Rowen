@@ -5,7 +5,7 @@ from dataclasses import asdict, replace
 from typing import Any
 
 import pytest
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from rowen.api import schemas
 from rowen.data import deck_ids, load_deck
@@ -97,6 +97,45 @@ EMPTY_VIEW = engine.PlayerView(
 EVENTS = TypeAdapter(tuple[schemas.EventView, ...])
 
 DECKS = tuple(load_deck(deck_id) for deck_id in deck_ids())
+
+# Each kind of action, and the JSON of it: in a view, and as the player sends
+# it back.
+ACTIONS: list[tuple[engine.Action, dict[str, Any]]] = [
+    (
+        engine.PlayUnit(card="sniper", row=RANGED),
+        {"type": "play_unit", "card": "sniper", "row": "ranged"},
+    ),
+    (
+        engine.PlaySpecial(card="thick-fog"),
+        {"type": "play_special", "card": "thick-fog"},
+    ),
+    (
+        engine.PlayHorn(card="war-horn", row=SIEGE),
+        {"type": "play_horn", "card": "war-horn", "row": "siege"},
+    ),
+    (
+        engine.PlayScarecrow(card="scarecrow", row=RANGED, unit="sniper"),
+        {
+            "type": "play_scarecrow",
+            "card": "scarecrow",
+            "row": "ranged",
+            "unit": "sniper",
+        },
+    ),
+    (engine.Pass(), {"type": "pass"}),
+    (
+        engine.Revive(card="sniper", row=RANGED),
+        {"type": "revive", "card": "sniper", "row": "ranged"},
+    ),
+    # A second revive, so a row fixed to either one is caught: the player never
+    # revives in the matches of test_api_app.
+    (
+        engine.Revive(card="soldier", row=MELEE),
+        {"type": "revive", "card": "soldier", "row": "melee"},
+    ),
+    (engine.Redraw(card="sniper"), {"type": "redraw", "card": "sniper"}),
+    (engine.EndRedraw(), {"type": "end_redraw"}),
+]
 
 
 def test_a_view_is_sent_field_by_field() -> None:
@@ -227,39 +266,7 @@ def test_a_view_is_sent_field_by_field() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("action", "expected"),
-    [
-        (
-            engine.PlayUnit(card="sniper", row=RANGED),
-            {"type": "play_unit", "card": "sniper", "row": "ranged"},
-        ),
-        (
-            engine.PlaySpecial(card="thick-fog"),
-            {"type": "play_special", "card": "thick-fog"},
-        ),
-        (
-            engine.PlayHorn(card="war-horn", row=SIEGE),
-            {"type": "play_horn", "card": "war-horn", "row": "siege"},
-        ),
-        (
-            engine.PlayScarecrow(card="scarecrow", row=RANGED, unit="sniper"),
-            {
-                "type": "play_scarecrow",
-                "card": "scarecrow",
-                "row": "ranged",
-                "unit": "sniper",
-            },
-        ),
-        (engine.Pass(), {"type": "pass"}),
-        (
-            engine.Revive(card="sniper", row=RANGED),
-            {"type": "revive", "card": "sniper", "row": "ranged"},
-        ),
-        (engine.Redraw(card="sniper"), {"type": "redraw", "card": "sniper"}),
-        (engine.EndRedraw(), {"type": "end_redraw"}),
-    ],
-)
+@pytest.mark.parametrize(("action", "expected"), ACTIONS)
 def test_each_kind_of_action_is_sent_with_its_type(
     action: engine.Action, expected: dict[str, Any]
 ) -> None:
@@ -268,6 +275,31 @@ def test_each_kind_of_action_is_sent_with_its_type(
     sent = schemas.from_view(view).model_dump(mode="json")
 
     assert sent["legal_actions"] == [expected]
+
+
+@pytest.mark.parametrize(("expected", "sent"), ACTIONS)
+def test_each_kind_of_action_sent_back_is_the_engines_own(
+    expected: engine.Action, sent: dict[str, Any]
+) -> None:
+    # The player sends back an action as the view held it.
+    action = TypeAdapter(schemas.Action).validate_json(json.dumps(sent))
+
+    assert schemas.to_action(action) == expected
+
+
+@pytest.mark.parametrize(
+    ("shape", "sent"),
+    [
+        (schemas.NewMatch, {"deck": "humans", "seed": 1}),
+        (schemas.Action, {"type": "pass", "card": "sniper"}),
+        (schemas.Action, {"type": "redraw", "card": "sniper", "row": "melee"}),
+    ],
+)
+def test_a_request_with_a_field_the_api_doesnt_know_is_turned_down(
+    shape: Any, sent: dict[str, Any]
+) -> None:
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        TypeAdapter(shape).validate_python(sent)
 
 
 def test_a_view_after_a_medic_says_the_player_is_reviving() -> None:
@@ -338,7 +370,9 @@ def test_the_json_schema_tells_each_kind_apart_by_its_type(
 
 
 @pytest.mark.parametrize(
-    "sent", [schemas.Match, tuple[schemas.EventView, ...]], ids=["match", "events"]
+    "sent",
+    [schemas.Match, tuple[schemas.EventView, ...], schemas.Played, schemas.Error],
+    ids=["match", "events", "played", "error"],
 )
 def test_every_field_is_always_sent(sent: Any) -> None:
     # So the browser's types have no optional fields: a field that may be empty
