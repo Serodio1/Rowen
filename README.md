@@ -123,7 +123,8 @@ npm run generate:api                 # generate src/api/schema.d.ts from it
 ```
 
 A backend test fails while `openapi.json` is out of date, and CI checks the
-types.
+types. A new version number of the project, or a FastAPI or Pydantic upgrade,
+can also change `openapi.json`: then run the first command again.
 
 Every push and pull request runs the same checks on GitHub Actions.
 

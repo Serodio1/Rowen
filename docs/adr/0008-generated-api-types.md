@@ -62,7 +62,9 @@ a stale copy must not go unnoticed.
   change `openapi.json`: the test catches it, and the file is written again.
 - openapi-typescript 7.13 asks for TypeScript 5. An `overrides` entry in
   `package.json` lets it use the project's TypeScript 6.0, with which it
-  generates the same file.
+  generates the same file. It cannot run on TypeScript 7, whose package no
+  longer has the compiler API that openapi-typescript builds the file with,
+  so moving to TypeScript 7 also waits for openapi-typescript.
 - openapi-fetch turns tuples into arrays in the types of responses (such as
   the two `players` of a view). Code that reads responses uses the types the
   client returns (`MethodResponse`), not the schema's types.

@@ -11,7 +11,7 @@ export type Api = Client<paths>;
  *
  * The API is at `/api` on the page's own server, which passes the requests on
  * to the API. The address is a full one (`http://localhost:5173/api`), because
- * the `fetch` of Node.js, which the tests run on, cannot take a relative one.
+ * the `Request` of Node.js, which the tests use, cannot take a relative one.
  *
  * @param fetch - What sends each request and returns the answer: the
  *   browser's `fetch`, unless a test passes a fake one, so that no request
