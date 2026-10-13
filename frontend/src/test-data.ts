@@ -31,7 +31,7 @@ type Side = View["players"][number];
 
 /** Return one player's side of the board at the start of a match. */
 export function side(changes: Partial<Side> = {}): Side {
-  const row = {
+  const row: Side["rows"]["melee"] = {
     units: [],
     horn: null,
     scarecrows: [],

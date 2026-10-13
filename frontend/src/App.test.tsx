@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
 import { App } from "./App.tsx";
 import { createApi } from "./api/client.ts";
@@ -72,9 +72,10 @@ test("choosing a deck starts a match with it, and shows the round, the hand and 
   const started = requests.at(-1);
   expect(started?.method).toBe("POST");
   expect(await started?.json()).toEqual({ deck: "robots" });
-  const [hand, moves] = screen.getAllByRole("list");
+  const hand = screen.getByRole("list", { name: "Your hand" });
+  const moves = screen.getByRole("list", { name: "What you can do" });
   expect(
-    within(hand ?? document.body)
+    within(hand)
       .getAllByRole("listitem")
       .map((item) => item.textContent),
   ).toEqual([
@@ -83,7 +84,7 @@ test("choosing a deck starts a match with it, and shows the round, the hand and 
     "Hoarfrost (special)",
   ]);
   expect(
-    within(moves ?? document.body)
+    within(moves)
       .getAllByRole("listitem")
       .map((item) => item.textContent),
   ).toEqual(["Swap Soldier", "Swap Hoarfrost", "Keep this hand"]);
@@ -159,4 +160,24 @@ test("when the decks can't be loaded, the page says it can't reach the server", 
     "Could not reach the server.",
   );
   expect(screen.queryByText("Loading the decks…")).not.toBeInTheDocument();
+});
+
+test("an answer for the decks that comes too late is ignored", async () => {
+  // A client whose requests wait until the test answers them.
+  const late: ((answer: Response) => void)[] = [];
+  const slow = createApi(() => new Promise((resolve) => late.push(resolve)));
+  // The page gets another client, so it asks for the decks again.
+  const { rerender } = render(<App api={slow} />);
+  rerender(<App api={fakeApi(THE_DECKS).api} />);
+  await screen.findByRole("button", { name: "Humans" });
+
+  // The first client's answers come now, after the second one's.
+  await act(async () => {
+    for (const answer of late) {
+      answer(Response.json({ message: "Too late." }, { status: 500 }));
+    }
+    await new Promise((resolve) => setTimeout(resolve));
+  });
+
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });

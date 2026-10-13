@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { Api, Deck, View } from "./api/client.ts";
 import { actionText, cardNames, cardText } from "./text.ts";
 
@@ -95,18 +95,20 @@ export function App({ api }: { api: Api }) {
 /** The match as text: the round, the cards in hand and the legal actions. */
 function Match({ view }: { view: View }) {
   const names = cardNames(view);
+  const handId = useId();
+  const movesId = useId();
   return (
     <section>
       <h2>Round {view.round}</h2>
-      <h3>Your hand</h3>
-      <ul>
+      <h3 id={handId}>Your hand</h3>
+      <ul aria-labelledby={handId}>
         {view.hand.map((card, index) => (
           // Copies of a card share its id, so the place in the hand is the key.
           <li key={index}>{cardText(card)}</li>
         ))}
       </ul>
-      <h3>What you can do</h3>
-      <ul>
+      <h3 id={movesId}>What you can do</h3>
+      <ul aria-labelledby={movesId}>
         {view.legal_actions.map((action, index) => (
           <li key={index}>{actionText(action, names)}</li>
         ))}
