@@ -69,13 +69,94 @@ def test_a_store_holds_max_matches_by_default() -> None:
     assert all(store.get(match_id) is state for match_id in ids[1:])
 
 
-@pytest.mark.parametrize("method", ["create", "get"])
+def test_a_match_is_replaced_if_it_is_still_the_old_one() -> None:
+    store = MatchStore()
+    old, new = new_state(0), new_state(1)
+    match_id = store.create(old)
+
+    replaced = store.replace(match_id, old, new)
+
+    assert replaced
+    assert store.get(match_id) is new
+
+
+def test_a_match_another_request_replaced_first_is_not_replaced() -> None:
+    # Two requests got the same match, as after a double click. The first one
+    # has already kept its result.
+    store = MatchStore()
+    old, first, second = new_state(0), new_state(1), new_state(2)
+    match_id = store.create(old)
+    store.replace(match_id, old, first)
+
+    replaced = store.replace(match_id, old, second)
+
+    assert not replaced
+    assert store.get(match_id) is first
+
+
+def test_an_equal_state_is_not_the_old_one() -> None:
+    # The same seed makes an equal state, but not the one the store holds.
+    store = MatchStore()
+    old, equal, new = new_state(0), new_state(0), new_state(1)
+    assert equal == old
+    match_id = store.create(old)
+
+    replaced = store.replace(match_id, equal, new)
+
+    assert not replaced
+    assert store.get(match_id) is old
+
+
+def test_an_unknown_match_is_not_replaced() -> None:
+    store = MatchStore()
+    old, new = new_state(0), new_state(1)
+    store.create(old)
+    match_id = uuid4()
+
+    replaced = store.replace(match_id, old, new)
+
+    assert not replaced
+    assert store.get(match_id) is None
+
+
+def test_a_match_pushed_out_is_not_replaced() -> None:
+    # The match was pushed out while its request was being played.
+    store = MatchStore(max_matches=1)
+    old, other, new = new_state(0), new_state(1), new_state(2)
+    match_id = store.create(old)
+    store.create(other)
+
+    replaced = store.replace(match_id, old, new)
+
+    assert not replaced
+    assert store.get(match_id) is None
+
+
+def test_a_match_replaced_counts_as_used() -> None:
+    store = MatchStore(max_matches=2)
+    states = [new_state(seed) for seed in range(4)]
+    first = store.create(states[0])
+    second = store.create(states[1])
+    # Playing the first match makes the second one the least recently used.
+    store.replace(first, states[0], states[2])
+
+    store.create(states[3])
+
+    assert store.get(second) is None
+    assert store.get(first) is states[2]
+
+
+@pytest.mark.parametrize("method", ["create", "get", "replace"])
 def test_a_thread_waits_while_another_one_uses_the_store(method: str) -> None:
     store = MatchStore()
     state = new_state()
     match_id = store.create(state)
-    argument = state if method == "create" else match_id
-    thread = threading.Thread(target=getattr(store, method), args=(argument,))
+    arguments = {
+        "create": (state,),
+        "get": (match_id,),
+        "replace": (match_id, state, new_state(1)),
+    }[method]
+    thread = threading.Thread(target=getattr(store, method), args=arguments)
 
     # While the test holds the lock, the other thread can't get in.
     with store._lock:

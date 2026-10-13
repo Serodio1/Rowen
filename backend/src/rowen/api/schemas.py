@@ -38,8 +38,9 @@ class Schema(BaseModel):
     """What every model here has in common.
 
     A model can't change once made, and a request with a field it doesn't know
-    is turned down: a typo such as ``"rows"`` for ``"row"`` is an error, not a
-    field left out in silence.
+    is turned down, instead of the field being left out in silence: sending
+    ``{"deck": "humans", "seed": 1}`` is an error, so nobody thinks they chose
+    the seed.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
