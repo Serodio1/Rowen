@@ -127,6 +127,12 @@ ACTIONS: list[tuple[engine.Action, dict[str, Any]]] = [
         engine.Revive(card="sniper", row=RANGED),
         {"type": "revive", "card": "sniper", "row": "ranged"},
     ),
+    # A second revive, so a row fixed to either one is caught: the player never
+    # revives in the matches of test_api_app.
+    (
+        engine.Revive(card="soldier", row=MELEE),
+        {"type": "revive", "card": "soldier", "row": "melee"},
+    ),
     (engine.Redraw(card="sniper"), {"type": "redraw", "card": "sniper"}),
     (engine.EndRedraw(), {"type": "end_redraw"}),
 ]

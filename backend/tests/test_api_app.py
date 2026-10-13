@@ -24,6 +24,7 @@ from rowen.engine.public import (
     Action,
     Event,
     GameState,
+    Pass,
     PlayerView,
     apply,
     player_view,
@@ -637,6 +638,28 @@ def test_a_bug_on_the_server_is_answered_with_an_error_too(
         "code": "server_error",
         "message": "Something went wrong on the server.",
     }
+
+
+def test_an_illegal_move_of_the_ai_is_a_bug_on_the_server(
+    client: TestClient, store: MatchStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # After the player's redraw, the AI swaps cards: it can't pass yet.
+    response = start(client, seed=PLAYER_STARTS)
+    before = state_of(store, response)
+
+    def choose_action(view: PlayerView) -> Action:
+        return Pass()
+
+    monkeypatch.setattr("rowen.api.app.choose_action", choose_action)
+    server = TestClient(app, raise_server_exceptions=False)
+
+    failed = play(server, response, {"type": "end_redraw"})
+
+    # Not a 409: the player did nothing wrong.
+    assert failed.status_code == 500
+    assert failed.json()["code"] == "server_error"
+    # Not even the player's action is kept.
+    assert state_of(store, response) is before
 
 
 def test_an_unknown_address_is_turned_down(client: TestClient) -> None:
