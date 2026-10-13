@@ -9,8 +9,8 @@ the server answers, so the player always gets the match on their turn, unless
 the match is over.
 
 When the API turns a request down, it always answers with the same shape, an
-``Error``: a ``code`` for the browser and a ``message`` for a person. So does
-it when a bug on the server makes a request fail.
+``Error``: a ``code`` for the browser and a ``message`` for a person. It does
+the same when a bug on the server makes a request fail.
 
 Endpoints get the match store and the seed of a new match from ``get_store``
 and ``new_seed``, through FastAPI's ``Depends``. The tests replace both with
@@ -104,7 +104,9 @@ class ApiError(Exception):
         self.error = Error(code=code, message=message)
 
 
-# The errors an endpoint can answer with, for the OpenAPI document.
+# The errors an endpoint answers with on purpose, for the OpenAPI document. A
+# bug on the server (500) and a body that can't be read (400) aren't listed: no
+# endpoint answers with them on purpose.
 def _errors(*status_codes: int) -> dict[int | str, dict[str, Any]]:
     return {status_code: {"model": Error} for status_code in status_codes}
 
@@ -227,9 +229,9 @@ def _api_error(request: Request, error: ApiError) -> JSONResponse:
 def _invalid_request(request: Request, error: RequestValidationError) -> JSONResponse:
     """Answer a request that isn't in the shape the endpoint expects.
 
-    FastAPI's own answer sends back each wrong value. Here only where the first
-    mistake is and what kind it is are sent: a value could be huge, or nested
-    so deep that sending it back fails.
+    FastAPI's own answer lists every mistake, each with its wrong value: it can
+    be many times bigger than the request, and a value nested too deep makes it
+    fail. Here only where the first mistake is and what kind it is are sent.
     """
     first = error.errors()[0]
     where = ".".join(str(part) for part in first["loc"])

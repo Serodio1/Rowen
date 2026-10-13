@@ -387,7 +387,8 @@ class NewMatch(Schema):
 class Match(Schema):
     """A match as the player may see it: its id and the player's view of it.
 
-    The id is all it takes to see the match, so only its player gets it.
+    The id is all it takes to see and play the match, so only its player gets
+    it.
     """
 
     id: UUID
@@ -422,8 +423,9 @@ class Error(Schema):
 
     ``code`` says what went wrong, for the browser, and ``message`` says it in
     words, for a person. A message may say where in the request the mistake
-    is, but never holds a value from it: a value can be huge, or nested too
-    deep to send back.
+    is, even with the name of a field the API doesn't know, but it never holds
+    a value from the request: a value can be nested too deep to send back. How
+    big a request may be is for #54.
     """
 
     code: ErrorCode
@@ -652,6 +654,9 @@ def to_action(action: Action) -> engine.Action:
 
     It is the other way round from ``_action``. Whether the action is legal is
     for the engine to say: it works out the legal actions of each view.
+
+    Every kind of action is here, so mypy reports a missing return when a new
+    kind has no case yet.
     """
     match action:
         case PlayUnit():
