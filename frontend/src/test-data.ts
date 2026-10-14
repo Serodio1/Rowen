@@ -20,6 +20,16 @@ export const SOLDIER = {
   legend: false,
 } satisfies Card;
 
+export const CAPTAIN = {
+  ...SOLDIER,
+  id: "captain",
+  name: "Captain",
+  rows: ["siege"],
+  strength: 10,
+  ability: null,
+  legend: true,
+} satisfies Card;
+
 export const HOARFROST = {
   type: "special",
   id: "hoarfrost",

@@ -2,7 +2,14 @@ import { render, screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
 import { Board } from "./Board.tsx";
 import type { Card, View } from "./api/client.ts";
-import { HOARFROST, SOLDIER, WAR_HORN, side, view } from "./test-data.ts";
+import {
+  CAPTAIN,
+  HOARFROST,
+  SOLDIER,
+  WAR_HORN,
+  side,
+  view,
+} from "./test-data.ts";
 
 type Side = View["players"][number];
 type Row = Side["rows"]["melee"];
@@ -14,16 +21,6 @@ const SNIPER = {
   rows: ["ranged"],
   strength: 6,
   ability: null,
-} satisfies Card;
-
-const CAPTAIN = {
-  ...SOLDIER,
-  id: "captain",
-  name: "Captain",
-  rows: ["siege"],
-  strength: 10,
-  ability: null,
-  legend: true,
 } satisfies Card;
 
 const DOWNPOUR = {
@@ -99,7 +96,35 @@ const THEIRS = side({
 });
 const MID = view({ hand: [SNIPER, HOARFROST], players: [YOURS, THEIRS] });
 
-/** Return each card in `element`, by its accessible name, which screen readers read. */
+// The AI ahead, with two Soldiers, a War Horn and a Scarecrow in its melee
+// row, under Hoarfrost: the row's score is the strength of no single card.
+const AI_AHEAD = view({
+  players: [
+    side({ lives: 1, total: 0 }),
+    side({
+      rows: {
+        melee: row({
+          units: [
+            { card: SOLDIER, strength: 2 },
+            { card: SOLDIER, strength: 2 },
+          ],
+          horn: WAR_HORN,
+          scarecrows: [SCARECROW],
+          weathered: true,
+          score: 4,
+        }),
+        ranged: row(),
+        siege: row(),
+      },
+      weather: [HOARFROST],
+      hand_size: 7,
+      deck_size: 9,
+      total: 4,
+    }),
+  ],
+});
+
+/** Return the name of each card in `element`, as screen readers read it. */
 function cards(element: HTMLElement) {
   return within(element)
     .queryAllByRole("img")
@@ -227,7 +252,9 @@ test("each player's deck and discard pile show how many cards they hold, and the
     name: "The AI's deck and discard pile",
   });
   expect(detail(ai, "Deck")).toContainElement(within(ai).getByText("9 cards"));
-  expect(detail(ai, "Discard pile")).toHaveTextContent(/2 cards$/);
+  expect(
+    within(detail(ai, "Discard pile") as HTMLElement).getByText("2 cards"),
+  ).toBeInTheDocument();
   // The last card discarded is on top.
   expect(cards(ai)).toEqual(["Sniper (6 ranged)"]);
 
@@ -293,4 +320,74 @@ test("a row under weather the page doesn't see in play still says so", () => {
   expect(
     screen.getByRole("group", { name: "Your melee row: 0, under weather" }),
   ).toBeInTheDocument();
+});
+
+test("the AI's total is marked when it is the higher one", () => {
+  render(<Board view={AI_AHEAD} />);
+
+  expect(
+    detail(screen.getByRole("group", { name: "The AI" }), "Total"),
+  ).toHaveTextContent(/^4 \(ahead\)$/);
+  expect(
+    detail(screen.getByRole("group", { name: "You" }), "Total"),
+  ).toHaveTextContent(/^0$/);
+});
+
+test("a row draws every card in it, its score in a bubble and the weather's name", () => {
+  render(<Board view={AI_AHEAD} />);
+
+  const melee = screen.getByRole("group", {
+    name: "The AI's melee row: 4, under Hoarfrost",
+  });
+  // Both copies of the unit, not only the first.
+  expect(cards(melee)).toEqual([
+    "War Horn (special)",
+    "Soldier (4 melee/ranged, agile), now 2",
+    "Soldier (4 melee/ranged, agile), now 2",
+    "Scarecrow (special)",
+  ]);
+  // The score and the weather's name are drawn for the eyes: screen readers
+  // read them in the row's name.
+  const score = within(melee).getByText("4");
+  expect(score).toHaveAttribute("aria-hidden");
+  expect(score).toHaveClass("bg-enemy");
+  expect(within(melee).getByText("Hoarfrost")).toHaveAttribute("aria-hidden");
+  // The player's bubbles are in their own colour.
+  expect(
+    within(screen.getByRole("group", { name: /^Your melee row/ })).getByText(
+      "0",
+    ),
+  ).toHaveClass("bg-ally");
+});
+
+test("each player's lives are drawn one by one, for the eyes", () => {
+  render(<Board view={AI_AHEAD} />);
+
+  for (const [name, lives] of [
+    ["You", 1],
+    ["The AI", 2],
+  ] as const) {
+    const drawn = detail(
+      screen.getByRole("group", { name }),
+      "Lives",
+    )?.firstElementChild;
+    expect(drawn).toHaveAttribute("aria-hidden");
+    expect(drawn?.children).toHaveLength(lives);
+  }
+});
+
+test("a deck shows how many cards it holds on its back, for the eyes", () => {
+  render(<Board view={AI_AHEAD} />);
+
+  const ai = screen.getByRole("group", {
+    name: "The AI's deck and discard pile",
+  });
+  expect(
+    within(detail(ai, "Deck") as HTMLElement).getByText("9"),
+  ).toHaveAttribute("aria-hidden");
+  // On a narrow screen, where the two players' piles are side by side, each
+  // says whose it is (only screen readers read it on a wide one).
+  expect(
+    within(ai).getByRole("heading", { name: "The AI's deck and discard pile" }),
+  ).toHaveClass("lg:sr-only");
 });

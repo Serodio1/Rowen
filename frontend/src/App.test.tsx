@@ -400,6 +400,8 @@ test.each<[number | null, string]>([
     fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
 
     expect(await screen.findByText(result)).toBeInTheDocument();
+    // The board stays, to show how the match ended.
+    expect(screen.getByRole("region", { name: "Board" })).toBeInTheDocument();
     expect(
       screen.queryByRole("list", { name: "What you can do" }),
     ).not.toBeInTheDocument();
