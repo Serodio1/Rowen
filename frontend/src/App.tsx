@@ -118,25 +118,29 @@ function PlayMatch({
   // ask for it. Each move then puts the view of its answer in the cache.
   const match = useQuery({ ...query, initialData: started.view });
   const play = useMutation({
+    mutationKey: ["play"],
     mutationFn: (action: Action) => playAction(api, started.id, action),
     onSuccess: (played) => {
       queryClient.setQueryData(query.queryKey, played.view);
     },
     onError: (error) => {
-      if (outOfDate(error)) {
-        // Ask for the match as it is now.
+      // Ask for the match as it is now, unless it is gone. When no answer
+      // came, or the server failed, the move may have been played all the
+      // same: a move from the old view could then be played twice.
+      if (error.code !== "match_not_found") {
         void queryClient.invalidateQueries({ queryKey: query.queryKey });
       }
     },
   });
 
-  // The latest request that didn't work, if any: asking for the match comes
-  // after the move that made the page ask.
-  const failure = match.error ?? play.error;
-  if (failure?.code === "match_not_found") {
+  if (
+    play.error?.code === "match_not_found" ||
+    match.error?.code === "match_not_found"
+  ) {
     // The server lost the match, as it does when it restarts.
     return (
       <section>
+        <h2>Match not found</h2>
         <p role="alert">This match is no longer on the server.</p>
         <button type="button" onClick={onLeave}>
           Start a new match
@@ -149,12 +153,29 @@ function PlayMatch({
   return (
     <section>
       <h2>Round {view.round}</h2>
-      {failure !== null && (
-        <p role="alert">
-          {outOfDate(failure)
-            ? "The match changed. This is where it is now."
-            : failure.message}
-        </p>
+      {match.isError ? (
+        // The page couldn't ask for the match after a move that didn't work,
+        // so its view may be out of date: no move until it can.
+        <>
+          <p role="alert">{match.error.message}</p>
+          <button
+            type="button"
+            disabled={match.isFetching}
+            onClick={() => {
+              void match.refetch();
+            }}
+          >
+            Try again
+          </button>
+        </>
+      ) : (
+        play.isError && (
+          <p role="alert">
+            {outOfDate(play.error)
+              ? "The match changed. This is where it is now."
+              : `${play.error.message} This is where the match is now.`}
+          </p>
+        )
       )}
       <Hand view={view} />
       {view.match_over ? (
@@ -167,10 +188,15 @@ function PlayMatch({
       ) : (
         <Moves
           view={view}
-          // No move while one is on its way, or while the page asks for the
-          // match: the moves on the page may be out of date.
-          disabled={play.isPending || match.isFetching}
+          // No move while one is on its way, or while the moves on the page
+          // may be out of date: the page is asking for the match, or couldn't.
+          disabled={play.isPending || match.isFetching || match.isError}
           onPlay={(action) => {
+            // Two clicks in the same instant both come before the page shows
+            // the buttons disabled; the cache already knows about the first.
+            if (queryClient.isMutating({ mutationKey: ["play"] }) > 0) {
+              return;
+            }
             play.mutate(action);
           }}
         />
@@ -223,7 +249,9 @@ function Moves({
               onClick={(event) => {
                 // The answer comes before the second click of a double click,
                 // which would land on a move of the next view: ignore it.
-                // (`detail` counts the clicks in a row; a key press gives 0.)
+                // (`detail` counts the clicks in a row, and a key press gives
+                // 0. Some systems count a fourth quick click as 1 again: this
+                // stops double and triple clicks.)
                 if (event.detail > 1) {
                   return;
                 }

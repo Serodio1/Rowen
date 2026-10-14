@@ -29,9 +29,11 @@ export class RequestError extends Error {
   }
 }
 
-// Every request here goes through `send`, so each one that doesn't work
-// throws a `RequestError`: this tells TypeScript, so the `error` TanStack
-// Query gives the page has a `code`.
+// Every request here goes through `send`, which throws a `RequestError` when
+// the API turns it down or doesn't answer: this tells TypeScript, so the
+// `error` TanStack Query gives the page has a `code`. (An answer of the wrong
+// shape could still fail with another error, without one; the API's tests
+// check the shape of its answers.)
 declare module "@tanstack/react-query" {
   interface Register {
     defaultError: RequestError;
@@ -49,12 +51,23 @@ export function createQueryClient(): QueryClient {
       queries: {
         // The decks don't change while the page is open, and a match only
         // changes when the player plays, which puts the new view in the
-        // cache. So an answer never needs asking again on its own, not even
-        // when the player comes back to the page.
+        // cache. So an answer that came is never asked for again on its own.
+        // A request that didn't work is, when the player comes back to the
+        // page, as if they had tried again.
         staleTime: Infinity,
         // A request that didn't work says so at once, and the player can try
         // again. (A mutation is never sent again on its own.)
         retry: false,
+        // Send each request even when the browser says it is offline, so it
+        // fails at once and the page says so. By default TanStack Query would
+        // hold it back without a word, and send it when the network is back,
+        // maybe long after: for a move, one the player may have given up on.
+        // (So nothing is asked for again on its own when the network is
+        // back, either.)
+        networkMode: "always",
+      },
+      mutations: {
+        networkMode: "always",
       },
     },
   });
@@ -65,6 +78,10 @@ export function decksQuery(api: Api) {
   return queryOptions({
     queryKey: ["decks"],
     queryFn: async () => (await send(api.GET("/decks"))).decks,
+    // Keep them while the page is open, even during a long match, so playing
+    // again never waits for them. (By default an answer no part of the page
+    // shows is dropped after 5 minutes.)
+    gcTime: Infinity,
   });
 }
 
@@ -72,7 +89,8 @@ export function decksQuery(api: Api) {
  * The player's view of the match with the id `matchId`.
  *
  * Starting the match and playing a move put the view of their answer here,
- * so the page only asks for it when the match changed in another way.
+ * so the page only asks for it when its view may be out of date: after a
+ * move that didn't work.
  */
 export function matchQuery(api: Api, matchId: string) {
   return queryOptions({

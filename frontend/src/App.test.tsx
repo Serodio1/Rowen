@@ -1,4 +1,4 @@
-import { QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
   render,
@@ -6,11 +6,11 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { afterEach, expect, test } from "vitest";
 import { App } from "./App.tsx";
 import { createApi, type View } from "./api/client.ts";
 import { createQueryClient } from "./api/requests.ts";
-import { DECKS, view } from "./test-data.ts";
+import { DECKS, HOARFROST, view } from "./test-data.ts";
 
 /**
  * An answer of the fake API: a status and a JSON body, any `Response`, or one
@@ -33,7 +33,9 @@ function fakeApi(answers: Record<string, Answer>) {
       return Promise.reject(new TypeError("Failed to fetch"));
     }
     if (answer instanceof Response || answer instanceof Promise) {
-      return Promise.resolve(answer);
+      // A copy for each request, as a server sends: a body can be read only
+      // once, so a second request would fail to read it.
+      return Promise.resolve(answer).then((response) => response.clone());
     }
     return Promise.resolve(
       Response.json(answer.body, { status: answer.status }),
@@ -56,6 +58,11 @@ function renderApp(api: ReturnType<typeof fakeApi>["api"]) {
       <App api={api} />
     </QueryClientProvider>,
   );
+}
+
+/** Wait until a request the page may have just sent has gone out. */
+function settle() {
+  return new Promise((resolve) => setTimeout(resolve));
 }
 
 /**
@@ -180,6 +187,7 @@ test("no deck can be chosen while a match starts", async () => {
   });
   expect(screen.getByRole("button", { name: "Robots" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "Robots" }));
+  await settle();
   expect(sent(requests, "POST /api/matches")).toHaveLength(1);
 
   answer.answer(Response.json(A_MATCH["POST /api/matches"].body));
@@ -264,7 +272,14 @@ test("when the decks can't be loaded, the page says it can't reach the server, a
 });
 
 test("clicking a move plays it, and the page shows the view of the answer", async () => {
-  const { api, requests } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
+  // Another round and another hand than the match started with, so the test
+  // sees that the page shows the answer's.
+  const after = view({
+    round: 2,
+    hand: [HOARFROST],
+    legal_actions: [{ type: "pass" }],
+  });
+  const { api, requests } = fakeApi({ ...A_MATCH, [PLAY]: played(after) });
   renderApp(api);
   await startMatch();
 
@@ -272,15 +287,18 @@ test("clicking a move plays it, and the page shows the view of the answer", asyn
     detail: 1,
   });
 
-  await screen.findByRole("button", { name: "Pass" });
+  expect(
+    await screen.findByRole("heading", { name: "Round 2" }),
+  ).toBeInTheDocument();
   const [move] = sent(requests, PLAY);
   // The action goes back as the view listed it.
   expect(await move?.json()).toEqual({ type: "end_redraw" });
-  expect(moves()).toEqual([
-    "Play Soldier in the melee row",
-    "Play Soldier in the ranged row",
-    "Pass",
-  ]);
+  expect(
+    within(screen.getByRole("list", { name: "Your hand" }))
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual(["Hoarfrost (special)"]);
+  expect(moves()).toEqual(["Pass"]);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
@@ -318,6 +336,7 @@ test("no move can be made while one is on its way", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }), {
     detail: 1,
   });
+  await settle();
   expect(sent(requests, PLAY)).toHaveLength(1);
 
   answer.answer(Response.json(played(ROUND_1).body));
@@ -325,24 +344,47 @@ test("no move can be made while one is on its way", async () => {
   expect(screen.getByRole("button", { name: "Pass" })).toBeEnabled();
 });
 
-test("the second click of a double click isn't a move", async () => {
+test.each([
+  [2, "the second click of a double click"],
+  [3, "the third click of a triple click"],
+])("a click with a count of %i, %s, isn't a move", async (count) => {
   const { api, requests } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
   renderApp(api);
   await startMatch();
 
-  // The answer comes between the two clicks, so the second one lands on a
-  // move of the next view.
+  // The answer comes before the next click, so it lands on a move of the
+  // next view.
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }), {
     detail: 1,
   });
   fireEvent.click(await screen.findByRole("button", { name: "Pass" }), {
-    detail: 2,
+    detail: count,
   });
 
-  // Let a request the second click might have sent arrive.
-  await new Promise((resolve) => setTimeout(resolve));
+  await settle();
   expect(sent(requests, PLAY)).toHaveLength(1);
   expect(moves()).toContain("Pass");
+});
+
+test("two clicks in the same instant make one move", async () => {
+  const { api, requests } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
+  renderApp(api);
+  await startMatch();
+
+  // No person can, but a script can click twice before the page shows the
+  // moves disabled.
+  fireEvent.click(screen.getByRole("button", { name: "Swap Soldier" }), {
+    detail: 1,
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }), {
+    detail: 1,
+  });
+
+  await screen.findByRole("button", { name: "Pass" });
+  await settle();
+  const [move, ...others] = sent(requests, PLAY);
+  expect(others).toHaveLength(0);
+  expect(await move?.json()).toEqual({ type: "redraw", card: "soldier" });
 });
 
 test.each<[number | null, string]>([
@@ -375,29 +417,43 @@ test.each<[number | null, string]>([
   },
 );
 
-test.each<[string, Record<string, Answer>]>([
-  ["a move", { [PLAY]: turnedDown(404, "match_not_found") }],
+const LOST = turnedDown(404, "match_not_found");
+
+test.each<[string, Record<string, Answer>, number]>([
+  ["a move", { [PLAY]: LOST }, 0],
   [
-    "the match, asked for again",
+    "asking for the match after a 409",
     {
       [PLAY]: turnedDown(409, "match_changed"),
-      "GET /api/matches/a-match": turnedDown(404, "match_not_found"),
+      "GET /api/matches/a-match": LOST,
     },
+    1,
+  ],
+  [
+    "asking for the match after a move got no answer",
+    { "GET /api/matches/a-match": LOST },
+    1,
   ],
 ])(
   "when the server lost the match, found by %s, the page says so, and the player can start a new one",
-  async (_, answers) => {
-    renderApp(fakeApi({ ...A_MATCH, ...answers }).api);
+  async (_, answers, asked) => {
+    const { api, requests } = fakeApi({ ...A_MATCH, ...answers });
+    renderApp(api);
     await startMatch();
 
     fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    // Wait for the end: the page may say something else on the way.
+    expect(
+      await screen.findByRole("heading", { name: "Match not found" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
       "This match is no longer on the server.",
     );
     expect(
       screen.queryByRole("heading", { name: "Round 1" }),
     ).not.toBeInTheDocument();
+    expect(sent(requests, "GET /api/matches/a-match")).toHaveLength(asked);
 
     fireEvent.click(screen.getByRole("button", { name: "Start a new match" }));
 
@@ -442,43 +498,118 @@ test.each(["illegal_action", "match_changed"])(
   },
 );
 
-test("when the match can't be asked for again, the page says so, and the player can still play", async () => {
+test("when the match can't be asked for again, no move can be made until it can", async () => {
   const answers: Record<string, Answer> = {
     ...A_MATCH,
     [PLAY]: turnedDown(409, "match_changed"),
   };
-  renderApp(fakeApi(answers).api);
+  const { api, requests } = fakeApi(answers);
+  renderApp(api);
   await startMatch();
 
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
+  expect(
+    await screen.findByRole("button", { name: "Try again" }),
+  ).toBeEnabled();
+  expect(screen.getByRole("alert")).toHaveTextContent(
     "Could not reach the server.",
   );
-  expect(screen.getByRole("button", { name: "Keep this hand" })).toBeEnabled();
+  // The moves on the page may be out of date.
+  for (const button of movesButtons()) {
+    expect(button).toBeDisabled();
+  }
 
-  answers[PLAY] = played(ROUND_1);
-  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  // Trying again asks for the match, not for the move.
+  const answer = later();
+  answers["GET /api/matches/a-match"] = answer.response;
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
-  await screen.findByRole("button", { name: "Pass" });
-  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Try again" })).toBeDisabled();
+  });
+  expect(sent(requests, "GET /api/matches/a-match")).toHaveLength(2);
+  expect(sent(requests, PLAY)).toHaveLength(1);
+
+  answer.answer(Response.json({ id: "a-match", view: ROUND_1 }));
+
+  expect(await screen.findByRole("button", { name: "Pass" })).toBeEnabled();
+  expect(
+    screen.queryByRole("button", { name: "Try again" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "The match changed. This is where it is now.",
+  );
 });
 
-test("when a move can't be sent, the page says so, and the player can try again", async () => {
-  const answers: Record<string, Answer> = { ...A_MATCH };
-  renderApp(fakeApi(answers).api);
-  await startMatch();
-
-  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
-
-  expect(await screen.findByRole("alert")).toHaveTextContent(
+test.each<[string, Answer | undefined, string]>([
+  ["no answer", undefined, "Could not reach the server."],
+  [
+    "an answer without a body",
+    new Response(null, { status: 502 }),
     "Could not reach the server.",
-  );
-  expect(screen.getByRole("button", { name: "Keep this hand" })).toBeEnabled();
+  ],
+  [
+    "a server error",
+    turnedDown(500, "server_error"),
+    "The API says server_error.",
+  ],
+  [
+    "an answer that turns it down",
+    turnedDown(422, "invalid_request"),
+    "The API says invalid_request.",
+  ],
+])(
+  "when a move gets %s, the page asks for the match, as the move may have been played",
+  async (_, failure, message) => {
+    const answer = later();
+    const answers: Record<string, Answer> = {
+      ...A_MATCH,
+      "GET /api/matches/a-match": answer.response,
+    };
+    if (failure !== undefined) {
+      answers[PLAY] = failure;
+    }
+    const { api, requests } = fakeApi(answers);
+    renderApp(api);
+    await startMatch();
 
-  answers[PLAY] = played(ROUND_1);
+    fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      `${message} This is where the match is now.`,
+    );
+    // No move until the page knows where the match is: the moves on the page
+    // may be out of date.
+    for (const button of movesButtons()) {
+      expect(button).toBeDisabled();
+    }
+    expect(sent(requests, "GET /api/matches/a-match")).toHaveLength(1);
+
+    // The move was played: the match is in round 1.
+    answer.answer(Response.json({ id: "a-match", view: ROUND_1 }));
+
+    expect(await screen.findByRole("button", { name: "Pass" })).toBeEnabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      `${message} This is where the match is now.`,
+    );
+    expect(sent(requests, PLAY)).toHaveLength(1);
+  },
+);
+
+// Whether the browser is online is shared by every test: put it back.
+afterEach(() => {
+  onlineManager.setOnline(true);
+});
+
+test("when the browser says it is offline, the page still sends its requests", async () => {
+  onlineManager.setOnline(false);
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
+  renderApp(api);
+
+  // The decks come, the match starts, and a move is played.
+  await startMatch();
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
 
-  await screen.findByRole("button", { name: "Pass" });
-  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "Pass" })).toBeEnabled();
 });
