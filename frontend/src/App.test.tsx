@@ -813,7 +813,10 @@ test("once a match starts, the focus is on the first move", async () => {
 
   await startMatch();
 
-  expect(screen.getByRole("button", { name: "Swap Soldier" })).toHaveFocus();
+  // The focus moves once the page is drawn.
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Swap Soldier" })).toHaveFocus();
+  });
 });
 
 test("after a move, the focus goes to the first move of the new view", async () => {
@@ -845,6 +848,8 @@ test("after a move, the focus stays where the player put it, out of the moves", 
   answer.answer(Response.json(played(ROUND_1).body));
 
   await screen.findByRole("button", { name: "Pass" });
+  // Once the page has had the time to move the focus.
+  await settle();
   expect(what).toHaveFocus();
 });
 
@@ -897,4 +902,46 @@ test("two clicks on the decks in the same instant start one match", async () => 
   const [started, ...others] = sent(requests, "POST /api/matches");
   expect(others).toHaveLength(0);
   expect(await started?.json()).toEqual({ deck: "humans" });
+});
+
+test("after a move that didn't work, the focus goes to the first move once the moves can be made", async () => {
+  const answer = later();
+  const { api } = fakeApi({
+    ...A_MATCH,
+    [PLAY]: turnedDown(500, "server_error"),
+    "GET /api/matches/a-match": answer.response,
+  });
+  renderApp(api);
+  await startMatch();
+
+  const button = screen.getByRole("button", { name: "Swap Hoarfrost" });
+  button.focus();
+  fireEvent.click(button);
+  // The page asks for the match again, and no move can be made meanwhile.
+  await waitFor(() => {
+    expect(button).toBeDisabled();
+  });
+  // The match is as it was: the move wasn't played.
+  answer.answer(Response.json({ id: "a-match", view: view() }));
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Swap Soldier" })).toHaveFocus();
+  });
+});
+
+test("the second click of a double click on the last move doesn't leave the end of the match", async () => {
+  const over = view({ match_over: true, winner: 0, legal_actions: [] });
+  renderApp(fakeApi({ ...A_MATCH, [PLAY]: played(over) }).api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }), {
+    detail: 1,
+  });
+  // The answer came first, so the second click lands on "Play again".
+  fireEvent.click(await screen.findByRole("button", { name: "Play again" }), {
+    detail: 2,
+  });
+
+  await settle();
+  expect(screen.getByText("You won the match!")).toBeInTheDocument();
 });

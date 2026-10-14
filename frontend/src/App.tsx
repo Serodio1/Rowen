@@ -295,7 +295,9 @@ function PlayMatch({
             // readers read who won with it.
             autoFocus
             aria-describedby={resultId}
-            onClick={onLeave}
+            // The second click of a double click on the last move could
+            // land here, and skip who won.
+            onClick={onFirstClick(onLeave)}
           >
             Play again
           </button>
@@ -342,13 +344,15 @@ function Moves({
     // After a move, the focus was on the button played, or on nothing once
     // the button was disabled: the next Tab would go on from a move that
     // may now be another one. And once a match starts, the deck chosen is
-    // gone. So the focus goes to the first move of the new view, unless the
-    // player put it somewhere else.
+    // gone. So once the moves can be made, the focus goes to the first one,
+    // unless the player put it somewhere else. (After a move that didn't
+    // work, the view may be the same: the moves become usable again. While
+    // they are disabled, the first one can't take the focus.)
     const focused = document.activeElement;
     if (focused === document.body || list.current?.contains(focused)) {
       list.current?.querySelector("button")?.focus();
     }
-  }, [view]);
+  }, [view, disabled]);
   return (
     <div className="flex flex-col items-center gap-2">
       <h3
