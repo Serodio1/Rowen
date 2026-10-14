@@ -419,10 +419,12 @@ class Match(Schema):
 
 
 class Played(Match):
-    """A match after the player's action, and what happened in it.
+    """A match after moves were played in it, and what happened.
 
-    ``events`` holds the events of the player's action and then those of the
-    AI's answer, in order, as the player may see them.
+    ``events`` holds the events of those moves, in order, as the player may see
+    them: in a new match, those of the AI's first moves, if it starts (none if
+    the player does); after the player's action, those of the action and then
+    those of the AI's answer.
     """
 
     events: tuple[EventView, ...]

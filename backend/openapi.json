@@ -27,7 +27,7 @@
     "/matches": {
       "post": {
         "summary": "Create Match",
-        "description": "Start a match against the AI, which plays another deck.\n\nThe ``Location`` header of the response holds the address of the match.",
+        "description": "Start a match against the AI, which plays another deck.\n\nIf the AI starts, it plays until it is the player's turn, and the events\nof its moves come with the match. The ``Location`` header of the response\nholds the address of the match.",
         "operationId": "create_match",
         "requestBody": {
           "content": {
@@ -45,7 +45,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Match"
+                  "$ref": "#/components/schemas/Played"
                 }
               }
             }
@@ -804,7 +804,7 @@
           "events"
         ],
         "title": "Played",
-        "description": "A match after the player's action, and what happened in it.\n\n``events`` holds the events of the player's action and then those of the\nAI's answer, in order, as the player may see them."
+        "description": "A match after moves were played in it, and what happened.\n\n``events`` holds the events of those moves, in order, as the player may see\nthem: in a new match, those of the AI's first moves, if it starts (none if\nthe player does); after the player's action, those of the action and then\nthose of the AI's answer."
       },
       "PlayerPassed": {
         "properties": {

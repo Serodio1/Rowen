@@ -47,7 +47,8 @@ uv run uvicorn rowen.api.app:app --reload --reload-dir src
 
 Then open <http://127.0.0.1:8000/docs>: it lists the endpoints and lets you
 try them. `GET /decks` lists the decks, and `POST /matches` with
-`{"deck": "humans"}` starts a match. To play, send one of the `legal_actions`
+`{"deck": "humans"}` starts a match (if the AI starts, it plays first, and the
+response says what it did). To play, send one of the `legal_actions`
 of the view, as it is, to `POST /matches/{id}/actions`: if it is then the AI's
 turn, the AI plays before the server responds, and the response holds the new
 view and what happened. When the API turns a request down, it answers with a

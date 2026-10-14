@@ -79,6 +79,12 @@ def play(client: TestClient, response: httpx2.Response, action: Any) -> httpx2.R
     return client.post(f"/matches/{response.json()['id']}/actions", json=action)
 
 
+def match_text(response: httpx2.Response) -> str:
+    """Return the match in a response, its id and view, as GET sends it."""
+    played = schemas.Played.model_validate_json(response.text)
+    return schemas.Match(id=played.id, view=played.view).model_dump_json()
+
+
 def first_action(response: httpx2.Response) -> Any:
     """Return the first legal action in the view of a response, as JSON."""
     return response.json()["view"]["legal_actions"][0]
@@ -146,17 +152,22 @@ def test_a_new_match_gets_an_address_of_its_own(client: TestClient) -> None:
     assert response.headers["Location"] == f"/matches/{match_id}"
 
 
-def test_the_player_gets_their_view_and_nothing_more(
-    client: TestClient, store: MatchStore
+def test_the_player_gets_their_view_and_the_events_of_the_ais_first_moves(
+    client: TestClient,
 ) -> None:
-    response = start(client)
+    # The same start, played with the engine and the AI directly.
+    state = start_match((DECKS["humans"], DECKS["robots"]), seed=AI_STARTS)
+    state, events = ai_answers(state)
+    assert events
 
-    state = state_of(store, response)
-    sent = schemas.Match(
+    response = start(client, seed=AI_STARTS)
+
+    sent = schemas.Played(
         id=UUID(response.json()["id"]),
         view=schemas.from_view(player_view(state, HUMAN)),
+        events=schemas.from_events(events, HUMAN),
     )
-    # The same JSON, as text: in Python, False == 0.
+    # The same JSON, as text: in Python, False == 0. Nothing more.
     assert response.text == sent.model_dump_json()
 
 
@@ -213,6 +224,8 @@ def test_the_ai_waits_when_the_player_wins_the_coin_flip(
     response = start(client, seed=PLAYER_STARTS)
 
     assert state_of(store, response) == start_match(decks, seed=PLAYER_STARTS)
+    # No move was played, so nothing happened yet.
+    assert response.json()["events"] == []
 
 
 @pytest.mark.parametrize("seed", range(10))
@@ -233,7 +246,9 @@ def test_a_match_can_be_seen_again(client: TestClient) -> None:
     response = client.get(started.headers["Location"])
 
     assert response.status_code == 200
-    assert response.text == started.text
+    # The same match, without the events of the AI's first moves: they come
+    # only with the new match.
+    assert response.text == match_text(started)
 
 
 def test_each_match_has_an_id_of_its_own(client: TestClient) -> None:
@@ -244,7 +259,7 @@ def test_each_match_has_an_id_of_its_own(client: TestClient) -> None:
     assert first.json()["id"] != second.json()["id"]
     assert first.json()["view"] == second.json()["view"]
     for started in (first, second):
-        assert client.get(started.headers["Location"]).text == started.text
+        assert client.get(started.headers["Location"]).text == match_text(started)
 
 
 @pytest.mark.parametrize("deck", ["elves", "", "HUMANS", "../specials", "decks/humans"])
@@ -333,7 +348,7 @@ def test_the_app_keeps_its_matches_in_a_store_of_its_own() -> None:
 
     response = client.get(started.headers["Location"])
 
-    assert response.text == started.text
+    assert response.text == match_text(started)
 
 
 def test_the_ai_doesnt_play_once_the_match_is_over() -> None:
