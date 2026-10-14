@@ -113,7 +113,7 @@ function movesButtons() {
   ).getAllByRole("button");
 }
 
-/** Return each card in the player's hand, as a screen reader names it. */
+/** Return each card in the player's hand, by its accessible name, which screen readers read. */
 function hand() {
   return within(screen.getByRole("list", { name: "Your hand" }))
     .getAllByRole("img")

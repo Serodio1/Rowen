@@ -99,7 +99,7 @@ const THEIRS = side({
 });
 const MID = view({ hand: [SNIPER, HOARFROST], players: [YOURS, THEIRS] });
 
-/** Return each card in `element`, as a screen reader names it. */
+/** Return each card in `element`, by its accessible name, which screen readers read. */
 function cards(element: HTMLElement) {
   return within(element)
     .queryAllByRole("img")

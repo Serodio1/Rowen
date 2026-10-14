@@ -11,7 +11,8 @@ import {
 import { Board } from "./Board.tsx";
 import { actionText, cardNames, resultText } from "./text.ts";
 
-// The look of the page's buttons and warnings (the colours are in index.css).
+// The look of the page's buttons and warnings (the wood and gold colours are
+// in index.css).
 const BUTTON =
   "rounded-md border border-gold-600 bg-wood-700 px-3 py-1.5 font-display text-gold-200 shadow shadow-black/50 hover:bg-wood-600 hover:text-gold-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300 disabled:cursor-not-allowed disabled:opacity-50";
 const ALERT =
@@ -258,7 +259,13 @@ function Moves({
       >
         What you can do
       </h3>
-      <ul aria-labelledby={id} className="flex flex-wrap justify-center gap-2">
+      {/* Tailwind takes the bullets off lists, and with them Safari drops the
+          list from what VoiceOver reads: role="list" puts it back. */}
+      <ul
+        role="list"
+        aria-labelledby={id}
+        className="flex flex-wrap justify-center gap-2"
+      >
         {view.legal_actions.map((action, index) => (
           <li key={index}>
             <button

@@ -18,14 +18,19 @@ const WEATHER_LOOKS: Partial<Record<SpecialCard["kind"], string>> = {
 
 /**
  * The board, as the player of the view sees it: the AI's side on top and the
- * player's own at the bottom, so the two melee rows meet in the middle, as on
- * a real table (and in the CLI). The player's hand is under their rows.
+ * player's own at the bottom, so the two melee rows meet in the middle, as
+ * when two people play face to face (and in the CLI). The player's hand is
+ * under their rows.
  *
  * On a wide screen, the players and the weather are on the left and the
  * decks on the right, as in The Witcher 3. On a narrow one, the players and
  * the weather are above the rows, and the decks below the hand.
  *
- * Everything shown comes from the view: nothing is worked out here (ADR 0002).
+ * Every number and card shown comes from the view: the page only lays them
+ * out, and sees which total is higher (ADR 0002).
+ *
+ * The lists have role="list": Tailwind takes their bullets off, and with
+ * them Safari drops the lists from what VoiceOver reads.
  */
 export function Board({ view }: { view: View }) {
   const { you, ai } = sides(view);
@@ -137,7 +142,7 @@ function PlayerPanel({
               : Array.from({ length: side.lives }, (_, index) => (
                   <span
                     key={index}
-                    className="size-3 rotate-45 rounded-sm bg-life shadow ring-1 ring-red-300/70"
+                    className="size-3 rotate-45 rounded-sm bg-life shadow ring-1 ring-red-300/70 forced-colors:bg-[CanvasText]"
                   />
                 ))}
           </span>
@@ -177,7 +182,7 @@ function Weather({ cards }: { cards: SpecialCard[] }) {
       {cards.length === 0 ? (
         <p className="text-xs italic opacity-70">None</p>
       ) : (
-        <ul className="flex flex-wrap justify-center gap-1">
+        <ul role="list" className="flex flex-wrap justify-center gap-1">
           {cards.map((card, index) => (
             // Two players may play the same weather card, with the same id.
             <li key={index}>
@@ -219,16 +224,14 @@ function BoardRow({
       aria-label={name}
       className="relative flex min-h-23 items-center gap-2 overflow-hidden rounded-md border border-wood-600/70 bg-black/25 p-1 lg:min-h-27"
     >
-      {/* The weather first, so the cards are drawn over it. */}
+      {/* The weather first, so the cards are drawn over it. (The high
+          contrast mode of Windows takes its look away: a dashed line shows
+          it then.) */}
       {under !== null && (
         <div
           aria-hidden
-          className={`pointer-events-none absolute inset-0 ${weatherLook(weather)}`}
-        >
-          <span className="absolute top-1 right-2 font-display text-xs text-white italic drop-shadow">
-            {under}
-          </span>
-        </div>
+          className={`pointer-events-none absolute inset-0 forced-colors:border-2 forced-colors:border-dashed ${weatherLook(weather)}`}
+        />
       )}
       <span
         aria-hidden
@@ -241,7 +244,10 @@ function BoardRow({
           <CardFace card={row.horn} name={cardText(row.horn)} />
         )}
       </div>
-      <ul className="relative flex min-w-0 flex-1 justify-center-safe gap-1 overflow-x-auto py-1.5 pl-1.5">
+      <ul
+        role="list"
+        className="relative flex min-w-0 flex-1 justify-center-safe gap-1 overflow-x-auto py-1.5 pl-1.5"
+      >
         {row.units.map((unit, index) => (
           // Copies of a unit share its id, so the place in the row is the key.
           <li key={`unit-${String(index)}`}>
@@ -258,6 +264,15 @@ function BoardRow({
           </li>
         ))}
       </ul>
+      {/* The weather's name last, so it is drawn over the cards. */}
+      {under !== null && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-1 right-1 rounded bg-black/65 px-1.5 font-display text-xs text-white italic"
+        >
+          {under}
+        </span>
+      )}
     </div>
   );
 }
@@ -283,6 +298,7 @@ function Hand({ view }: { view: View }) {
         <p className="text-sm italic opacity-70">Your hand is empty.</p>
       ) : (
         <ul
+          role="list"
           aria-labelledby={id}
           className="flex justify-center-safe gap-1.5 overflow-x-auto pt-1.5 pl-1.5"
         >
@@ -304,7 +320,12 @@ function Piles({ name, side }: { name: string; side: Side }) {
   const top = side.discard.at(-1);
   return (
     <div role="group" aria-labelledby={id}>
-      <h3 id={id} className="sr-only">
+      {/* On a narrow screen the two players' piles are side by side, so each
+          says whose it is. */}
+      <h3
+        id={id}
+        className="mb-1 text-center font-display text-xs text-gold-300 lg:sr-only"
+      >
         {name}
       </h3>
       <dl className="flex gap-2 text-center text-xs lg:flex-col lg:items-center">
@@ -324,7 +345,7 @@ function Piles({ name, side }: { name: string; side: Side }) {
           <dd className="flex flex-col items-center gap-1">
             <span
               aria-hidden
-              className="grid h-20 w-14 place-items-center rounded-md border-2 border-gold-400 bg-linear-to-b from-[#5a2320] to-[#2b100e] font-display text-lg font-bold text-gold-200 shadow-md shadow-black/60 lg:h-24 lg:w-16"
+              className="grid h-20 w-14 place-items-center rounded-md border-2 border-gold-400 bg-linear-to-b from-card-back to-card-back-dark font-display text-lg font-bold text-gold-200 shadow-md shadow-black/60 lg:h-24 lg:w-16"
             >
               {side.deck_size}
             </span>

@@ -20,13 +20,17 @@
   --color-gold-400: #d9a948;
   --color-gold-600: #9a7124;
   --color-parchment: #eee0bf;
+  --color-parchment-dark: #cbb487;
   --color-ink: #2a1c10;
   /* The score bubbles: the player's are gold, the AI's are pale blue. */
   --color-ally: #e9c46a;
   --color-enemy: #b9d3e6;
   --color-life: #c3262e;
+  /* The back of a deck's cards. */
+  --color-card-back: #5a2320;
+  --color-card-back-dark: #2b100e;
 
-  /* Fonts every computer has: Palatino on Windows and macOS, else Georgia. */
+  /* Fonts most computers have: Palatino on Windows and macOS, else Georgia. */
   --font-display: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
 }
 
