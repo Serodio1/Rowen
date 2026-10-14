@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import pluginQuery from "@tanstack/eslint-plugin-query";
 import prettier from "eslint-config-prettier/flat";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
@@ -17,6 +18,9 @@ export default defineConfig(
       tseslint.configs.strictTypeChecked,
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
+      // TanStack Query's mistakes, such as a query key that is missing
+      // something its request uses.
+      pluginQuery.configs["flat/recommended-strict"],
     ],
     languageOptions: {
       globals: globals.browser,
