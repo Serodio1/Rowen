@@ -437,8 +437,10 @@ def test_every_view_of_a_match_is_sent_as_it_is(seed: int) -> None:
         sent = schemas.from_view(view)
         text = sent.model_dump_json()
         # Field by field, the JSON is the view, with a "type" on each card and
-        # action, and a "weather_row" on each special card.
-        assert as_text(without_added(json.loads(text))) == as_text(asdict(view))
+        # action, and the right "weather_row" on each special card.
+        assert as_text(without_types(json.loads(text))) == as_text(
+            with_weather_rows(asdict(view))
+        )
         # And what the JSON reads back as is what was sent.
         assert schemas.PlayerView.model_validate_json(text) == sent
 
@@ -579,9 +581,12 @@ def test_every_event_of_a_match_is_sent_as_the_player_sees_it(seed: int) -> None
             sent = schemas.from_events(events, player)
             text = EVENTS.dump_json(sent)
             # Field by field, the JSON is each event as player_events lets the
-            # player see it, with a "type".
+            # player see it, with a "type" (and the right "weather_row" on each
+            # special card).
             seen = [asdict(event) for event in engine.player_events(events, player)]
-            assert as_text(without_added(json.loads(text))) == as_text(seen)
+            assert as_text(without_types(json.loads(text))) == as_text(
+                with_weather_rows(seen)
+            )
             # And what the JSON reads back as is what was sent.
             assert EVENTS.validate_json(text) == sent
 
@@ -595,18 +600,28 @@ def as_text(value: Any) -> str:
     return json.dumps(value, sort_keys=True, indent=2)
 
 
-def without_added(value: Any) -> Any:
-    """Return JSON without what the API adds to the view.
-
-    That is the "type" of each card, action and event, and the "weather_row" of
-    each special card.
-    """
+def without_types(value: Any) -> Any:
+    """Return JSON without the "type" of each card, action and event."""
     if isinstance(value, dict):
         return {
-            key: without_added(item)
-            for key, item in value.items()
-            if key not in {"type", "weather_row"}
+            key: without_types(item) for key, item in value.items() if key != "type"
         }
     if isinstance(value, list):
-        return [without_added(item) for item in value]
+        return [without_types(item) for item in value]
+    return value
+
+
+def with_weather_rows(value: Any) -> Any:
+    """Return a value from ``asdict`` with the "weather_row" the API adds.
+
+    Only special cards have a "kind", so each dict with one gets the row its
+    weather hits, from ``WEATHER_ROWS_JSON``, wherever the card is.
+    """
+    if isinstance(value, dict):
+        added = {key: with_weather_rows(item) for key, item in value.items()}
+        if "kind" in value:
+            added["weather_row"] = WEATHER_ROWS_JSON[value["kind"]]
+        return added
+    if isinstance(value, (list, tuple)):
+        return [with_weather_rows(item) for item in value]
     return value
