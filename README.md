@@ -74,9 +74,10 @@ With the web API running too (above, in another terminal), open
 a move to make it, and the AI answers at once, until the match is over. The page
 shows the board: the AI's rows on top and yours below, with their scores, the
 weather, each player's lives, cards in hand, deck and discard pile, and your hand
-under your rows. It doesn't show yet what the AI played. The look follows the
-card game in The Witcher 3, but it is all drawn with CSS: no art, icon or font
-comes from the game. The CSS is made with Tailwind CSS 4, so the page needs a
+under your rows. Over the board, it says how the last round went, and under the
+moves what happened in the match so far, the latest move first. The look follows
+the card game in The Witcher 3, but it is all drawn with CSS: no art, icon or
+font comes from the game. The CSS is made with Tailwind CSS 4, so the page needs a
 recent browser: Chrome or Edge 111, Safari 16.4 or Firefox 128, or later. The
 development server passes the page's requests for
 `/api` on to the web API at 127.0.0.1:8000, where uvicorn listens by default
