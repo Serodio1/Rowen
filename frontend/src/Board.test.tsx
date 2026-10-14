@@ -391,3 +391,16 @@ test("a deck shows how many cards it holds on its back, for the eyes", () => {
     within(ai).getByRole("heading", { name: "The AI's deck and discard pile" }),
   ).toHaveClass("lg:sr-only");
 });
+
+test("the same weather, played by both players, is shown twice", () => {
+  const twice = view({
+    players: [side({ weather: [HOARFROST] }), side({ weather: [HOARFROST] })],
+  });
+  render(<Board view={twice} />);
+
+  // Both cards have the same id: the page must still tell them apart.
+  expect(cards(screen.getByRole("group", { name: "Weather" }))).toEqual([
+    "Hoarfrost (weather on melee)",
+    "Hoarfrost (weather on melee)",
+  ]);
+});
