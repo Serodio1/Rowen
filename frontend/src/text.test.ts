@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { Action, Card } from "./api/client.ts";
 import { HOARFROST, SOLDIER, side, view } from "./test-data.ts";
-import { actionText, cardNames, cardText } from "./text.ts";
+import { actionText, cardNames, cardText, resultText } from "./text.ts";
 
 test.each<[Card, string]>([
   [SOLDIER, "Soldier (4 melee/ranged, agile)"],
@@ -101,4 +101,18 @@ test("the names of the cards are those in the hand, the discard piles and on the
     "their-discarded": "THEIR-DISCARDED",
     theirs: "THEIRS",
   });
+});
+
+test.each<[number | null, string]>([
+  [0, "You won the match!"],
+  [1, "The AI won the match."],
+  [null, "The match is a draw."],
+])("the result says who won, for the player 0: winner %s", (winner, text) => {
+  expect(resultText(view({ match_over: true, winner }))).toBe(text);
+});
+
+test("the result is for the player of the view", () => {
+  const over = view({ player: 1, match_over: true, winner: 1 });
+
+  expect(resultText(over)).toBe("You won the match!");
 });
