@@ -10,13 +10,14 @@ import type { Action, Card, View } from "./api/client.ts";
 /**
  * Return a card with what a player needs to know about it.
  *
- * For example `Soldier (4 melee/ranged, agile)` or `Hoarfrost (special)`.
- * Unlike the CLI, a weather card doesn't say which row it hits: that is a
- * rule, and the API doesn't send it yet (#52).
+ * For example `Soldier (4 melee/ranged, agile)`, `Hoarfrost (weather on
+ * melee)` or `War Horn (special)`, as in the CLI.
  */
 export function cardText(card: Card): string {
   if (card.type === "special") {
-    return `${card.name} (special)`;
+    return card.weather_row === null
+      ? `${card.name} (special)`
+      : `${card.name} (weather on ${card.weather_row})`;
   }
 
   const details = [`${String(card.strength)} ${card.rows.join("/")}`];

@@ -566,6 +566,10 @@ export interface components {
     /**
      * SpecialCard
      * @description A special card, as ``engine.SpecialCard`` describes it.
+     *
+     *     ``weather_row`` is the row a weather card hits, on both sides of the board,
+     *     or null for any other special card. It is a rule, so the API says it: the
+     *     page doesn't know the rules (ADR 0002).
      */
     SpecialCard: {
       /**
@@ -578,6 +582,7 @@ export interface components {
       /** Name */
       name: string;
       kind: components["schemas"]["SpecialKind"];
+      weather_row: components["schemas"]["Row"] | null;
     };
     /**
      * SpecialKind

@@ -60,12 +60,18 @@ class UnitCard(Schema):
 
 
 class SpecialCard(Schema):
-    """A special card, as ``engine.SpecialCard`` describes it."""
+    """A special card, as ``engine.SpecialCard`` describes it.
+
+    ``weather_row`` is the row a weather card hits, on both sides of the board,
+    or null for any other special card. It is a rule, so the API says it: the
+    page doesn't know the rules (ADR 0002).
+    """
 
     type: Literal["special"]
     id: str
     name: str
     kind: SpecialKind
+    weather_row: Row | None
 
 
 # Any card, unit or special. Its "type" says which.
@@ -523,7 +529,13 @@ def _unit(card: engine.UnitCard) -> UnitCard:
 
 def _special(card: engine.SpecialCard) -> SpecialCard:
     """Return a special card as the API sends it."""
-    return SpecialCard(type="special", id=card.id, name=card.name, kind=card.kind)
+    return SpecialCard(
+        type="special",
+        id=card.id,
+        name=card.name,
+        kind=card.kind,
+        weather_row=engine.WEATHER_ROWS.get(card.kind),
+    )
 
 
 def _action(action: engine.Action) -> Action:

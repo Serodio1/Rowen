@@ -165,7 +165,7 @@ test("choosing a deck starts a match with it, and shows the round, the hand and 
   ).toEqual([
     "Soldier (4 melee/ranged, agile)",
     "Soldier (4 melee/ranged, agile)",
-    "Hoarfrost (special)",
+    "Hoarfrost (weather on melee)",
   ]);
   expect(moves()).toEqual(["Swap Soldier", "Swap Hoarfrost", "Keep this hand"]);
   // The view came with the match: the page didn't ask for it.
@@ -297,7 +297,7 @@ test("clicking a move plays it, and the page shows the view of the answer", asyn
     within(screen.getByRole("list", { name: "Your hand" }))
       .getAllByRole("listitem")
       .map((item) => item.textContent),
-  ).toEqual(["Hoarfrost (special)"]);
+  ).toEqual(["Hoarfrost (weather on melee)"]);
   expect(moves()).toEqual(["Pass"]);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });

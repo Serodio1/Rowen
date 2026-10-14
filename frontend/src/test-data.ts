@@ -25,6 +25,7 @@ export const HOARFROST = {
   id: "hoarfrost",
   name: "Hoarfrost",
   kind: "hoarfrost",
+  weather_row: "melee",
 } satisfies Card;
 
 type Side = View["players"][number];

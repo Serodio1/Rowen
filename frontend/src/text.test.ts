@@ -5,7 +5,17 @@ import { actionText, cardNames, cardText, resultText } from "./text.ts";
 
 test.each<[Card, string]>([
   [SOLDIER, "Soldier (4 melee/ranged, agile)"],
-  [HOARFROST, "Hoarfrost (special)"],
+  [HOARFROST, "Hoarfrost (weather on melee)"],
+  [
+    {
+      type: "special",
+      id: "war-horn",
+      name: "War Horn",
+      kind: "war-horn",
+      weather_row: null,
+    },
+    "War Horn (special)",
+  ],
   [
     { ...SOLDIER, name: "Captain", strength: 10, legend: true, ability: null },
     "Captain (10 melee/ranged, legend)",
