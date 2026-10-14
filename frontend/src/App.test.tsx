@@ -632,7 +632,9 @@ function log() {
     screen.getByRole("log", { name: "What happened" }),
   ).queryAllByRole("listitem");
   return entries.map((entry) =>
-    Array.from(entry.querySelectorAll("p"), (sentence) => sentence.textContent),
+    within(entry)
+      .getAllByText(/./)
+      .map((sentence) => sentence.textContent),
   );
 }
 
@@ -666,6 +668,10 @@ test("before anything happened, the page says so", async () => {
   const what = screen.getByRole("log", { name: "What happened" });
   expect(log()).toEqual([]);
   expect(within(what).getByText("Nothing yet.")).toBeInTheDocument();
+  // No round is over: nothing between the round and the board.
+  expect(
+    screen.getByRole("heading", { name: "Round 1" }).nextElementSibling,
+  ).toBe(screen.getByRole("region", { name: "Board" }));
 });
 
 test("after each move, the page says what happened, the latest move first", async () => {

@@ -367,8 +367,9 @@ test("what happened is the sentence of each event, in order, with no round over"
 });
 
 test("each round that ends in what happened is the next one, and the last one is how the round went", () => {
-  // The AI passed long ago: the player passes, and the AI plays on alone
-  // until the next round ends too.
+  // The player passes with no cards left: in the next round the engine
+  // passes for them at once, as their hand is still empty, and the AI plays
+  // on alone until that round ends too.
   expect(
     happened(
       [
