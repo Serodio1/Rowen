@@ -189,11 +189,14 @@ function PlayMatch({
           },
         ],
   );
+  const resultId = useId();
   const play = useMutation({
     mutationKey: ["play"],
     mutationFn: (action: Action) => playAction(api, started.id, action),
     onSuccess: (played) => {
       // The view the move was played from: the events start in its round.
+      // (The cache always has one, from `initialData`: `undefined` is only
+      // for the types.)
       const before = queryClient.getQueryData(query.queryKey);
       // Events name their cards by id. A card can leave the view, such as a
       // unit a Scarecrow takes back to the AI's hand, but it was in the view
@@ -282,14 +285,16 @@ function PlayMatch({
       <Board view={view} />
       {view.match_over ? (
         <div className="flex flex-col items-center gap-3">
-          <p className="font-display text-2xl text-gold-200">
+          <p id={resultId} className="font-display text-2xl text-gold-200">
             {resultText(view)}
           </p>
           <button
             type="button"
             className={BUTTON}
-            // The moves are gone: the focus goes on from here.
+            // The moves are gone: the focus goes on from here, and screen
+            // readers read who won with it.
             autoFocus
+            aria-describedby={resultId}
             onClick={onLeave}
           >
             Play again
@@ -399,18 +404,29 @@ function Log({ entries }: { entries: Entry[] }) {
         role="log"
         aria-labelledby={id}
         tabIndex={0}
-        className="max-h-48 overflow-y-auto rounded-sm text-sm focus-visible:outline-2 focus-visible:outline-gold-300"
+        className="max-h-48 overflow-y-auto rounded-sm px-1 text-sm focus-visible:outline-2 focus-visible:outline-gold-300"
       >
         {entries.length === 0 ? (
           <p className="italic opacity-70">Nothing yet.</p>
         ) : (
-          <ol role="list" className="flex flex-col divide-y divide-wood-600">
+          <ol role="list" className="flex flex-col divide-y divide-gold-600/80">
             {entries.map((entry) => (
               <li key={entry.number} className="py-1">
                 {entry.sentences.map((sentence, index) => (
                   // A move can make the same sentence twice, such as two
-                  // copies of a unit mustered: the place is the key.
-                  <p key={index}>{sentence}</p>
+                  // copies of a unit mustered: the place is the key. How the
+                  // round went stands out, as it is easy to miss over the
+                  // board once the page is scrolled down to the moves.
+                  <p
+                    key={index}
+                    className={
+                      sentence === entry.round
+                        ? "font-display text-gold-200"
+                        : undefined
+                    }
+                  >
+                    {sentence}
+                  </p>
                 ))}
               </li>
             ))}
