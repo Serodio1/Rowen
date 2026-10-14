@@ -70,9 +70,12 @@ npm run dev     # start the development server
 
 With the web API running too (above, in another terminal), open
 <http://localhost:5173> and choose a deck: a match against the AI starts. Click
-a move to make it, and the AI answers at once, until the match is over. For now
-the page shows the round, your hand and your moves, but not yet the board or
-what the AI played. The development server passes the page's requests for
+a move to make it, and the AI answers at once, until the match is over. The page
+shows the board: the AI's rows on top and yours below, with their scores, the
+weather, each player's lives, cards in hand, deck and discard pile, and your hand
+under your rows. It doesn't show yet what the AI played. The look follows the
+card game in The Witcher 3, but it is all drawn with CSS: no art, icon or font
+comes from the game. The development server passes the page's requests for
 `/api` on to the web API at 127.0.0.1:8000, where uvicorn listens by default
 (`vite.config.ts`), and updates the page whenever the code changes. If the page
 says "Could not reach the server.", start the API and try again. Restarting the
