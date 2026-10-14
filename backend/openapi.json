@@ -5,6 +5,25 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/decks": {
+      "get": {
+        "summary": "List Decks",
+        "description": "Return the decks the player can choose from to start a match.\n\nThe AI plays another one of them.",
+        "operationId": "list_decks",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Decks"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/matches": {
       "post": {
         "summary": "Create Match",
@@ -338,6 +357,44 @@
         ],
         "title": "CardsDrawn",
         "description": "The player drew cards: ``engine.CardsDrawn``.\n\nThe player only gets this for their own cards. For the opponent's, they get\n``OpponentDrew``."
+      },
+      "DeckSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "DeckSummary",
+        "description": "A deck the player can choose: its id, to start a match, and its name."
+      },
+      "Decks": {
+        "properties": {
+          "decks": {
+            "items": {
+              "$ref": "#/components/schemas/DeckSummary"
+            },
+            "type": "array",
+            "title": "Decks"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decks"
+        ],
+        "title": "Decks",
+        "description": "The decks a player can choose from, in alphabetical order of their ids.\n\nThe answer is an object with a list in it, not a bare list, like every\nother answer of the API, so it can get more fields later."
       },
       "EndRedraw": {
         "properties": {

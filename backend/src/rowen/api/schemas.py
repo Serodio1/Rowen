@@ -378,6 +378,23 @@ class PlayerView(Schema):
     winner: int | None
 
 
+class DeckSummary(Schema):
+    """A deck the player can choose: its id, to start a match, and its name."""
+
+    id: str
+    name: str
+
+
+class Decks(Schema):
+    """The decks a player can choose from, in alphabetical order of their ids.
+
+    The answer is an object with a list in it, not a bare list, like every
+    other answer of the API, so it can get more fields later.
+    """
+
+    decks: tuple[DeckSummary, ...]
+
+
 class NewMatch(Schema):
     """What the player sends to start a match: the id of their deck."""
 

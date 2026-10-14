@@ -35,6 +35,8 @@ from starlette.exceptions import HTTPException
 from rowen.ai.baseline import choose_action
 from rowen.api.schemas import (
     Action,
+    Decks,
+    DeckSummary,
     Error,
     ErrorCode,
     Match,
@@ -124,6 +126,16 @@ class ApiError(Exception):
 # endpoint answers with them on purpose.
 def _errors(*status_codes: int) -> dict[int | str, dict[str, Any]]:
     return {status_code: {"model": Error} for status_code in status_codes}
+
+
+@app.get("/decks")
+def list_decks() -> Decks:
+    """Return the decks the player can choose from to start a match.
+
+    The AI plays another one of them.
+    """
+    decks = [load_deck(deck_id) for deck_id in deck_ids()]
+    return Decks(decks=tuple(DeckSummary(id=deck.id, name=deck.name) for deck in decks))
 
 
 @app.post(

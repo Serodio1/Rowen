@@ -37,8 +37,8 @@ choices always give the same match.
 
 ## Run the web API
 
-The web API is what the browser will play through. It already lets you play a
-whole match against the AI, as JSON:
+The web API is what the browser plays through. It also lets you play a whole
+match against the AI, as JSON:
 
 ```sh
 cd backend
@@ -46,13 +46,13 @@ uv run uvicorn rowen.api.app:app --reload --reload-dir src
 ```
 
 Then open <http://127.0.0.1:8000/docs>: it lists the endpoints and lets you
-try them. `POST /matches` with `{"deck": "humans"}` starts a match. To play,
-send one of the `legal_actions` of the view, as it is, to
-`POST /matches/{id}/actions`: if it is then the AI's turn, the AI plays before
-the server responds, and the response holds the new view and what happened.
-When the API turns a request down, it answers with a `code` and a `message`,
-such as `illegal_action`. `--reload` restarts the server whenever the Python
-code in `src` changes.
+try them. `GET /decks` lists the decks, and `POST /matches` with
+`{"deck": "humans"}` starts a match. To play, send one of the `legal_actions`
+of the view, as it is, to `POST /matches/{id}/actions`: if it is then the AI's
+turn, the AI plays before the server responds, and the response holds the new
+view and what happened. When the API turns a request down, it answers with a
+`code` and a `message`, such as `illegal_action`. `--reload` restarts the
+server whenever the Python code in `src` changes.
 Matches are kept in memory for now, so they are lost when the server stops or
 restarts.
 
@@ -68,9 +68,13 @@ npm ci          # install the exact versions in package-lock.json
 npm run dev     # start the development server
 ```
 
-Then open <http://localhost:5173>. For now the page only shows the name of the
-game: the next step connects it to the web API. The development server updates
-the page whenever the code changes.
+With the web API running too (above, in another terminal), open
+<http://localhost:5173> and choose a deck: a match against the AI starts. For
+now the page shows the round, your hand and the moves you can make, as text;
+making them comes next. The development server passes the page's requests for
+`/api` on to the web API at 127.0.0.1:8000, where uvicorn listens by default
+(`vite.config.ts`), and updates the page whenever the code changes. If the page
+says "Could not reach the server.", start the API and reload the page.
 
 On Windows, if PowerShell says that running scripts is disabled, run
 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
