@@ -132,12 +132,14 @@ function PlayerPanel({
         <dt className="opacity-80">Lives</dt>
         <dd>
           <span aria-hidden className="flex gap-1.5">
-            {Array.from({ length: side.lives }, (_, index) => (
-              <span
-                key={index}
-                className="size-3 rotate-45 rounded-sm bg-life shadow ring-1 ring-red-300/70"
-              />
-            ))}
+            {side.lives === 0
+              ? "–"
+              : Array.from({ length: side.lives }, (_, index) => (
+                  <span
+                    key={index}
+                    className="size-3 rotate-45 rounded-sm bg-life shadow ring-1 ring-red-300/70"
+                  />
+                ))}
           </span>
           <span className="sr-only">{side.lives}</span>
         </dd>

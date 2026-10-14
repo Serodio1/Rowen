@@ -179,6 +179,15 @@ test("with the same total, neither player is ahead", () => {
   ).toHaveTextContent(/^5$/);
 });
 
+test("a player with no lives left has a dash for lives, and 0 for screen readers", () => {
+  const over = view({ players: [side({ lives: 0 }), side({ lives: 1 })] });
+  render(<Board view={over} />);
+
+  const lives = detail(screen.getByRole("group", { name: "You" }), "Lives");
+  expect(lives).toHaveTextContent(/^–0$/);
+  expect(within(lives as HTMLElement).getByText("0")).toHaveClass("sr-only");
+});
+
 test("during the redraw, each panel says how many swaps are left", () => {
   const redraw = view({
     players: [side({ redraws_left: 1 }), side({ redraws_left: 2 })],
