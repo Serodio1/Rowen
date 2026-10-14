@@ -1,21 +1,19 @@
 import { expect, test } from "vitest";
 import type { Action, Card } from "./api/client.ts";
-import { HOARFROST, SOLDIER, side, view } from "./test-data.ts";
-import { actionText, cardNames, cardText, resultText } from "./text.ts";
+import { HOARFROST, SOLDIER, WAR_HORN, side, view } from "./test-data.ts";
+import {
+  actionText,
+  cardLabels,
+  cardNames,
+  cardText,
+  resultText,
+  unitText,
+} from "./text.ts";
 
 test.each<[Card, string]>([
   [SOLDIER, "Soldier (4 melee/ranged, agile)"],
   [HOARFROST, "Hoarfrost (weather on melee)"],
-  [
-    {
-      type: "special",
-      id: "war-horn",
-      name: "War Horn",
-      kind: "war-horn",
-      weather_row: null,
-    },
-    "War Horn (special)",
-  ],
+  [WAR_HORN, "War Horn (special)"],
   [
     { ...SOLDIER, name: "Captain", strength: 10, legend: true, ability: null },
     "Captain (10 melee/ranged, legend)",
@@ -125,4 +123,27 @@ test("the result is for the player of the view", () => {
   const over = view({ player: 1, match_over: true, winner: 1 });
 
   expect(resultText(over)).toBe("You won the match!");
+});
+
+test.each<[number, string]>([
+  [4, "Soldier (4 melee/ranged, agile)"],
+  [1, "Soldier (4 melee/ranged, agile), now 1"],
+  [8, "Soldier (4 melee/ranged, agile), now 8"],
+])(
+  "a unit on the board says its strength now, if it isn't its own: %i",
+  (strength, text) => {
+    expect(unitText({ card: SOLDIER, strength })).toBe(text);
+  },
+);
+
+test.each<[Card, string[]]>([
+  [{ ...SOLDIER, rows: ["siege"], ability: "muster" }, ["Siege", "Muster"]],
+  [{ ...SOLDIER, rows: ["ranged"], ability: null }, ["Ranged"]],
+  // Only what it does: "Melee/Ranged" doesn't fit on the card.
+  [SOLDIER, ["Agile"]],
+  [{ ...SOLDIER, ability: null }, []],
+  [HOARFROST, ["Weather", "Melee"]],
+  [WAR_HORN, ["Special"]],
+])("a card shows short words on what it is: %j", (card, labels) => {
+  expect(cardLabels(card)).toEqual(labels);
 });

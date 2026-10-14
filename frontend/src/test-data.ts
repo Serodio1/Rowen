@@ -28,6 +28,14 @@ export const HOARFROST = {
   weather_row: "melee",
 } satisfies Card;
 
+export const WAR_HORN = {
+  type: "special",
+  id: "war-horn",
+  name: "War Horn",
+  kind: "war-horn",
+  weather_row: null,
+} satisfies Card;
+
 type Side = View["players"][number];
 
 /** Return one player's side of the board at the start of a match. */
