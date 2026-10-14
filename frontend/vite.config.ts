@@ -1,9 +1,11 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 // https://vite.dev/config/ and https://vitest.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  // Tailwind builds the CSS from the classes the components use (src/index.css).
+  plugins: [react(), tailwindcss()],
   // The page calls the web API under /api/ on its own server
   // (src/api/client.ts): the development server (npm run dev) and the preview
   // of the build (npm run preview) pass those requests on to the API, without
