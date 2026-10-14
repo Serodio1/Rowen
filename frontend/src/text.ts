@@ -1,9 +1,11 @@
 /**
- * The match in words: cards and actions as text, for the page to show.
+ * The match in words: cards, actions and events as text, for the page to
+ * show.
  *
  * The functions here only turn data into text, so they are tested on their
- * own. Nothing is worked out here: the cards, the legal actions and every
- * number come from the server (ADR 0002).
+ * own. The cards, the legal actions, the scores and who won come from the
+ * server (ADR 0002): here the rounds that end are only numbered, and the
+ * winner's score put first.
  */
 import type { Action, Card, Event, View } from "./api/client.ts";
 
