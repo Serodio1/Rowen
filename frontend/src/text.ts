@@ -94,7 +94,10 @@ export function resultText(view: View): string {
  * Actions and events name their cards by id. The cards an action names are
  * all in the view: in the hand, in a discard pile (to revive) or on the board
  * (to take back with a Scarecrow). Those an event names are in the view
- * before or after it, or in an earlier one.
+ * before or after it: a card that leaves the view, such as a unit a
+ * Scarecrow takes back to the AI's hand, was in the view before. (All but a
+ * unit the AI both plays and takes back between two of the player's moves,
+ * once the player passed: it is named by its id.)
  */
 export function cardNames(view: View): Map<string, string> {
   const cards: Card[] = [...view.hand];

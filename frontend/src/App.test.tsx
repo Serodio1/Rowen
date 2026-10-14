@@ -802,6 +802,14 @@ test("when a round ends, the page says how it went over the board, until the nex
   expect(screen.getAllByText("Round 1: the AI won, 30 to 12.")).toHaveLength(1);
 });
 
+test("once a match starts, the focus is on the first move", async () => {
+  renderApp(fakeApi(A_MATCH).api);
+
+  await startMatch();
+
+  expect(screen.getByRole("button", { name: "Swap Soldier" })).toHaveFocus();
+});
+
 test("after a move, the focus goes to the first move of the new view", async () => {
   const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
   renderApp(api);

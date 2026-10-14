@@ -173,10 +173,6 @@ function PlayMatch({
   // The view starts as the one that came with the match, so the page doesn't
   // ask for it. Each move then puts the view of its answer in the cache.
   const match = useQuery({ ...query, initialData: started.view });
-  // The name of every card the page has seen in the match, by id. Events name
-  // their cards by id, and a card can leave the view, such as a unit a
-  // Scarecrow takes back to the AI's hand.
-  const names = useRef(cardNames(started.view));
   // What happened, the latest first.
   const [log, setLog] = useState<Entry[]>(() =>
     started.events.length === 0
@@ -199,16 +195,17 @@ function PlayMatch({
     onSuccess: (played) => {
       // The view the move was played from: the events start in its round.
       const before = queryClient.getQueryData(query.queryKey);
-      const seen = new Map([
-        ...names.current,
+      // Events name their cards by id. A card can leave the view, such as a
+      // unit a Scarecrow takes back to the AI's hand, but it was in the view
+      // before.
+      const names = new Map([
         ...(before === undefined ? [] : cardNames(before)),
         ...cardNames(played.view),
       ]);
-      names.current = seen;
       const entry = happened(
         played.events,
         played.view.player,
-        seen,
+        names,
         before?.round ?? played.view.round,
       );
       setLog((log) => [{ number: log.length + 1, ...entry }, ...log]);
@@ -336,16 +333,12 @@ function Moves({
   const names = cardNames(view);
   const id = useId();
   const list = useRef<HTMLUListElement>(null);
-  // The view the moves were last shown for.
-  const shown = useRef(view);
   useEffect(() => {
-    if (shown.current === view) {
-      return;
-    }
-    shown.current = view;
     // After a move, the focus was on the button played, or on nothing once
     // the button was disabled: the next Tab would go on from a move that
-    // may now be another one. It goes to the first move of the new view.
+    // may now be another one. And once a match starts, the deck chosen is
+    // gone. So the focus goes to the first move of the new view, unless the
+    // player put it somewhere else.
     const focused = document.activeElement;
     if (focused === document.body || list.current?.contains(focused)) {
       list.current?.querySelector("button")?.focus();
