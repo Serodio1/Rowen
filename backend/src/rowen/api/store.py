@@ -22,8 +22,8 @@ without a word. A request that comes once the first one's result is kept
 plays on the new match, as the second click of a double click usually does:
 the server plays an action in a few milliseconds. A request doesn't say which
 state of the match it was sent from, so the server can't tell a double click
-from two clicks. So the browser must not send an action before the last one
-is answered (#52).
+from two clicks. The browser can: it ignores the second click of a double
+click, and sends no action while one is on its way (``frontend/src/App.tsx``).
 
 PostgreSQL takes its place later in this milestone, behind the same methods,
 so the endpoints don't change. There, ``replace`` will compare a version
