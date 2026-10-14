@@ -20,11 +20,30 @@ export const SOLDIER = {
   legend: false,
 } satisfies Card;
 
+export const CAPTAIN = {
+  ...SOLDIER,
+  id: "captain",
+  name: "Captain",
+  rows: ["siege"],
+  strength: 10,
+  ability: null,
+  legend: true,
+} satisfies Card;
+
 export const HOARFROST = {
   type: "special",
   id: "hoarfrost",
   name: "Hoarfrost",
   kind: "hoarfrost",
+  weather_row: "melee",
+} satisfies Card;
+
+export const WAR_HORN = {
+  type: "special",
+  id: "war-horn",
+  name: "War Horn",
+  kind: "war-horn",
+  weather_row: null,
 } satisfies Card;
 
 type Side = View["players"][number];

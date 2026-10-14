@@ -1206,6 +1206,16 @@
           },
           "kind": {
             "$ref": "#/components/schemas/SpecialKind"
+          },
+          "weather_row": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Row"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -1214,10 +1224,11 @@
           "type",
           "id",
           "name",
-          "kind"
+          "kind",
+          "weather_row"
         ],
         "title": "SpecialCard",
-        "description": "A special card, as ``engine.SpecialCard`` describes it."
+        "description": "A special card, as ``engine.SpecialCard`` describes it.\n\n``weather_row`` is the row a weather card hits, on both sides of the board,\nor null for any other special card. It is a rule, so the API says it: the\npage doesn't know the rules (ADR 0002)."
       },
       "SpecialKind": {
         "type": "string",

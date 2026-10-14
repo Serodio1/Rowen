@@ -7,16 +7,20 @@
  */
 import type { Action, Card, View } from "./api/client.ts";
 
+/** A unit on the board, with its strength now. */
+type Unit = View["players"][number]["rows"]["melee"]["units"][number];
+
 /**
  * Return a card with what a player needs to know about it.
  *
- * For example `Soldier (4 melee/ranged, agile)` or `Hoarfrost (special)`.
- * Unlike the CLI, a weather card doesn't say which row it hits: that is a
- * rule, and the API doesn't send it yet (#52).
+ * For example `Soldier (4 melee/ranged, agile)`, `Hoarfrost (weather on
+ * melee)` or `War Horn (special)`, as in the CLI.
  */
 export function cardText(card: Card): string {
   if (card.type === "special") {
-    return `${card.name} (special)`;
+    return card.weather_row === null
+      ? `${card.name} (special)`
+      : `${card.name} (weather on ${card.weather_row})`;
   }
 
   const details = [`${String(card.strength)} ${card.rows.join("/")}`];
@@ -27,6 +31,49 @@ export function cardText(card: Card): string {
     details.push(card.ability);
   }
   return `${card.name} (${details.join(", ")})`;
+}
+
+/**
+ * Return a unit on the board, with its strength now if weather or another
+ * card changed it.
+ *
+ * For example `Soldier (4 melee/ranged, agile), now 1`.
+ */
+export function unitText(unit: Unit): string {
+  const text = cardText(unit.card);
+  return unit.strength === unit.card.strength
+    ? text
+    : `${text}, now ${String(unit.strength)}`;
+}
+
+/**
+ * Return the short words a card shows under its name: where it goes and what
+ * it does.
+ *
+ * For example `["Siege", "Muster"]`, `["Weather", "Melee"]` for Hoarfrost, or
+ * `["Special"]`. A unit that may go in more than one row shows only what it
+ * does, such as `["Agile"]`: the words must fit on the card, and `cardText`
+ * says it all.
+ */
+export function cardLabels(card: Card): string[] {
+  if (card.type === "special") {
+    return card.weather_row === null
+      ? ["Special"]
+      : ["Weather", capitalized(card.weather_row)];
+  }
+
+  const [row, ...others] = card.rows;
+  const labels =
+    row !== undefined && others.length === 0 ? [capitalized(row)] : [];
+  if (card.ability !== null) {
+    labels.push(capitalized(card.ability));
+  }
+  return labels;
+}
+
+/** Return a word with its first letter in capitals: `melee` is `Melee`. */
+function capitalized(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 /**

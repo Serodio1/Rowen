@@ -1,0 +1,106 @@
+/*
+ * The look of the page: a dark wooden table with gold, after the card game in
+ * The Witcher 3. All of it is drawn here, with CSS: no image, icon or font
+ * comes from the game.
+ *
+ * Tailwind makes a class for each colour and font in `@theme` (such as
+ * `bg-wood-800` or `font-display`), and each `@utility` is a class of its
+ * own. The build keeps only the classes the components use.
+ */
+@import "tailwindcss";
+
+@theme {
+  --color-wood-950: #170d06;
+  --color-wood-900: #241509;
+  --color-wood-800: #34200f;
+  --color-wood-700: #482d17;
+  --color-wood-600: #5f3d20;
+  --color-gold-200: #f6e2a8;
+  --color-gold-300: #ecc977;
+  --color-gold-400: #d9a948;
+  --color-gold-600: #9a7124;
+  --color-parchment: #eee0bf;
+  --color-parchment-dark: #cbb487;
+  --color-ink: #2a1c10;
+  /* The score bubbles: the player's are gold, the AI's are pale blue. */
+  --color-ally: #e9c46a;
+  --color-enemy: #b9d3e6;
+  --color-life: #c3262e;
+  /* The back of a deck's cards. */
+  --color-card-back: #5a2320;
+  --color-card-back-dark: #2b100e;
+
+  /* Fonts most computers have: Palatino on Windows and macOS, else Georgia. */
+  --font-display: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+}
+
+@layer base {
+  body {
+    min-height: 100vh;
+    background-color: var(--color-wood-950);
+    background-image: radial-gradient(
+      ellipse at center,
+      rgb(255 255 255 / 0.04),
+      rgb(0 0 0 / 0.5)
+    );
+    color: var(--color-parchment);
+  }
+}
+
+/* A wooden surface: fine grain, lit from the top. */
+@utility wood {
+  background-color: var(--color-wood-800);
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgb(0 0 0 / 0.08) 0 1px,
+      transparent 1px 7px,
+      rgb(255 255 255 / 0.03) 7px 8px,
+      transparent 8px 19px
+    ),
+    linear-gradient(rgb(255 255 255 / 0.05), rgb(0 0 0 / 0.3));
+}
+
+/* What each kind of weather looks like over a row. */
+/* Frost: ice crystals, whiter near the ground. */
+@utility weather-frost {
+  background-image:
+    repeating-linear-gradient(
+      60deg,
+      rgb(255 255 255 / 0.12) 0 1px,
+      transparent 1px 12px
+    ),
+    repeating-linear-gradient(
+      -60deg,
+      rgb(255 255 255 / 0.12) 0 1px,
+      transparent 1px 12px
+    ),
+    linear-gradient(to top, rgb(205 235 255 / 0.5), rgb(190 225 250 / 0.12));
+}
+
+/* Fog: soft white clouds. */
+@utility weather-fog {
+  background-image:
+    radial-gradient(
+      ellipse at 20% 60%,
+      rgb(235 235 235 / 0.45),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at 75% 40%,
+      rgb(225 225 225 / 0.4),
+      transparent 55%
+    ),
+    linear-gradient(rgb(200 200 200 / 0.15), rgb(200 200 200 / 0.15));
+}
+
+/* Rain: steep streaks under a grey-blue sky. */
+@utility weather-rain {
+  background-image:
+    repeating-linear-gradient(
+      100deg,
+      rgb(170 200 235 / 0.4) 0 1px,
+      transparent 1px 7px
+    ),
+    linear-gradient(rgb(50 75 110 / 0.4), rgb(50 75 110 / 0.25));
+}

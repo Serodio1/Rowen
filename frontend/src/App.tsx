@@ -8,7 +8,15 @@ import {
   startMatch,
   type RequestError,
 } from "./api/requests.ts";
-import { actionText, cardNames, cardText, resultText } from "./text.ts";
+import { Board } from "./Board.tsx";
+import { actionText, cardNames, resultText } from "./text.ts";
+
+// The look of the page's buttons and warnings (the wood and gold colours are
+// in index.css).
+const BUTTON =
+  "rounded-md border border-gold-600 bg-wood-700 px-3 py-1.5 font-display text-gold-200 shadow shadow-black/50 hover:bg-wood-600 hover:text-gold-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300 disabled:cursor-not-allowed disabled:opacity-50";
+const ALERT =
+  "rounded-md border border-red-400/60 bg-red-950/70 px-3 py-2 text-red-100";
 
 /**
  * The game's page: choose a deck to start a match against the AI, then play
@@ -25,8 +33,10 @@ export function App({ api }: { api: Api }) {
   const [match, setMatch] = useState<Match | null>(null);
 
   return (
-    <main>
-      <h1>Rowen</h1>
+    <main className="mx-auto max-w-7xl px-2 py-3 lg:px-4">
+      <h1 className="mb-2 text-center font-display text-3xl font-bold tracking-wide text-gold-300 drop-shadow lg:text-4xl">
+        Rowen
+      </h1>
       {match === null ? (
         <ChooseDeck api={api} onStart={setMatch} />
       ) : (
@@ -61,15 +71,22 @@ function ChooseDeck({
   });
 
   return (
-    <section>
-      <h2>Choose your deck</h2>
-      {start.isError && <p role="alert">{start.error.message}</p>}
-      {decks.isPending && <p>Loading the decks…</p>}
+    <section className="wood mx-auto flex max-w-xl flex-col items-center gap-4 rounded-xl border-2 border-wood-600 p-6 shadow-2xl shadow-black/60">
+      <h2 className="font-display text-2xl text-gold-300">Choose your deck</h2>
+      {start.isError && (
+        <p role="alert" className={ALERT}>
+          {start.error.message}
+        </p>
+      )}
+      {decks.isPending && <p className="italic">Loading the decks…</p>}
       {decks.isError && (
         <>
-          <p role="alert">{decks.error.message}</p>
+          <p role="alert" className={ALERT}>
+            {decks.error.message}
+          </p>
           <button
             type="button"
+            className={BUTTON}
             onClick={() => {
               void decks.refetch();
             }}
@@ -78,27 +95,31 @@ function ChooseDeck({
           </button>
         </>
       )}
-      {decks.isSuccess &&
-        decks.data.map((deck) => (
-          <button
-            key={deck.id}
-            type="button"
-            // One match at a time: no second click while one starts.
-            disabled={start.isPending}
-            onClick={() => {
-              start.mutate(deck.id);
-            }}
-          >
-            {deck.name}
-          </button>
-        ))}
+      {decks.isSuccess && (
+        <div className="flex flex-wrap justify-center gap-3">
+          {decks.data.map((deck) => (
+            <button
+              key={deck.id}
+              type="button"
+              className={`${BUTTON} px-8 py-4 text-xl`}
+              // One match at a time: no second click while one starts.
+              disabled={start.isPending}
+              onClick={() => {
+                start.mutate(deck.id);
+              }}
+            >
+              {deck.name}
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
 /**
- * The match being played: the round, the cards in hand and the moves the
- * player can make, or who won once it is over.
+ * The match being played: the round, the board and the moves the player can
+ * make, or who won once it is over.
  *
  * @param started - The match as it started.
  * @param onLeave - Called when the player is done with the match.
@@ -139,10 +160,12 @@ function PlayMatch({
   ) {
     // The server lost the match, as it does when it restarts.
     return (
-      <section>
-        <h2>Match not found</h2>
-        <p role="alert">This match is no longer on the server.</p>
-        <button type="button" onClick={onLeave}>
+      <section className="wood mx-auto flex max-w-xl flex-col items-center gap-4 rounded-xl border-2 border-wood-600 p-6 shadow-2xl shadow-black/60">
+        <h2 className="font-display text-2xl text-gold-300">Match not found</h2>
+        <p role="alert" className={ALERT}>
+          This match is no longer on the server.
+        </p>
+        <button type="button" className={BUTTON} onClick={onLeave}>
           Start a new match
         </button>
       </section>
@@ -151,15 +174,20 @@ function PlayMatch({
 
   const view = match.data;
   return (
-    <section>
-      <h2>Round {view.round}</h2>
+    <section className="flex flex-col gap-3">
+      <h2 className="text-center font-display text-xl text-gold-300 lg:text-2xl">
+        Round {view.round}
+      </h2>
       {match.isError ? (
         // The page couldn't ask for the match after a move that didn't work,
         // so its view may be out of date: no move until it can.
-        <>
-          <p role="alert">{match.error.message}</p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <p role="alert" className={ALERT}>
+            {match.error.message}
+          </p>
           <button
             type="button"
+            className={BUTTON}
             disabled={match.isFetching}
             onClick={() => {
               void match.refetch();
@@ -167,24 +195,26 @@ function PlayMatch({
           >
             Try again
           </button>
-        </>
+        </div>
       ) : (
         play.isError && (
-          <p role="alert">
+          <p role="alert" className={`${ALERT} text-center`}>
             {outOfDate(play.error)
               ? "The match changed. This is where it is now."
               : `${play.error.message} This is where the match is now.`}
           </p>
         )
       )}
-      <Hand view={view} />
+      <Board view={view} />
       {view.match_over ? (
-        <>
-          <p>{resultText(view)}</p>
-          <button type="button" onClick={onLeave}>
+        <div className="flex flex-col items-center gap-3">
+          <p className="font-display text-2xl text-gold-200">
+            {resultText(view)}
+          </p>
+          <button type="button" className={BUTTON} onClick={onLeave}>
             Play again
           </button>
-        </>
+        </div>
       ) : (
         <Moves
           view={view}
@@ -205,22 +235,6 @@ function PlayMatch({
   );
 }
 
-/** The cards in the player's hand. */
-function Hand({ view }: { view: View }) {
-  const id = useId();
-  return (
-    <>
-      <h3 id={id}>Your hand</h3>
-      <ul aria-labelledby={id}>
-        {view.hand.map((card, index) => (
-          // Copies of a card share its id, so the place in the hand is the key.
-          <li key={index}>{cardText(card)}</li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
 /**
  * The legal actions of the view, as buttons.
  *
@@ -238,13 +252,25 @@ function Moves({
   const names = cardNames(view);
   const id = useId();
   return (
-    <>
-      <h3 id={id}>What you can do</h3>
-      <ul aria-labelledby={id}>
+    <div className="flex flex-col items-center gap-2">
+      <h3
+        id={id}
+        className="font-display text-xs tracking-widest text-gold-300/80 uppercase"
+      >
+        What you can do
+      </h3>
+      {/* Tailwind takes the bullets off lists, and with them Safari drops the
+          list from what VoiceOver reads: role="list" puts it back. */}
+      <ul
+        role="list"
+        aria-labelledby={id}
+        className="flex flex-wrap justify-center gap-2"
+      >
         {view.legal_actions.map((action, index) => (
           <li key={index}>
             <button
               type="button"
+              className={BUTTON}
               disabled={disabled}
               onClick={(event) => {
                 // The answer comes before the second click of a double click,
@@ -263,7 +289,7 @@ function Moves({
           </li>
         ))}
       </ul>
-    </>
+    </div>
   );
 }
 

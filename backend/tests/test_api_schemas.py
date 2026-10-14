@@ -55,12 +55,14 @@ THICK_FOG_JSON = {
     "id": "thick-fog",
     "name": "Thick Fog",
     "kind": "thick-fog",
+    "weather_row": "ranged",
 }
 WAR_HORN_JSON = {
     "type": "special",
     "id": "war-horn",
     "name": "War Horn",
     "kind": "war-horn",
+    "weather_row": None,
 }
 
 EMPTY_ROW = engine.RowView(units=(), horn=None, scarecrows=(), weathered=False, score=0)
@@ -268,6 +270,35 @@ def test_a_view_is_sent_field_by_field() -> None:
     )
 
 
+# The row each kind of special card hits with its weather, as the API sends
+# it (rules, section 8): written out, not taken from the engine.
+WEATHER_ROWS_JSON = {
+    engine.SpecialKind.HOARFROST: "melee",
+    engine.SpecialKind.THICK_FOG: "ranged",
+    engine.SpecialKind.DOWNPOUR: "siege",
+    engine.SpecialKind.CLEAR_SKIES: None,
+    engine.SpecialKind.WAR_HORN: None,
+    engine.SpecialKind.WILDFIRE: None,
+    engine.SpecialKind.SCARECROW: None,
+}
+
+
+@pytest.mark.parametrize(("kind", "weather_row"), WEATHER_ROWS_JSON.items())
+def test_a_special_card_says_which_row_its_weather_hits(
+    kind: engine.SpecialKind, weather_row: str | None
+) -> None:
+    card = engine.SpecialCard(id="card", name="Card", kind=kind)
+    view = replace(EMPTY_VIEW, hand=(card,))
+
+    sent = json.loads(schemas.from_view(view).model_dump_json())
+
+    assert sent["hand"][0]["weather_row"] == weather_row
+
+
+def test_every_kind_of_special_card_is_tested_for_its_weather_row() -> None:
+    assert set(WEATHER_ROWS_JSON) == set(engine.SpecialKind)
+
+
 @pytest.mark.parametrize(("action", "expected"), ACTIONS)
 def test_each_kind_of_action_is_sent_with_its_type(
     action: engine.Action, expected: dict[str, Any]
@@ -406,8 +437,10 @@ def test_every_view_of_a_match_is_sent_as_it_is(seed: int) -> None:
         sent = schemas.from_view(view)
         text = sent.model_dump_json()
         # Field by field, the JSON is the view, with a "type" on each card and
-        # action.
-        assert as_text(without_types(json.loads(text))) == as_text(asdict(view))
+        # action, and the right "weather_row" on each special card.
+        assert as_text(without_types(json.loads(text))) == as_text(
+            with_weather_rows(asdict(view))
+        )
         # And what the JSON reads back as is what was sent.
         assert schemas.PlayerView.model_validate_json(text) == sent
 
@@ -548,9 +581,12 @@ def test_every_event_of_a_match_is_sent_as_the_player_sees_it(seed: int) -> None
             sent = schemas.from_events(events, player)
             text = EVENTS.dump_json(sent)
             # Field by field, the JSON is each event as player_events lets the
-            # player see it, with a "type".
+            # player see it, with a "type" (and the right "weather_row" on each
+            # special card).
             seen = [asdict(event) for event in engine.player_events(events, player)]
-            assert as_text(without_types(json.loads(text))) == as_text(seen)
+            assert as_text(without_types(json.loads(text))) == as_text(
+                with_weather_rows(seen)
+            )
             # And what the JSON reads back as is what was sent.
             assert EVENTS.validate_json(text) == sent
 
@@ -572,4 +608,20 @@ def without_types(value: Any) -> Any:
         }
     if isinstance(value, list):
         return [without_types(item) for item in value]
+    return value
+
+
+def with_weather_rows(value: Any) -> Any:
+    """Return a value from ``asdict`` with the "weather_row" the API adds.
+
+    Only special cards have a "kind", so each dict with one gets the row its
+    weather hits, from ``WEATHER_ROWS_JSON``, wherever the card is.
+    """
+    if isinstance(value, dict):
+        added = {key: with_weather_rows(item) for key, item in value.items()}
+        if "kind" in value:
+            added["weather_row"] = WEATHER_ROWS_JSON[value["kind"]]
+        return added
+    if isinstance(value, (list, tuple)):
+        return [with_weather_rows(item) for item in value]
     return value

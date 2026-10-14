@@ -113,6 +113,13 @@ function movesButtons() {
   ).getAllByRole("button");
 }
 
+/** Return each card in the player's hand, by its accessible name, which screen readers read. */
+function hand() {
+  return within(screen.getByRole("list", { name: "Your hand" }))
+    .getAllByRole("img")
+    .map((card) => card.getAttribute("aria-label"));
+}
+
 /** Return the text of each move the page offers. */
 function moves() {
   return movesButtons().map((button) => button.textContent);
@@ -157,15 +164,10 @@ test("choosing a deck starts a match with it, and shows the round, the hand and 
   ).toBeInTheDocument();
   const [started] = sent(requests, "POST /api/matches");
   expect(await started?.json()).toEqual({ deck: "robots" });
-  const hand = screen.getByRole("list", { name: "Your hand" });
-  expect(
-    within(hand)
-      .getAllByRole("listitem")
-      .map((item) => item.textContent),
-  ).toEqual([
+  expect(hand()).toEqual([
     "Soldier (4 melee/ranged, agile)",
     "Soldier (4 melee/ranged, agile)",
-    "Hoarfrost (special)",
+    "Hoarfrost (weather on melee)",
   ]);
   expect(moves()).toEqual(["Swap Soldier", "Swap Hoarfrost", "Keep this hand"]);
   // The view came with the match: the page didn't ask for it.
@@ -293,11 +295,7 @@ test("clicking a move plays it, and the page shows the view of the answer", asyn
   const [move] = sent(requests, PLAY);
   // The action goes back as the view listed it.
   expect(await move?.json()).toEqual({ type: "end_redraw" });
-  expect(
-    within(screen.getByRole("list", { name: "Your hand" }))
-      .getAllByRole("listitem")
-      .map((item) => item.textContent),
-  ).toEqual(["Hoarfrost (special)"]);
+  expect(hand()).toEqual(["Hoarfrost (weather on melee)"]);
   expect(moves()).toEqual(["Pass"]);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
@@ -402,6 +400,8 @@ test.each<[number | null, string]>([
     fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
 
     expect(await screen.findByText(result)).toBeInTheDocument();
+    // The board stays, to show how the match ended.
+    expect(screen.getByRole("region", { name: "Board" })).toBeInTheDocument();
     expect(
       screen.queryByRole("list", { name: "What you can do" }),
     ).not.toBeInTheDocument();
