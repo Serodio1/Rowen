@@ -51,7 +51,11 @@ within hours, but anyone who installed in that window got them.
   Hooks rules and the React Refresh rule. Warnings fail the check too
   (`--max-warnings=0`). **Prettier** formats the code with its default
   options, and `eslint-config-prettier` turns off the ESLint rules that would
-  fight it.
+  fight it. Since Tailwind came in (#68), ESLint also runs the correctness
+  rules of `eslint-plugin-better-tailwindcss`: a class that doesn't exist,
+  such as a typo in a colour, draws nothing and would pass every other check.
+  Its stylistic rules (class order, line wrapping) are left out, as Prettier
+  already formats the code.
 - **TypeScript 6.0**, the version of the template.
 - A **`Frontend` CI job** next to `Backend`, with the same step names: install
   dependencies, lint, check formatting, type-check, test, plus a build.
