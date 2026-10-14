@@ -30,6 +30,18 @@ export function cardText(card: Card): string {
 }
 
 /**
+ * Return who won the match, for the player of the view, once it is over.
+ */
+export function resultText(view: View): string {
+  if (view.winner === null) {
+    return "The match is a draw.";
+  }
+  return view.winner === view.player
+    ? "You won the match!"
+    : "The AI won the match.";
+}
+
+/**
  * Return the name of every card the view shows, by id.
  *
  * Actions name their cards by id. The cards they name are all in the view: in

@@ -1,5 +1,5 @@
 import createClient, { type Client, type MethodResponse } from "openapi-fetch";
-import type { paths } from "./schema";
+import type { components, paths } from "./schema";
 
 /** A client for the web API: one method per HTTP method, such as `POST`. */
 export type Api = Client<paths>;
@@ -22,6 +22,12 @@ export type Card = View["hand"][number];
 
 /** One of the moves the player can make, as the view lists them. */
 export type Action = View["legal_actions"][number];
+
+/**
+ * What went wrong with a request, as the API says it: `"match_not_found"`.
+ * A string is the same in the schema's types as in the client's.
+ */
+export type ErrorCode = components["schemas"]["ErrorCode"];
 
 /**
  * Make a client for the web API, typed from its OpenAPI document: a wrong
