@@ -26,6 +26,14 @@ const CAPTAIN = {
   legend: true,
 } satisfies Card;
 
+const DOWNPOUR = {
+  type: "special",
+  id: "downpour",
+  name: "Downpour",
+  kind: "downpour",
+  weather_row: "siege",
+} satisfies Card;
+
 const SCARECROW = {
   type: "special",
   id: "scarecrow",
@@ -47,8 +55,8 @@ function row(changes: Partial<Row> = {}): Row {
 }
 
 // Round 1, after the redraw. The player played Hoarfrost, which hits both
-// melee rows, and the AI passed. The numbers are the API's: nothing here
-// works them out.
+// melee rows, the AI played Downpour, which hits both siege rows, and then
+// passed. The numbers are the API's: nothing here works them out.
 const YOURS = side({
   rows: {
     melee: row({
@@ -61,7 +69,7 @@ const YOURS = side({
       horn: WAR_HORN,
       score: 12,
     }),
-    siege: row({ scarecrows: [SCARECROW] }),
+    siege: row({ scarecrows: [SCARECROW], weathered: true }),
   },
   weather: [HOARFROST],
   lives: 2,
@@ -74,8 +82,13 @@ const THEIRS = side({
   rows: {
     melee: row({ weathered: true }),
     ranged: row(),
-    siege: row({ units: [{ card: CAPTAIN, strength: 10 }], score: 10 }),
+    siege: row({
+      units: [{ card: CAPTAIN, strength: 10 }],
+      weathered: true,
+      score: 10,
+    }),
   },
+  weather: [DOWNPOUR],
   discard: [SOLDIER, SNIPER],
   lives: 1,
   passed: true,
@@ -106,12 +119,12 @@ test("the AI's rows are on top and the player's below, so the melee rows meet in
       .getAllByRole("group", { name: /row/ })
       .map((group) => group.getAttribute("aria-label")),
   ).toEqual([
-    "The AI's siege row: 10",
+    "The AI's siege row: 10, under Downpour",
     "The AI's ranged row: 0",
     "The AI's melee row: 0, under Hoarfrost",
     "Your melee row: 1, under Hoarfrost",
     "Your ranged row: 12",
-    "Your siege row: 0",
+    "Your siege row: 0, under Downpour",
   ]);
 });
 
@@ -154,6 +167,18 @@ test("each player's panel shows their total, lives and cards in hand, and whethe
   expect(within(you).queryByText("Swaps left")).not.toBeInTheDocument();
 });
 
+test("with the same total, neither player is ahead", () => {
+  const even = view({ players: [side({ total: 5 }), side({ total: 5 })] });
+  render(<Board view={even} />);
+
+  expect(
+    detail(screen.getByRole("group", { name: "You" }), "Total"),
+  ).toHaveTextContent(/^5$/);
+  expect(
+    detail(screen.getByRole("group", { name: "The AI" }), "Total"),
+  ).toHaveTextContent(/^5$/);
+});
+
 test("during the redraw, each panel says how many swaps are left", () => {
   const redraw = view({
     players: [side({ redraws_left: 1 }), side({ redraws_left: 2 })],
@@ -171,7 +196,9 @@ test("during the redraw, each panel says how many swaps are left", () => {
 test("the weather in play is shown once, for both sides", () => {
   render(<Board view={MID} />);
 
+  // The AI's first, as its side is on top.
   expect(cards(screen.getByRole("group", { name: "Weather" }))).toEqual([
+    "Downpour (weather on siege)",
     "Hoarfrost (weather on melee)",
   ]);
 });
@@ -220,7 +247,7 @@ test("the player of the view is at the bottom, whichever player they are", () =>
     detail(screen.getByRole("group", { name: "You" }), "Total"),
   ).toHaveTextContent(/^10$/);
   expect(
-    screen.getByRole("group", { name: "Your siege row: 10" }),
+    screen.getByRole("group", { name: "Your siege row: 10, under Downpour" }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("group", { name: "The AI's ranged row: 12" }),
