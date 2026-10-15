@@ -8,9 +8,15 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
 import { App } from "./App.tsx";
-import { createApi, type View } from "./api/client.ts";
+import {
+  createApi,
+  type Card,
+  type Event,
+  type Played,
+  type View,
+} from "./api/client.ts";
 import { createQueryClient } from "./api/requests.ts";
-import { DECKS, HOARFROST, view } from "./test-data.ts";
+import { DECKS, HOARFROST, SOLDIER, side, view } from "./test-data.ts";
 
 /**
  * An answer of the fake API: a status and a JSON body, any `Response`, or one
@@ -81,7 +87,10 @@ const THE_DECKS = { "GET /api/decks": { status: 200, body: { decks: DECKS } } };
 
 const A_MATCH = {
   ...THE_DECKS,
-  "POST /api/matches": { status: 201, body: { id: "a-match", view: view() } },
+  "POST /api/matches": {
+    status: 201,
+    body: { id: "a-match", view: view(), events: [] } satisfies Played,
+  },
 };
 
 // Where the moves of the match "a-match" go.
@@ -96,9 +105,12 @@ const ROUND_1 = view({
   ],
 });
 
-/** Return the API's answer to a move: the view after it, with no events. */
-function played(after: View) {
-  return { status: 200, body: { id: "a-match", view: after, events: [] } };
+/** Return the API's answer to a move: the view after it, and its events. */
+function played(after: View, events: Event[] = []) {
+  return {
+    status: 200,
+    body: { id: "a-match", view: after, events } satisfies Played,
+  };
 }
 
 /** Return an answer of the API that turns a request down. */
@@ -612,4 +624,324 @@ test("when the browser says it is offline, the page still sends its requests", a
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
 
   expect(await screen.findByRole("button", { name: "Pass" })).toBeEnabled();
+});
+
+/** Return what happened, as the page shows it: the sentences of each move. */
+function log() {
+  const entries = within(
+    screen.getByRole("log", { name: "What happened" }),
+  ).queryAllByRole("listitem");
+  return entries.map((entry) =>
+    within(entry)
+      .getAllByText(/./)
+      .map((sentence) => sentence.textContent),
+  );
+}
+
+test("when the AI starts the match, the page says what it did", async () => {
+  const { api } = fakeApi({
+    ...THE_DECKS,
+    "POST /api/matches": {
+      status: 201,
+      body: {
+        id: "a-match",
+        view: view(),
+        events: [
+          { type: "opponent_redrew", player: 1 },
+          { type: "redraw_ended", player: 1 },
+        ],
+      } satisfies Played,
+    },
+  });
+  renderApp(api);
+  await startMatch();
+
+  expect(log()).toEqual([
+    ["The AI swapped a card.", "The AI finished swapping."],
+  ]);
+});
+
+test("before anything happened, the page says so", async () => {
+  renderApp(fakeApi(A_MATCH).api);
+  await startMatch();
+
+  const what = screen.getByRole("log", { name: "What happened" });
+  expect(log()).toEqual([]);
+  expect(within(what).getByText("Nothing yet.")).toBeInTheDocument();
+  // No round is over: nothing between the round and the board.
+  expect(
+    screen.getByRole("heading", { name: "Round 1" }).nextElementSibling,
+  ).toBe(screen.getByRole("region", { name: "Board" }));
+});
+
+test("after each move, the page says what happened, the latest move first", async () => {
+  const answers: Record<string, Answer> = {
+    ...A_MATCH,
+    [PLAY]: played(ROUND_1, [
+      { type: "redraw_ended", player: 0 },
+      {
+        type: "unit_played",
+        player: 1,
+        card: "soldier",
+        row: "melee",
+        side: 1,
+      },
+    ]),
+  };
+  const { api } = fakeApi(answers);
+  renderApp(api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByRole("button", { name: "Pass" });
+  answers[PLAY] = played(ROUND_1, [
+    { type: "unit_played", player: 0, card: "soldier", row: "ranged", side: 0 },
+    { type: "player_passed", player: 1 },
+  ]);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Play Soldier in the melee row" }),
+  );
+
+  await waitFor(() => {
+    expect(log()).toHaveLength(2);
+  });
+  expect(log()).toEqual([
+    ["You played Soldier in the ranged row.", "The AI passed."],
+    ["You finished swapping.", "The AI played Soldier in the melee row."],
+  ]);
+});
+
+test("a card that left the view is still named, as the page saw it before", async () => {
+  // The AI's Scarecrow takes back its Sniper, which goes to its hand: the
+  // view after the move doesn't show it, but the view before did.
+  const sniper = {
+    ...SOLDIER,
+    id: "sniper",
+    name: "Sniper",
+    rows: ["ranged"],
+  } satisfies Card;
+  const scarecrow = {
+    type: "special",
+    id: "scarecrow",
+    name: "Scarecrow",
+    kind: "scarecrow",
+    weather_row: null,
+  } satisfies Card;
+  const ranged = side().rows.ranged;
+  const aiRows = (row: typeof ranged) =>
+    side({ rows: { ...side().rows, ranged: row } });
+  const before = view({
+    players: [
+      side(),
+      aiRows({ ...ranged, units: [{ card: sniper, strength: 6 }], score: 6 }),
+    ],
+  });
+  const after = view({
+    ...ROUND_1,
+    players: [side(), aiRows({ ...ranged, scarecrows: [scarecrow] })],
+  });
+  const { api } = fakeApi({
+    ...THE_DECKS,
+    "POST /api/matches": {
+      status: 201,
+      body: { id: "a-match", view: before, events: [] } satisfies Played,
+    },
+    [PLAY]: played(after, [
+      {
+        type: "scarecrow_played",
+        player: 1,
+        card: "scarecrow",
+        row: "ranged",
+        unit: "sniper",
+      },
+    ]),
+  });
+  renderApp(api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+
+  await waitFor(() => {
+    expect(log()).toEqual([
+      ["The AI played Scarecrow in the ranged row and took back Sniper."],
+    ]);
+  });
+});
+
+test("when a round ends, the page says how it went over the board, until the next move", async () => {
+  const answers: Record<string, Answer> = {
+    ...A_MATCH,
+    [PLAY]: played(view({ ...ROUND_1, round: 2 }), [
+      { type: "player_passed", player: 0 },
+      { type: "round_ended", scores: [12, 30], winner: 1 },
+    ]),
+  };
+  const { api } = fakeApi(answers);
+  renderApp(api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+
+  // Round 1 is over: the view is in round 2 now. The page says so over the
+  // board, and in the log.
+  const [banner, ...others] = await screen.findAllByText(
+    "Round 1: the AI won, 30 to 12.",
+  );
+  expect(others).toHaveLength(1);
+  expect(
+    banner?.compareDocumentPosition(
+      screen.getByRole("region", { name: "Board" }),
+    ),
+  ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(screen.getByRole("heading", { name: "Round 2" })).toBeInTheDocument();
+  expect(log()).toEqual([["You passed.", "Round 1: the AI won, 30 to 12."]]);
+
+  answers[PLAY] = played(view({ ...ROUND_1, round: 2 }), [
+    { type: "player_passed", player: 0 },
+  ]);
+  fireEvent.click(screen.getByRole("button", { name: "Pass" }));
+
+  await waitFor(() => {
+    expect(log()).toHaveLength(2);
+  });
+  // Only in the log now.
+  expect(screen.getAllByText("Round 1: the AI won, 30 to 12.")).toHaveLength(1);
+});
+
+test("once a match starts, the focus is on the first move", async () => {
+  renderApp(fakeApi(A_MATCH).api);
+
+  await startMatch();
+
+  // The focus moves once the page is drawn.
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Swap Soldier" })).toHaveFocus();
+  });
+});
+
+test("after a move, the focus goes to the first move of the new view", async () => {
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
+  renderApp(api);
+  await startMatch();
+
+  const button = screen.getByRole("button", { name: "Swap Hoarfrost" });
+  button.focus();
+  fireEvent.click(button);
+
+  await waitFor(() => {
+    expect(
+      screen.getByRole("button", { name: "Play Soldier in the melee row" }),
+    ).toHaveFocus();
+  });
+});
+
+test("after a move, the focus stays where the player put it, out of the moves", async () => {
+  const answer = later();
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: answer.response });
+  renderApp(api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  // While the move is on its way, the player goes to read what happened.
+  const what = screen.getByRole("log", { name: "What happened" });
+  what.focus();
+  answer.answer(Response.json(played(ROUND_1).body));
+
+  await screen.findByRole("button", { name: "Pass" });
+  // Once the page has had the time to move the focus.
+  await settle();
+  expect(what).toHaveFocus();
+});
+
+test("once the match is over, the focus is on playing again", async () => {
+  const over = view({ match_over: true, winner: 0, legal_actions: [] });
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(over) });
+  renderApp(api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+
+  expect(
+    await screen.findByRole("button", { name: "Play again" }),
+  ).toHaveFocus();
+});
+
+test("the second click of a double click on playing again doesn't start a match", async () => {
+  const over = view({ match_over: true, winner: 0, legal_actions: [] });
+  const { api, requests } = fakeApi({ ...A_MATCH, [PLAY]: played(over) });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+
+  fireEvent.click(await screen.findByRole("button", { name: "Play again" }), {
+    detail: 1,
+  });
+  // The decks are in the cache, so the second click lands on one.
+  fireEvent.click(screen.getByRole("button", { name: "Humans" }), {
+    detail: 2,
+  });
+
+  await settle();
+  expect(sent(requests, "POST /api/matches")).toHaveLength(1);
+  expect(
+    screen.getByRole("heading", { name: "Choose your deck" }),
+  ).toBeInTheDocument();
+});
+
+test("two clicks on the decks in the same instant start one match", async () => {
+  const { api, requests } = fakeApi(A_MATCH);
+  renderApp(api);
+
+  // No person can, but a script can click twice before the page shows the
+  // decks disabled.
+  fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
+  fireEvent.click(screen.getByRole("button", { name: "Robots" }));
+
+  await screen.findByRole("heading", { name: "Round 1" });
+  await settle();
+  const [started, ...others] = sent(requests, "POST /api/matches");
+  expect(others).toHaveLength(0);
+  expect(await started?.json()).toEqual({ deck: "humans" });
+});
+
+test("after a move that didn't work, the focus goes to the first move once the moves can be made", async () => {
+  const answer = later();
+  const { api } = fakeApi({
+    ...A_MATCH,
+    [PLAY]: turnedDown(500, "server_error"),
+    "GET /api/matches/a-match": answer.response,
+  });
+  renderApp(api);
+  await startMatch();
+
+  const button = screen.getByRole("button", { name: "Swap Hoarfrost" });
+  button.focus();
+  fireEvent.click(button);
+  // The page asks for the match again, and no move can be made meanwhile.
+  await waitFor(() => {
+    expect(button).toBeDisabled();
+  });
+  // The match is as it was: the move wasn't played.
+  answer.answer(Response.json({ id: "a-match", view: view() }));
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Swap Soldier" })).toHaveFocus();
+  });
+});
+
+test("the second click of a double click on the last move doesn't leave the end of the match", async () => {
+  const over = view({ match_over: true, winner: 0, legal_actions: [] });
+  renderApp(fakeApi({ ...A_MATCH, [PLAY]: played(over) }).api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }), {
+    detail: 1,
+  });
+  // The answer came first, so the second click lands on "Play again".
+  fireEvent.click(await screen.findByRole("button", { name: "Play again" }), {
+    detail: 2,
+  });
+
+  await settle();
+  expect(screen.getByText("You won the match!")).toBeInTheDocument();
 });

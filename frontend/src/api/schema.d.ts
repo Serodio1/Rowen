@@ -39,7 +39,9 @@ export interface paths {
      * Create Match
      * @description Start a match against the AI, which plays another deck.
      *
-     *     The ``Location`` header of the response holds the address of the match.
+     *     If the AI starts, it plays until it is the player's turn, and the events
+     *     of its moves come with the match. The ``Location`` header of the response
+     *     holds the address of the match.
      */
     post: operations["create_match"];
     delete?: never;
@@ -378,10 +380,12 @@ export interface components {
     };
     /**
      * Played
-     * @description A match after the player's action, and what happened in it.
+     * @description A match after moves were played in it, and what happened.
      *
-     *     ``events`` holds the events of the player's action and then those of the
-     *     AI's answer, in order, as the player may see them.
+     *     ``events`` holds the events of those moves, in order, as the player may see
+     *     them: in a new match, those of the AI's first moves, if it starts (none if
+     *     the player does); after the player's action, those of the action and then
+     *     those of the AI's answer.
      */
     Played: {
       /**
@@ -794,7 +798,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["Match"];
+          "application/json": components["schemas"]["Played"];
         };
       };
       /** @description Unprocessable Content */

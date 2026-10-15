@@ -1,8 +1,9 @@
 """The web API: start a match against the AI, play it, and see it as the player may.
 
 The server keeps the state of each match and never sends it: a response holds
-only the player's view, and the events of their action and of the AI's answer
-as the player may see them. So the AI's hand, the order of the decks and the
+only the player's view, and the events of the moves just played (the AI's
+first moves in a new match, or the player's action and the AI's answer) as the
+player may see them. So the AI's hand, the order of the decks and the
 seed stay on the server (ADR 0002). The human player is player 0 and the AI
 player 1, as in the CLI. When the AI has a move to make, it makes it before
 the server answers, so the player always gets the match on their turn, unless
@@ -145,10 +146,12 @@ def list_decks() -> Decks:
 )
 def create_match(
     new_match: NewMatch, response: Response, store: Store, seed: Seed
-) -> Match:
+) -> Played:
     """Start a match against the AI, which plays another deck.
 
-    The ``Location`` header of the response holds the address of the match.
+    If the AI starts, it plays until it is the player's turn, and the events
+    of its moves come with the match. The ``Location`` header of the response
+    holds the address of the match.
     """
     decks = deck_ids()
     if new_match.deck not in decks:
@@ -159,10 +162,14 @@ def create_match(
         )
     ai_deck = next(deck for deck in decks if deck != new_match.deck)
     state = start_match((load_deck(new_match.deck), load_deck(ai_deck)), seed=seed)
-    state, _ = _ai_plays(state)
+    state, events = _ai_plays(state)
     match_id = store.create(state)
     response.headers["Location"] = app.url_path_for("get_match", match_id=str(match_id))
-    return Match(id=match_id, view=from_view(player_view(state, HUMAN)))
+    return Played(
+        id=match_id,
+        view=from_view(player_view(state, HUMAN)),
+        events=from_events(events, HUMAN),
+    )
 
 
 @app.get(

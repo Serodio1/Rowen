@@ -14,6 +14,16 @@ export type Deck = MethodResponse<Api, "get", "/decks">["decks"][number];
 /** A match: its id and the player's view of it. */
 export type Match = MethodResponse<Api, "get", "/matches/{match_id}">;
 
+/**
+ * A match after moves were played in it, and what happened: the events of
+ * the AI's first moves in a new match, or those of the player's move and of
+ * the AI's answer.
+ */
+export type Played = MethodResponse<Api, "post", "/matches">;
+
+/** Something that happened in the match, as the player may see it. */
+export type Event = Played["events"][number];
+
 /** What the player may see of a match. */
 export type View = Match["view"];
 
