@@ -195,7 +195,8 @@ export interface components {
      *     words, for a person. A message may say where in the request the mistake
      *     is, even with the name of a field the API doesn't know, but it never holds
      *     a value from the request: a value can be nested too deep to send back.
-     *     nginx turns down a request over 16 KB before it reaches the API.
+     *     A request over 16 KB never reaches the API: nginx turns it down with a
+     *     page of its own, not this error.
      */
     Error: {
       code: components["schemas"]["ErrorCode"];

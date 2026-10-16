@@ -28,6 +28,12 @@ arrived as `203.0.113.9,<the visitor's address>`.
   - Every request to `/api/`: 5 a second, burst 20.
   - New matches (`/api/matches`): 10 a minute, burst 5, on top of that. One
     address would need about 100 minutes to push out 1,000 matches.
+- **A visitor is an IPv4 address, or an IPv6 block of 64 bits** (a /64: the
+  first four groups). One home usually gets a whole /64 and can send each
+  request from another address in it, so counting single IPv6 addresses
+  would let one visitor through every limit. When nginx writes the address
+  with `::` among those four groups, the groups before `::` are used, a
+  larger block: never looser than a /64.
 - **The address is the last one in `X-Forwarded-For`, only from Google's
   front end** (`set_real_ip_from 169.254.0.0/16`, `real_ip_recursive off`).
   Link-local addresses cannot come from the internet, and the addresses
@@ -69,5 +75,16 @@ arrived as `203.0.113.9,<the visitor's address>`.
 - If Google ever reached nginx from an address outside `169.254.0.0/16`,
   every visitor would share Google's address and its limits. The access log
   shows the address nginx uses, so this would be visible.
+- Anything put in front of Cloud Run later (a load balancer, a CDN) adds its
+  own address at the end of `X-Forwarded-For`, so it changes which entry is
+  the visitor's: this setting has to change with it.
+- A request over 16 KB gets nginx's own HTML page, not an error like the
+  API's. The page never sends one.
 - `too_many_requests` is in the API's `ErrorCode` although only nginx sends
-  it.
+  it. The endpoints in the OpenAPI document do not list a 429: nginx, not
+  the API, answers it, for any of them.
+- With the visitor's real address, nginx's log lines in Cloud Logging hold
+  it. Cloud Run's own request log already did, so little changes.
+- CI cannot check the part that only Google's front end exercises
+  (`set_real_ip_from`), since in Compose no request comes from there:
+  `docs/deploy.md` says how to check it after a deployment.

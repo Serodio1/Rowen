@@ -429,7 +429,7 @@
           "message"
         ],
         "title": "Error",
-        "description": "What the API sends when it turns a request down.\n\n``code`` says what went wrong, for the browser, and ``message`` says it in\nwords, for a person. A message may say where in the request the mistake\nis, even with the name of a field the API doesn't know, but it never holds\na value from the request: a value can be nested too deep to send back.\nnginx turns down a request over 16 KB before it reaches the API."
+        "description": "What the API sends when it turns a request down.\n\n``code`` says what went wrong, for the browser, and ``message`` says it in\nwords, for a person. A message may say where in the request the mistake\nis, even with the name of a field the API doesn't know, but it never holds\na value from the request: a value can be nested too deep to send back.\nA request over 16 KB never reaches the API: nginx turns it down with a\npage of its own, not this error."
       },
       "ErrorCode": {
         "type": "string",
