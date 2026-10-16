@@ -8,8 +8,9 @@ PostgreSQL, and a React + TypeScript frontend.
 
 > **Status:** Phase 1 is done and released as
 > [`v0.1.0`](https://github.com/Serodio1/Rowen/releases): the game engine, a
-> baseline AI and a full match against it in the terminal. Next is Phase 2, a
-> first version that can be played online.
+> baseline AI and a full match against it in the terminal. Phase 2, a first
+> version that can be played online, is under way: a match against the AI can
+> already be played in the browser.
 
 ## Documentation
 
@@ -20,10 +21,34 @@ PostgreSQL, and a React + TypeScript frontend.
 - [Phase 1 retrospective](docs/retrospectives/phase-1.md): what the game
   engine release built, and what it taught.
 
+## Play with Docker
+
+The quickest way to play: with [Docker](https://docs.docker.com/get-started/get-docker/)
+running (Docker Desktop on Windows and macOS), run this in the repository's
+folder:
+
+```sh
+docker compose up --build    # build the images, then start the game
+```
+
+Then open <http://localhost:8080> and choose a deck. `Ctrl+C` stops the game
+(and ends the match, since matches are kept in memory), and
+`docker compose down` removes its containers. The first build downloads
+the base images and takes a few minutes; later ones reuse what did not change.
+If `docker` says it cannot find `dockerDesktopLinuxEngine`, Docker Desktop is
+not running: start it and wait until it says the engine is running. Every 5
+seconds, the API's log shows a `GET /decks`: that is Docker checking that the
+API answers.
+
+Two containers run (`compose.yaml`, [ADR 0009](docs/adr/0009-docker-images-behind-nginx.md)):
+`web`, where nginx serves the page and passes its requests for `/api` on to
+the API, and `api`, the web API. These are the images a server would run; for
+development, run the API and the page without Docker, as below.
+
 ## Play in the terminal
 
-Until the web interface is ready, a match against the AI can be played in the
-terminal (see [Development](#development) for uv):
+A match against the AI can also be played in the terminal (see
+[Development](#development) for uv):
 
 ```sh
 cd backend
@@ -139,7 +164,9 @@ A backend test fails while `openapi.json` is out of date, and CI checks the
 types. A new version number of the project, or a FastAPI or Pydantic upgrade,
 can also change `openapi.json`: then run the first command again.
 
-Every push and pull request runs the same checks on GitHub Actions.
+GitHub Actions runs the same checks on every pull request and every push to
+`main`. It also builds the Docker images, starts them and checks, through
+nginx, that the game answers.
 
 ## License
 

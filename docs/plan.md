@@ -82,7 +82,7 @@ rowen/
 │   ├── rules.md         # game rules
 │   └── adr/             # architecture decision records
 ├── .github/workflows/
-├── docker-compose.yml
+├── compose.yaml
 └── README.md
 ```
 
@@ -129,7 +129,8 @@ rule has tests.
 - React app: basic board, hand, play a card, pass, round and match results
   (no art yet).
 - TypeScript types generated from OpenAPI.
-- Docker Compose for local development (API + DB + frontend).
+- Docker images and Docker Compose: the whole game with one command
+  (API + frontend, later the DB).
 - Deployment to a public URL and CD on merge to `main`.
 
 Done when: anyone with the link can play a full match as a guest.

@@ -10,7 +10,8 @@ export default defineConfig({
   // (src/api/client.ts): the development server (npm run dev) and the preview
   // of the build (npm run preview) pass those requests on to the API, without
   // the /api. So the API needs no CORS. The API is where uvicorn listens by
-  // default.
+  // default. frontend/nginx.conf does the same in the Docker image (ADR 0009):
+  // change both together.
   server: {
     proxy: {
       "/api/": {

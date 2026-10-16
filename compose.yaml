@@ -1,0 +1,38 @@
+# The whole game with one command: docker compose up --build, then open
+# http://localhost:8080 (see the README and ADR 0009). The images are the ones
+# a server would run; for development, the API and the page run without Docker.
+# compose.yaml is the name Docker Compose looks for first (docker-compose.yml is
+# the older one).
+
+services:
+  # The web API (backend/Dockerfile). Its port is not published on the
+  # computer: only the page's nginx reaches it, by the name "api".
+  api:
+    build: ./backend
+    # Safer settings: the container's files cannot be changed, it keeps none of
+    # the Linux capabilities (special rights, such as changing who owns a
+    # file), and it can never gain more (no-new-privileges).
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  # The page, served by nginx, which passes /api/ on to the API
+  # (frontend/Dockerfile and frontend/nginx.conf).
+  web:
+    build: ./frontend
+    # Only this computer can open the page, not the others on its network.
+    ports:
+      - "127.0.0.1:8080:8080"
+    # nginx starts once the API answers (the API's HEALTHCHECK). When
+    # docker compose up replaces the API's container, nginx starts again too,
+    # since it looks up the API's address only when it starts.
+    depends_on:
+      api:
+        condition: service_healthy
+        restart: true
+    # The same safer settings as the API's.
+    read_only: true
+    # The only place nginx writes: its temporary files.
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
