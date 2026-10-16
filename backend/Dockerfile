@@ -43,7 +43,8 @@ EXPOSE 8000
 
 # Docker runs this to know whether the API answers: every second while it
 # starts, then every 5 seconds. Compose starts nginx once it does (depends_on
-# in compose.yaml). Each check shows in the API's log as a GET /decks.
+# in compose.yaml). Each check shows in the API's log as a GET /api/decks,
+# since --root-path (below) adds /api to the paths it logs.
 HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --start-interval=1s --retries=5 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/decks', timeout=2)"]
 

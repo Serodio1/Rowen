@@ -152,18 +152,17 @@ def test_a_new_match_gets_an_address_of_its_own(client: TestClient) -> None:
     assert response.headers["Location"] == f"/matches/{match_id}"
 
 
-def test_behind_a_proxy_the_address_and_the_docs_include_its_path(
-    store: MatchStore,
+def test_behind_nginx_the_addresses_the_api_gives_out_start_with_api(
+    client: TestClient,
 ) -> None:
     # In Docker, nginx serves the API under /api (ADR 0009), and uvicorn runs
-    # with --root-path /api, which TestClient's root_path stands in for.
-    app.dependency_overrides[get_store] = lambda: store
-    client = TestClient(app, root_path="/api")
-    try:
-        response = start(client)
-        docs = client.get("/docs")
-    finally:
-        app.dependency_overrides.clear()
+    # with --root-path /api, which the test client's root_path stands in for.
+    # The client fixture still gives the app the store of this test. The docs
+    # page is FastAPI's, checked because the README sends people to /api/docs.
+    proxied = TestClient(app, root_path="/api")
+
+    response = start(proxied)
+    docs = proxied.get("/docs")
 
     match_id = response.json()["id"]
     assert response.headers["Location"] == f"/api/matches/{match_id}"

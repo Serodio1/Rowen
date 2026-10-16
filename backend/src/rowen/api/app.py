@@ -168,8 +168,8 @@ def create_match(
     state = start_match((load_deck(new_match.deck), load_deck(ai_deck)), seed=seed)
     state, events = _ai_plays(state)
     match_id = store.create(state)
-    # Behind nginx, the API is served under /api: uvicorn's --root-path puts
-    # that in root_path (backend/Dockerfile), and the address needs it too.
+    # url_path_for leaves out root_path, which behind nginx is /api (uvicorn's
+    # --root-path in backend/Dockerfile), so it is added here.
     path = app.url_path_for("get_match", match_id=str(match_id))
     response.headers["Location"] = request.scope.get("root_path", "") + path
     return Played(
