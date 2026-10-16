@@ -39,7 +39,8 @@ and pass `/api` on.
   what ADR 0001 expected: Compose runs the images a server would run, not a
   development setup.
 - **A `Docker` job in CI** builds both images on every pull request, starts
-  them, and asks nginx for the page, the decks and a new match.
+  them, and through nginx asks for the page and its JavaScript, then plays a
+  whole match with `curl` and reads it back.
 
 ## Alternatives considered
 
@@ -57,6 +58,8 @@ and pass `/api` on.
   development setup already works.
 - **Only build the images in CI.** Faster, but a wrong `nginx.conf` or a
   container that cannot reach the other would still build.
+- **Play the match in a browser in CI** (Playwright). Closer to a player, but
+  Playwright comes in Phase 3; `curl` already goes through nginx and the API.
 
 ## Consequences
 
@@ -65,8 +68,15 @@ and pass `/api` on.
 - `nginx.conf` is one more file to understand. It mirrors the proxy in
   `vite.config.ts`, so a change to how the page reaches the API changes both.
 - The API still runs as one process, since matches are kept in its memory;
-  more processes wait for the database (#55).
+  more processes wait for the database (#55). The CI's match fails if a
+  second process answers some of its moves.
+- nginx looks up the API's address only when it starts, so Compose restarts
+  nginx when the API's container is replaced (`restart: true`).
 - The images follow tags such as `python:3.14-slim-trixie`, which get security
   fixes but can change between two builds. Pinning them to an exact digest,
   with a bot that updates it, is left for later.
-- The `Location` header of a new match still lacks the `/api` (#54).
+- Behind nginx, the API does not know that it lives under `/api`: the
+  `Location` header of a new match lacks it, and `/api/docs` cannot load
+  `/openapi.json`. The page uses neither; both are fixed with the deployment
+  (#54), together with the security headers that matter once the game is
+  public.

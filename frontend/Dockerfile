@@ -12,10 +12,12 @@ WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 
+# Then the code, built into dist/.
 COPY . .
 RUN npm run build
 
-# nginx's own image that runs as a user with no special rights, not as root.
+# The image nginx's makers publish for running nginx as a user with no special
+# rights, not as root. Its own command starts nginx, so no CMD is needed.
 FROM nginxinc/nginx-unprivileged:1.30-alpine
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf

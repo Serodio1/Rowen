@@ -1,5 +1,7 @@
 # Not sent to Docker when it builds the image: the image installs the packages
-# and builds the page itself, and local files stay on the computer.
+# itself (node_modules from Windows would not work in Linux) and builds the
+# page itself, and *.local files (such as .env.local) are for this computer
+# only.
 node_modules
 dist
 *.log

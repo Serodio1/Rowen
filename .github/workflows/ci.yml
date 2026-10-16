@@ -109,16 +109,30 @@ jobs:
       - name: Start the game
         run: docker compose up --detach --wait
 
-      # Through nginx, as the browser does: the page, then the API under /api/,
-      # reading the decks and starting a match.
+      # Through nginx, as the browser does: the page and its JavaScript, the
+      # decks, then a whole match (at most 100 moves), always playing the first
+      # legal move, read back at the end. The first request tries again for a few seconds, in
+      # case nginx is not listening yet. Moves are never sent twice.
       - name: Smoke test
         run: |
-          curl --fail --silent --show-error http://localhost:8080/ | grep --quiet '<div id="root">'
-          curl --fail --silent --show-error http://localhost:8080/api/decks | grep --quiet '"humans"'
-          curl --fail --silent --show-error --output /dev/null \
-            --header 'Content-Type: application/json' --data '{"deck": "humans"}' \
-            http://localhost:8080/api/matches
+          url=http://localhost:8080
+          js=$(curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 1 "$url/" | grep --only-matching '/assets/[^"]*\.js')
+          curl --fail --silent --show-error --output /dev/null "$url$js"
+          curl --fail --silent --show-error "$url/api/decks" | grep --quiet '"humans"'
+          match=$(curl --fail --silent --show-error --header 'Content-Type: application/json' \
+            --data '{"deck": "humans"}' "$url/api/matches")
+          id=$(jq --raw-output .id <<< "$match")
+          for move in $(seq 100); do
+            jq --exit-status .view.match_over <<< "$match" > /dev/null && break
+            action=$(jq --compact-output '.view.legal_actions[0]' <<< "$match")
+            match=$(curl --fail --silent --show-error --header 'Content-Type: application/json' \
+              --data "$action" "$url/api/matches/$id/actions")
+          done
+          curl --fail --silent --show-error "$url/api/matches/$id" | jq --exit-status .view.match_over
 
+      # Each container's state and health, then what they printed.
       - name: Show the logs
         if: failure()
-        run: docker compose logs
+        run: |
+          docker compose ps --all
+          docker compose logs
