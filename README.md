@@ -10,7 +10,15 @@ PostgreSQL, and a React + TypeScript frontend.
 > [`v0.1.0`](https://github.com/Serodio1/Rowen/releases): the game engine, a
 > baseline AI and a full match against it in the terminal. Phase 2, a first
 > version that can be played online, is under way: a match against the AI can
-> already be played in the browser.
+> already be played in the browser, online.
+
+## Play online
+
+**<https://rowen-806785616593.europe-west1.run.app>**: choose a deck and play
+against the AI, with nothing to install. After a quiet while the server is
+stopped, so the first visit can take a few seconds while it starts, and a
+match left alone that long is lost: until the database arrives, matches are
+kept in the server's memory.
 
 ## Documentation
 
