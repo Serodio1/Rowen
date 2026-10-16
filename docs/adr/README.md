@@ -23,6 +23,7 @@ plus a section on the alternatives that were considered.
 | [0008](0008-generated-api-types.md) | Keep the OpenAPI document and the generated API types in the repository | Accepted |
 | [0009](0009-docker-images-behind-nginx.md) | Run the game in two Docker images, with nginx in front of the API | Accepted |
 | [0010](0010-deploy-on-cloud-run.md) | Deploy the game on Google Cloud Run, nginx and the API in one service | Accepted |
+| [0011](0011-limit-requests-per-address.md) | Limit the API's requests per visitor's address, in nginx | Accepted |
 
 ## Writing a new ADR
 

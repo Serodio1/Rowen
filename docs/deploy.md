@@ -106,6 +106,26 @@ curl.exe -sI "$url/"              # 200, with the Content-Security-Policy
 curl.exe -s "$url/api/decks"      # the decks
 ```
 
+## Checking the limits on requests
+
+CI cannot try how nginx finds the visitor's address behind Cloud Run
+([ADR 0011](adr/0011-limit-requests-per-address.md)). After a deployment that
+changes `frontend/nginx.conf`, send a request with a made-up address, then
+read the logs:
+
+```powershell
+$url = gcloud run services describe rowen --region=europe-west1 --format="value(status.url)"
+curl.exe -s -o NUL -H "X-Forwarded-For: 203.0.113.9" "$url/api/decks"
+gcloud run services logs read rowen --region=europe-west1 --limit=10
+```
+
+nginx's line for that request must start with your own address, not
+`203.0.113.9` nor `169.254.…`. Then many requests in a row must end in 429:
+
+```powershell
+1..40 | ForEach-Object { curl.exe -s -o NUL -w "%{http_code} " "$url/api/decks" }
+```
+
 ## When something goes wrong
 
 What the containers printed (each request, and any error):
