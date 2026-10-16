@@ -81,6 +81,10 @@ app = FastAPI(
     title="Rowen",
     version=version("rowen"),
     generate_unique_id_function=_operation_id,
+    # No redirect from /decks/ to /decks: the API's redirects name its own
+    # address, which behind nginx is not the browser's, and the page never adds
+    # the slash. Such an address is just unknown (404).
+    redirect_slashes=False,
 )
 
 # All the server's matches, in the memory of its process. So the server must
