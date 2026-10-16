@@ -120,11 +120,22 @@ gcloud run services logs read rowen --region=europe-west1 --limit=10
 ```
 
 nginx's line for that request must start with your own address, not
-`203.0.113.9` nor `169.254.…`. Then many requests in a row must end in 429:
+`203.0.113.9` nor `169.254.…`. Then new matches in a row must end in 429:
 
 ```powershell
-1..40 | ForEach-Object { curl.exe -s -o NUL -w "%{http_code} " "$url/api/decks" }
+1..10 | ForEach-Object { curl.exe -s -o NUL -w "%{http_code} " --data "{}" "$url/api/matches" }
+#   422 422 422 422 422 422 429 429 429 429
 ```
+
+The body `{}` names no deck, so the API turns each request down (422) and no
+match is made, but nginx counts it. Two things that look like checks do not
+work from a computer far from the server:
+
+- Requests for the decks in a row: each one takes about a tenth of a second
+  to come back, so they arrive at about 7 a second, and the limit of 5 a
+  second with a burst of 20 lasts beyond 40 of them.
+- A `POST` with no body (`-X POST` alone): curl sends no `Content-Length`,
+  and Google's front end answers 411 before nginx sees it.
 
 ## When something goes wrong
 
