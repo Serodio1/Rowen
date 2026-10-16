@@ -31,19 +31,20 @@ folder:
 docker compose up --build    # build the images, then start the game
 ```
 
-Then open <http://localhost:8080> and choose a deck. `Ctrl+C` stops the game,
-and `docker compose down` removes its containers. The first build downloads
+Then open <http://localhost:8080> and choose a deck. `Ctrl+C` stops the game
+(and ends the match, since matches are kept in memory), and
+`docker compose down` removes its containers. The first build downloads
 the base images and takes a few minutes; later ones reuse what did not change.
 
 Two containers run (`compose.yaml`, [ADR 0009](docs/adr/0009-docker-images-behind-nginx.md)):
 `web`, where nginx serves the page and passes its requests for `/api` on to
-the API, and `api`, the web API. These are the images a server runs; for
+the API, and `api`, the web API. These are the images a server would run; for
 development, run the API and the page without Docker, as below.
 
 ## Play in the terminal
 
-Until the web interface is ready, a match against the AI can be played in the
-terminal (see [Development](#development) for uv):
+A match against the AI can also be played in the terminal (see
+[Development](#development) for uv):
 
 ```sh
 cd backend
@@ -159,8 +160,9 @@ A backend test fails while `openapi.json` is out of date, and CI checks the
 types. A new version number of the project, or a FastAPI or Pydantic upgrade,
 can also change `openapi.json`: then run the first command again.
 
-Every push and pull request runs the same checks on GitHub Actions, and also
-builds the Docker images, starts them and checks that the game answers.
+GitHub Actions runs the same checks on every pull request and every push to
+`main`. It also builds the Docker images, starts them and checks, through
+nginx, that the game answers.
 
 ## License
 

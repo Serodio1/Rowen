@@ -45,7 +45,7 @@ export type ErrorCode = components["schemas"]["ErrorCode"];
  * error.
  *
  * The API is at `/api` on the page's own server, which passes the requests on
- * to the API. The address is a full one (`http://localhost:5173/api`), because
+ * to the API. The address is a full one (such as `http://localhost:5173/api`), because
  * the `Request` of Node.js, which the tests use, cannot take a relative one.
  *
  * To know whether a request worked, check `data` (`if (!data)`), not

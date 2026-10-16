@@ -129,7 +129,8 @@ rule has tests.
 - React app: basic board, hand, play a card, pass, round and match results
   (no art yet).
 - TypeScript types generated from OpenAPI.
-- Docker images and Docker Compose: the whole game with one command (API + frontend, later the DB).
+- Docker images and Docker Compose: the whole game with one command
+  (API + frontend, later the DB).
 - Deployment to a public URL and CD on merge to `main`.
 
 Done when: anyone with the link can play a full match as a guest.
