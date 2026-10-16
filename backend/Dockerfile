@@ -54,5 +54,8 @@ HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --start-interval=1s --r
 # 127.0.0.1 so that Cloud Run's startup probe surely reaches it too: its
 # documentation does not say from where the probe asks. --root-path tells the
 # API that nginx serves it under /api, for the addresses it gives out (a new
-# match's Location, and /api/docs).
-CMD ["uvicorn", "rowen.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--root-path", "/api"]
+# match's Location, and /api/docs). --no-proxy-headers: uvicorn trusts the
+# X-Forwarded-For and X-Forwarded-Proto headers of requests from 127.0.0.1,
+# which is now nginx, and nginx passes on whatever the browser sent; so a
+# visitor could choose the address the API sees and logs.
+CMD ["uvicorn", "rowen.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--root-path", "/api", "--no-proxy-headers"]

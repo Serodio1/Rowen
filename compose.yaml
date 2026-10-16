@@ -30,8 +30,9 @@ services:
     # nginx runs in the API's network: for both, 127.0.0.1 is the same.
     network_mode: "service:api"
     # nginx starts once the API answers (the API's HEALTHCHECK). When
-    # docker compose up replaces the API's container, its network goes with
-    # it, so nginx starts again too, in the new one.
+    # docker compose up (for the whole game, not only the api service)
+    # replaces the API's container, its network goes with it, so nginx starts
+    # again too, in the new one.
     depends_on:
       api:
         condition: service_healthy

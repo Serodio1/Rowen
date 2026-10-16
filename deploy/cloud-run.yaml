@@ -16,9 +16,10 @@ spec:
         # second instance would not know them (until the database, #55). It
         # also caps what the service can cost.
         autoscaling.knative.dev/maxScale: "1"
-        # CPU only while a request is being answered, the billing that the
-        # free tier covers. Between requests the instance is paused, and after
-        # some idle minutes it is stopped: its matches are then lost.
+        # CPU only while a request is being answered (request-based billing),
+        # so idle time is not billed. Between requests the instance gets no
+        # CPU, and after up to 15 idle minutes it is stopped: its matches are
+        # then lost.
         run.googleapis.com/cpu-throttling: "true"
         # nginx starts only after the API's startup probe passes, so it never
         # passes on requests to an API that is not listening yet.
@@ -27,6 +28,9 @@ spec:
       # The service's own identity, with no roles: the game calls no other
       # Google service. docs/deploy.md creates it.
       serviceAccountName: rowen-run@PROJECT_ID.iam.gserviceaccount.com
+      # Up to 80 requests at once, said here since the default depends on the
+      # CPU, and with 1 a page that asks for two things at once would wait.
+      containerConcurrency: 80
       containers:
         # nginx with the page (frontend/Dockerfile): the only container that
         # receives the requests from the internet, on port 8080. It passes
@@ -59,3 +63,8 @@ spec:
               port: 8000
             periodSeconds: 1
             failureThreshold: 30
+  # Every deployment sends all requests to its new revision, also after a
+  # rollback to an older one (docs/deploy.md).
+  traffic:
+    - latestRevision: true
+      percent: 100

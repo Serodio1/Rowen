@@ -113,7 +113,8 @@ jobs:
       # its JavaScript with nosniff, a redirect that names only the path (as
       # behind Cloud Run), the API's docs under /api, the decks, then
       # a whole match (at most 100 moves), always playing the first legal move,
-      # read back at the end. The first request tries again for a few seconds,
+      # read back at the end. Last, that the API ignores an address a visitor
+      # writes in X-Forwarded-For. The first request tries again for a few seconds,
       # in case nginx is not listening yet. Moves are never sent twice.
       - name: Smoke test
         run: |
@@ -138,6 +139,10 @@ jobs:
               --data "$action" "$url/api/matches/$id/actions")
           done
           curl --fail --silent --show-error "$url/api/matches/$id" | jq --exit-status .view.match_over
+          curl --fail --silent --show-error --output /dev/null --header 'X-Forwarded-For: 203.0.113.9' "$url/api/decks"
+          if docker compose logs api | grep --quiet 203.0.113.9; then
+            echo "The API took the address in X-Forwarded-For"; exit 1
+          fi
 
       # Each container's state and health, then what they printed.
       - name: Show the logs

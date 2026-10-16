@@ -9,10 +9,18 @@ images. Deploying from CI on every merge comes later (#56).
 
 The commands below are for PowerShell on Windows, run from the repository's
 folder, with the [gcloud CLI](https://cloud.google.com/sdk/docs/install)
-signed in (`gcloud init`) and the project chosen as its default. Docker
-Desktop must be running.
+signed in (`gcloud init`) as the project's owner, and the project chosen as its
+default. Docker Desktop must be running.
 
 ## Once per project
+
+In the [Google Cloud console](https://console.cloud.google.com/billing), link
+a billing account to the project (the APIs below need one), then, under
+*Billing* → *Budgets & alerts*, create two budgets: an alert by email at €1 for
+all services, and a spending cap on Cloud Run at €2 a month. The cap counts
+list prices, before the free tier, and is not instant: when it is reached,
+Google pauses Cloud Run, so the game goes offline until the next month or
+until the cap is raised.
 
 Turn on the three Google APIs the deployment uses, and nothing else:
 
@@ -23,15 +31,18 @@ gcloud services list --enabled    # compute.googleapis.com must not be listed
 
 Create the image store, and the policy that keeps only the last 3 versions of
 each image (the store is free up to 0.5 GB). Artifact Registry applies the
-policy about once a day:
+policy about once a day, so only the last 3 deployments can be rolled back to.
+The second command must print `Dry run is disabled.`: the policy really
+deletes.
 
 ```powershell
 gcloud artifacts repositories create rowen --repository-format=docker --location=europe-west1
-gcloud artifacts repositories set-cleanup-policies rowen --location=europe-west1 --policy=deploy/cleanup-policy.json
+gcloud artifacts repositories set-cleanup-policies rowen --location=europe-west1 --policy=deploy/cleanup-policy.json --no-dry-run
 ```
 
 Create the service's own identity, with no roles: the game calls no other
-Google service.
+Google service. Google may take a minute to know it everywhere: if the first
+deployment says it does not exist, run that deployment again.
 
 ```powershell
 gcloud iam service-accounts create rowen-run --display-name="Rowen on Cloud Run"
@@ -54,11 +65,12 @@ git pull
 git status --short    # must print nothing
 
 $project = gcloud config get-value project
+$project                       # the project's ID: if empty, run gcloud init
 $tag = git rev-parse --short HEAD
 $registry = "europe-west1-docker.pkg.dev/$project/rowen"
 
-docker build --tag "$registry/api:$tag" backend
-docker build --tag "$registry/web:$tag" frontend
+docker build --platform=linux/amd64 --provenance=false --tag "$registry/api:$tag" backend
+docker build --platform=linux/amd64 --provenance=false --tag "$registry/web:$tag" frontend
 docker push "$registry/api:$tag"
 docker push "$registry/web:$tag"
 
@@ -67,8 +79,13 @@ docker push "$registry/web:$tag"
 gcloud run services replace "$env:TEMP\rowen-run.yaml" --region=europe-west1
 ```
 
+Cloud Run runs only `linux/amd64` images, whatever the computer is.
+`--provenance=false` leaves out the build's record that Docker Desktop
+otherwise pushes beside each image, which Artifact Registry could count as
+versions of its own.
+
 `services replace` creates a new revision of the service, starts it, and
-sends it the requests once its containers' startup probes pass. Adding
+sends it all the requests once its containers' startup probes pass. Adding
 `--dry-run` to it checks the file without deploying. Matches in memory are
 lost with every deployment, until the database (#55).
 
@@ -97,12 +114,13 @@ What the containers printed (each request, and any error):
 gcloud run services logs read rowen --region=europe-west1 --limit=50
 ```
 
-Go back to an earlier revision, then back to the newest once it is fixed:
+Go back to an earlier revision (its name comes from the list, such as
+`rowen-00002-abc`); the next deployment sends the requests to its new revision
+again:
 
 ```powershell
 gcloud run revisions list --service=rowen --region=europe-west1
-gcloud run services update-traffic rowen --region=europe-west1 --to-revisions=<revision>=100
-gcloud run services update-traffic rowen --region=europe-west1 --to-latest
+gcloud run services update-traffic rowen --region=europe-west1 --to-revisions=REVISION_NAME=100
 ```
 
 Take the game offline (the images stay in the store):
