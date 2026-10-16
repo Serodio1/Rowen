@@ -110,7 +110,8 @@ jobs:
         run: docker compose up --detach --wait
 
       # Through nginx, as the browser does: the page with its security headers,
-      # its JavaScript with nosniff, the API's docs under /api, the decks, then
+      # its JavaScript with nosniff, a redirect that names only the path (as
+      # behind Cloud Run), the API's docs under /api, the decks, then
       # a whole match (at most 100 moves), always playing the first legal move,
       # read back at the end. The first request tries again for a few seconds,
       # in case nginx is not listening yet. Moves are never sent twice.
@@ -123,6 +124,7 @@ jobs:
           grep --quiet --ignore-case "content-security-policy: default-src 'self'" <<< "$page"
           grep --quiet --ignore-case "frame-ancestors 'none'" <<< "$page"
           grep --quiet --ignore-case 'x-content-type-options: nosniff' <<< "$page"
+          curl --silent --show-error --head "$url/assets" | grep --quiet --ignore-case '^location: /assets/'
           curl --fail --silent --show-error "$url/api/docs" | grep --quiet "'/api/openapi.json'"
           curl --fail --silent --show-error --output /dev/null "$url/api/openapi.json"
           curl --fail --silent --show-error "$url/api/decks" | grep --quiet '"humans"'
