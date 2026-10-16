@@ -18,6 +18,7 @@ PostgreSQL, and a React + TypeScript frontend.
 - [Game rules](docs/rules.md)
 - [Architecture decision records](docs/adr/README.md): why the main
   technical decisions were made.
+- [Deploying to Google Cloud Run](docs/deploy.md)
 - [Phase 1 retrospective](docs/retrospectives/phase-1.md): what the game
   engine release built, and what it taught.
 

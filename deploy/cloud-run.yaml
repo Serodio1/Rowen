@@ -1,0 +1,61 @@
+# The game on Google Cloud Run: one service, "rowen", with two containers that
+# run side by side on the same instance and share its network (ADR 0010).
+# docs/deploy.md says how to deploy it: PROJECT_ID and IMAGE_TAG are replaced
+# by the project's ID and the commit the images were built from, then
+#   gcloud run services replace <the file> --region europe-west1
+# Field reference: https://cloud.google.com/run/docs/reference/yaml/v1
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: rowen
+spec:
+  template:
+    metadata:
+      annotations:
+        # At most one instance: matches are kept in the API's memory, so a
+        # second instance would not know them (until the database, #55). It
+        # also caps what the service can cost.
+        autoscaling.knative.dev/maxScale: "1"
+        # CPU only while a request is being answered, the billing that the
+        # free tier covers. Between requests the instance is paused, and after
+        # some idle minutes it is stopped: its matches are then lost.
+        run.googleapis.com/cpu-throttling: "true"
+        # nginx starts only after the API's startup probe passes, so it never
+        # passes on requests to an API that is not listening yet.
+        run.googleapis.com/container-dependencies: '{"web": ["api"]}'
+    spec:
+      # The service's own identity, with no roles: the game calls no other
+      # Google service. docs/deploy.md creates it.
+      serviceAccountName: rowen-run@PROJECT_ID.iam.gserviceaccount.com
+      containers:
+        # nginx with the page (frontend/Dockerfile): the only container that
+        # receives the requests from the internet, on port 8080. It passes
+        # /api/ on to the API on 127.0.0.1:8000 (frontend/nginx.conf).
+        - name: web
+          image: europe-west1-docker.pkg.dev/PROJECT_ID/rowen/web:IMAGE_TAG
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          startupProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 1
+            failureThreshold: 30
+        # The web API (backend/Dockerfile). Cloud Run does not run Docker's
+        # HEALTHCHECK, so this probe asks the same /decks.
+        - name: api
+          image: europe-west1-docker.pkg.dev/PROJECT_ID/rowen/api:IMAGE_TAG
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /decks
+              port: 8000
+            periodSeconds: 1
+            failureThreshold: 30
