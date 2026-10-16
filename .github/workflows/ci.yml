@@ -111,11 +111,16 @@ jobs:
 
       # Through nginx, as the browser does: the page with its security headers,
       # its JavaScript with nosniff, a redirect that names only the path (as
-      # behind Cloud Run), the API's docs under /api, the decks, then
-      # a whole match (at most 100 moves), always playing the first legal move,
-      # read back at the end. Last, that the API ignores an address a visitor
-      # writes in X-Forwarded-For. The first request tries again for a few seconds,
-      # in case nginx is not listening yet. Moves are never sent twice.
+      # behind Cloud Run), the API's docs under /api, the decks, then a whole
+      # match (at most 100 moves), always playing the first legal move, read
+      # back at the end. A move every quarter of a second stays under nginx's
+      # limit of 5 requests a second. Then, that the API ignores an address a
+      # visitor writes in X-Forwarded-For. Last, nginx's limits: a request
+      # over 16 KB, new matches in a row, each with another address in
+      # X-Forwarded-For, until nginx answers 429 with its error, and then
+      # requests for the decks in a row, until 429 again. The first
+      # request tries again for a few seconds, in case nginx is not listening
+      # yet. Moves are never sent twice.
       - name: Smoke test
         run: |
           url=http://localhost:8080
@@ -137,12 +142,27 @@ jobs:
             action=$(jq --compact-output '.view.legal_actions[0]' <<< "$match")
             match=$(curl --fail --silent --show-error --header 'Content-Type: application/json' \
               --data "$action" "$url/api/matches/$id/actions")
+            sleep 0.25
           done
           curl --fail --silent --show-error "$url/api/matches/$id" | jq --exit-status .view.match_over
           curl --fail --silent --show-error --output /dev/null --header 'X-Forwarded-For: 203.0.113.9' "$url/api/decks"
           if docker compose logs api | grep --quiet 203.0.113.9; then
             echo "The API took the address in X-Forwarded-For"; exit 1
           fi
+          head --bytes 20000 /dev/zero | curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' --data-binary @- "$url/api/matches" | grep --quiet '^413$'
+          for n in $(seq 10); do
+            answer=$(curl --silent --show-error --write-out '\n%{http_code}' --header 'Content-Type: application/json' \
+              --header "X-Forwarded-For: 203.0.113.$n" --data '{"deck": "humans"}' "$url/api/matches")
+            [ "$(tail --lines 1 <<< "$answer")" = 429 ] && break
+          done
+          [ "$(tail --lines 1 <<< "$answer")" = 429 ]
+          head --lines 1 <<< "$answer" | jq --exit-status '.code == "too_many_requests"'
+          for n in $(seq 40); do
+            code=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$url/api/decks")
+            [ "$code" = 429 ] && break
+          done
+          [ "$code" = 429 ]
 
       # Each container's state and health, then what they printed.
       - name: Show the logs

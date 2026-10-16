@@ -229,6 +229,28 @@ test("when the API turns a match down, the page shows why, and the player can tr
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
+test("when nginx turns a match down for too many requests, the page shows its message", async () => {
+  // The answer frontend/nginx.conf gives over a limit, word for word.
+  const answers: Record<string, Answer> = {
+    ...THE_DECKS,
+    "POST /api/matches": {
+      status: 429,
+      body: {
+        code: "too_many_requests",
+        message: "Too many requests. Wait a moment and try again.",
+      },
+    },
+  };
+  renderApp(fakeApi(answers).api);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Too many requests. Wait a moment and try again.",
+  );
+  expect(screen.getByRole("button", { name: "Humans" })).toBeEnabled();
+});
+
 test.each<[string, Answer | undefined]>([
   ["no answer", undefined],
   ["an answer without a body", new Response(null, { status: 502 })],
