@@ -1,0 +1,7 @@
+# Only what the Dockerfile copies goes to Docker when it builds the image: not
+# the virtual environment, the tests or the caches.
+*
+!pyproject.toml
+!uv.lock
+!src
+**/__pycache__

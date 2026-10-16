@@ -1,0 +1,29 @@
+# The whole game with one command: docker compose up --build, then open
+# http://localhost:8080 (see the README and ADR 0009). The images are the ones
+# a server would run; for development, the API and the page run without Docker.
+
+services:
+  # The web API (backend/Dockerfile). Its port is not published on the
+  # computer: only the page's nginx reaches it, by the name "api".
+  api:
+    build: ./backend
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  # The page, served by nginx, which passes /api/ on to the API
+  # (frontend/Dockerfile and frontend/nginx.conf).
+  web:
+    build: ./frontend
+    # Only this computer can open the page, not the others on its network.
+    ports:
+      - "127.0.0.1:8080:8080"
+    # nginx starts once the API answers (the API's HEALTHCHECK).
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    # The only place nginx writes: its temporary files.
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
