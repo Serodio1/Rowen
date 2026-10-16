@@ -42,7 +42,8 @@ API answers.
 
 Two containers run (`compose.yaml`, [ADR 0009](docs/adr/0009-docker-images-behind-nginx.md)):
 `web`, where nginx serves the page and passes its requests for `/api` on to
-the API, and `api`, the web API. These are the images a server would run; for
+the API, and `api`, the web API, whose endpoints are listed at
+<http://localhost:8080/api/docs>. These are the images a server would run; for
 development, run the API and the page without Docker, as below.
 
 ## Play in the terminal

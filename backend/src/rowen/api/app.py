@@ -145,7 +145,11 @@ def list_decks() -> Decks:
     responses=_errors(status.HTTP_422_UNPROCESSABLE_CONTENT),
 )
 def create_match(
-    new_match: NewMatch, response: Response, store: Store, seed: Seed
+    new_match: NewMatch,
+    request: Request,
+    response: Response,
+    store: Store,
+    seed: Seed,
 ) -> Played:
     """Start a match against the AI, which plays another deck.
 
@@ -164,7 +168,10 @@ def create_match(
     state = start_match((load_deck(new_match.deck), load_deck(ai_deck)), seed=seed)
     state, events = _ai_plays(state)
     match_id = store.create(state)
-    response.headers["Location"] = app.url_path_for("get_match", match_id=str(match_id))
+    # Behind nginx, the API is served under /api: uvicorn's --root-path puts
+    # that in root_path (backend/Dockerfile), and the address needs it too.
+    path = app.url_path_for("get_match", match_id=str(match_id))
+    response.headers["Location"] = request.scope.get("root_path", "") + path
     return Played(
         id=match_id,
         view=from_view(player_view(state, HUMAN)),

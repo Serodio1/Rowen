@@ -49,5 +49,7 @@ HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --start-interval=1s --r
 
 # One process only: matches are kept in that process's memory, so a second
 # worker would not know them. 0.0.0.0 lets the other containers reach the API;
-# Docker Compose does not publish its port on the computer.
-CMD ["uvicorn", "rowen.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Docker Compose does not publish its port on the computer. --root-path tells
+# the API that nginx serves it under /api, for the addresses it gives out (a
+# new match's Location, and /api/docs).
+CMD ["uvicorn", "rowen.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--root-path", "/api"]

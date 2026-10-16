@@ -152,6 +152,24 @@ def test_a_new_match_gets_an_address_of_its_own(client: TestClient) -> None:
     assert response.headers["Location"] == f"/matches/{match_id}"
 
 
+def test_behind_a_proxy_the_address_and_the_docs_include_its_path(
+    store: MatchStore,
+) -> None:
+    # In Docker, nginx serves the API under /api (ADR 0009), and uvicorn runs
+    # with --root-path /api, which TestClient's root_path stands in for.
+    app.dependency_overrides[get_store] = lambda: store
+    client = TestClient(app, root_path="/api")
+    try:
+        response = start(client)
+        docs = client.get("/docs")
+    finally:
+        app.dependency_overrides.clear()
+
+    match_id = response.json()["id"]
+    assert response.headers["Location"] == f"/api/matches/{match_id}"
+    assert "'/api/openapi.json'" in docs.text
+
+
 def test_the_player_gets_their_view_and_the_events_of_the_ais_first_moves(
     client: TestClient,
 ) -> None:
