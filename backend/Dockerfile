@@ -43,11 +43,14 @@ EXPOSE 8000
 
 # Docker runs this to know whether the API answers: every second while it
 # starts, then every 5 seconds. Compose starts nginx once it does (depends_on
-# in compose.yaml). Each check shows in the API's log as a GET /decks.
+# in compose.yaml). Each check shows in the API's log as a GET /api/decks,
+# since --root-path (below) adds /api to the paths it logs.
 HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --start-interval=1s --retries=5 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/decks', timeout=2)"]
 
 # One process only: matches are kept in that process's memory, so a second
 # worker would not know them. 0.0.0.0 lets the other containers reach the API;
-# Docker Compose does not publish its port on the computer.
-CMD ["uvicorn", "rowen.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Docker Compose does not publish its port on the computer. --root-path tells
+# the API that nginx serves it under /api, for the addresses it gives out (a
+# new match's Location, and /api/docs).
+CMD ["uvicorn", "rowen.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--root-path", "/api"]

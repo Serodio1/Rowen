@@ -81,6 +81,10 @@ app = FastAPI(
     title="Rowen",
     version=version("rowen"),
     generate_unique_id_function=_operation_id,
+    # No redirect from /decks/ to /decks: the API's redirects name its own
+    # address, which behind nginx is not the browser's, and the page never adds
+    # the slash. Such an address is just unknown (404).
+    redirect_slashes=False,
 )
 
 # All the server's matches, in the memory of its process. So the server must
@@ -145,7 +149,11 @@ def list_decks() -> Decks:
     responses=_errors(status.HTTP_422_UNPROCESSABLE_CONTENT),
 )
 def create_match(
-    new_match: NewMatch, response: Response, store: Store, seed: Seed
+    new_match: NewMatch,
+    request: Request,
+    response: Response,
+    store: Store,
+    seed: Seed,
 ) -> Played:
     """Start a match against the AI, which plays another deck.
 
@@ -164,7 +172,10 @@ def create_match(
     state = start_match((load_deck(new_match.deck), load_deck(ai_deck)), seed=seed)
     state, events = _ai_plays(state)
     match_id = store.create(state)
-    response.headers["Location"] = app.url_path_for("get_match", match_id=str(match_id))
+    # url_path_for leaves out root_path, which behind nginx is /api (uvicorn's
+    # --root-path in backend/Dockerfile), so it is added here.
+    path = app.url_path_for("get_match", match_id=str(match_id))
+    response.headers["Location"] = request.scope.get("root_path", "") + path
     return Played(
         id=match_id,
         view=from_view(player_view(state, HUMAN)),

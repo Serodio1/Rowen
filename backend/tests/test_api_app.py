@@ -152,6 +152,25 @@ def test_a_new_match_gets_an_address_of_its_own(client: TestClient) -> None:
     assert response.headers["Location"] == f"/matches/{match_id}"
 
 
+def test_behind_nginx_the_addresses_the_api_gives_out_start_with_api(
+    client: TestClient,
+) -> None:
+    # In Docker, nginx serves the API under /api (ADR 0009), and uvicorn runs
+    # with --root-path /api, which the test client's root_path stands in for:
+    # the paths then start with /api, as uvicorn's do. The client fixture
+    # still gives the app the store of this test. The docs page is FastAPI's,
+    # checked because the README sends people to /api/docs.
+    proxied = TestClient(app, root_path="/api")
+
+    response = proxied.post("/api/matches", json={"deck": "humans"})
+    docs = proxied.get("/api/docs")
+
+    match_id = response.json()["id"]
+    assert response.headers["Location"] == f"/api/matches/{match_id}"
+    assert proxied.get(response.headers["Location"]).status_code == 200
+    assert "'/api/openapi.json'" in docs.text
+
+
 def test_the_player_gets_their_view_and_the_events_of_the_ais_first_moves(
     client: TestClient,
 ) -> None:
@@ -716,6 +735,15 @@ def test_an_illegal_move_of_the_ai_is_a_bug_on_the_server(
 
 def test_an_unknown_address_is_turned_down(client: TestClient) -> None:
     response = client.get("/no-such-address")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
+def test_an_address_with_a_slash_at_the_end_is_unknown_not_redirected(
+    client: TestClient,
+) -> None:
+    response = client.get("/decks/", follow_redirects=False)
 
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
