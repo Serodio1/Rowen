@@ -5,10 +5,17 @@
 # the older one).
 
 services:
-  # The web API (backend/Dockerfile). Its port is not published on the
-  # computer: only the page's nginx reaches it, by the name "api".
+  # The web API (backend/Dockerfile). The page's nginx shares its network
+  # (network_mode below), so only nginx reaches it, on 127.0.0.1:8000, as in
+  # Cloud Run (deploy/cloud-run.yaml).
   api:
     build: ./backend
+    # The page's port. A container that shares another's network cannot
+    # publish ports, so nginx's port 8080 is published here, on the network
+    # they share. Only this computer can open the page, not the others on its
+    # network. The API's port 8000 is not published.
+    ports:
+      - "127.0.0.1:8080:8080"
     # Safer settings: the container's files cannot be changed, it keeps none of
     # the Linux capabilities (special rights, such as changing who owns a
     # file), and it can never gain more (no-new-privileges).
@@ -20,12 +27,12 @@ services:
   # (frontend/Dockerfile and frontend/nginx.conf).
   web:
     build: ./frontend
-    # Only this computer can open the page, not the others on its network.
-    ports:
-      - "127.0.0.1:8080:8080"
+    # nginx runs in the API's network: for both, 127.0.0.1 is the same.
+    network_mode: "service:api"
     # nginx starts once the API answers (the API's HEALTHCHECK). When
-    # docker compose up replaces the API's container, nginx starts again too,
-    # since it looks up the API's address only when it starts.
+    # docker compose up (for the whole game, not only the api service)
+    # replaces the API's container, its network goes with it, so nginx starts
+    # again too, in the new one.
     depends_on:
       api:
         condition: service_healthy
