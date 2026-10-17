@@ -230,7 +230,8 @@ function PlayMatch({
     play.error?.code === "match_not_found" ||
     match.error?.code === "match_not_found"
   ) {
-    // The server lost the match, as it does when it restarts.
+    // The server doesn't know the match: it was kept in the memory of a
+    // server that restarted, or the link is wrong.
     return (
       <section className="wood mx-auto flex max-w-xl flex-col items-center gap-4 rounded-xl border-2 border-wood-600 p-6 shadow-2xl shadow-black/60">
         <h2 className="font-display text-2xl text-gold-300">Match not found</h2>

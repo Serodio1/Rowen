@@ -12,9 +12,9 @@ spec:
   template:
     metadata:
       annotations:
-        # At most one instance: matches are kept in the API's memory, so a
-        # second instance would not know them (until the database, #55). It
-        # also caps what the service can cost.
+        # At most one instance: it caps what the service can cost, and one
+        # is plenty for this game. (The matches are in the database, so a
+        # second instance would know them too.)
         autoscaling.knative.dev/maxScale: "1"
         # CPU only while a request is being answered (request-based billing),
         # so idle time is not billed. Between requests the instance gets no
@@ -53,6 +53,15 @@ spec:
         # HEALTHCHECK, so this probe asks the same /decks.
         - name: api
           image: europe-west1-docker.pkg.dev/PROJECT_ID/rowen/api:IMAGE_TAG
+          # The database's address, with the password of the role the API
+          # connects as, from Secret Manager (docs/deploy.md): never in this
+          # file. Read when an instance starts.
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rowen-database-url
+                  key: latest
           resources:
             limits:
               cpu: "1"

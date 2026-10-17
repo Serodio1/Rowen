@@ -17,9 +17,8 @@ PostgreSQL, and a React + TypeScript frontend.
 **<https://rowen-806785616593.europe-west1.run.app>**: choose a deck and play
 against the AI, with nothing to install. After a quiet while the server is
 stopped, so the first visit can take a few seconds more while it starts
-(about 6 when measured). Until the database
-arrives, matches are kept in the server's memory: a match left alone that
-long, or one under way when a new version goes online, is lost.
+(about 6 when measured). Matches are kept in a database, so a match goes on
+after the server sleeps, and when a new version goes online.
 
 ## Documentation
 

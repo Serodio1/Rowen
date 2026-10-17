@@ -255,6 +255,22 @@ jobs:
           docker push "$REGISTRY/api:$TAG"
           docker push "$REGISTRY/web:$TAG"
 
+      # Brings the database's tables up to date, as the database's owner (a
+      # secret of the environment), before the new revision starts: if a
+      # migration fails, nothing is deployed. The revision still running
+      # meets the new tables for a moment, so a migration must not break it
+      # (add, then remove in a later deployment).
+      - uses: astral-sh/setup-uv@v7
+        with:
+          working-directory: backend
+          enable-cache: true
+
+      - name: Migrate the database
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+        run: uv run --locked --no-dev alembic upgrade head
+
       # Waits until the new revision's containers start and it gets all the
       # requests; fails if they do not start.
       - name: Deploy
@@ -262,10 +278,10 @@ jobs:
           sed -e "s/PROJECT_ID/$PROJECT_ID/g" -e "s/IMAGE_TAG/$TAG/g" deploy/cloud-run.yaml > "$RUNNER_TEMP/rowen-run.yaml"
           gcloud run services replace "$RUNNER_TEMP/rowen-run.yaml" --region=europe-west1
 
-      # The game answers online: the page with its security header, then the
-      # decks through nginx. No new match, so no visitor's limit is used up.
-      # The first request tries again for a while, in case the instance is
-      # still starting.
+      # The game answers online: the page with its security header, the
+      # decks through nginx, then a new match, read back from the database
+      # (one new match of the runner's own limit). The first request tries
+      # again for a while, in case the instance is still starting.
       - name: Check the game online
         id: check
         run: |
@@ -274,3 +290,7 @@ jobs:
           page=$(curl --fail --silent --show-error --head --retry 5 --retry-all-errors --retry-delay 3 "$url/")
           grep --quiet --ignore-case "content-security-policy: default-src 'self'" <<< "$page"
           curl --fail --silent --show-error "$url/api/decks" | grep --quiet '"humans"'
+          match=$(curl --fail --silent --show-error --header 'Content-Type: application/json' \
+            --data '{"deck": "humans"}' "$url/api/matches")
+          id=$(jq --raw-output .id <<< "$match")
+          curl --fail --silent --show-error "$url/api/matches/$id" | jq --exit-status '.version == 1'
