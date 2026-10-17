@@ -133,6 +133,74 @@ and tags* and add `main`, so no other branch can run a job in it. Under
 Google may take a few minutes to apply new permissions: if the first
 deployment from CI is denied, run it again with *Run workflow*.
 
+## Once per project: the database
+
+The matches are kept in PostgreSQL, on [Neon](https://neon.com)'s free plan,
+in Frankfurt, near Cloud Run's `europe-west1`
+([ADR 0013](adr/0013-keep-matches-in-postgresql.md)). Two roles use it:
+
+- the database's owner, `neondb_owner`, which CI uses to run the migrations
+  (they make and change the tables);
+- `rowen_app`, which the API uses: it may only read, add and change rows,
+  never change a table.
+
+**On Neon** (sign up at <https://neon.com>, with GitHub or an email), create
+a project: name `rowen`, Postgres version 18, region *AWS Europe Central 1
+(Frankfurt)*. Then open *SQL Editor* and run this first, to get a long random
+password for `rowen_app` (64 hexadecimal characters):
+
+```sql
+SELECT replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
+```
+
+Copy it, then run the rest with the password pasted in place of `PASSWORD`:
+
+```sql
+CREATE ROLE rowen_app WITH LOGIN PASSWORD 'PASSWORD';
+GRANT CONNECT ON DATABASE neondb TO rowen_app;
+GRANT USAGE ON SCHEMA public TO rowen_app;
+-- The tables the owner makes later (the migrations) are open to rowen_app.
+ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE ON TABLES TO rowen_app;
+```
+
+Under *Connect* (on the project's dashboard), with *Connection pooling*
+turned off, copy the address Neon shows for `neondb_owner`. It looks like
+`postgresql://neondb_owner:...@ep-....eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require`.
+Make the two addresses the game uses from it, changing `sslmode=require` to
+`sslmode=verify-full&sslrootcert=/etc/ssl/certs/ca-certificates.crt`, so the
+connection also checks that the server is Neon's (the file is where Debian
+and Ubuntu keep the certificates they trust):
+
+- **for the migrations**, the owner's, as it is apart from `sslmode`;
+- **for the API**, the same with `rowen_app` and its password in place of
+  `neondb_owner` and the owner's password.
+
+**In Secret Manager**, keep the API's address, readable by `rowen-run` only.
+`Read-Host` asks for it, so it never goes into the terminal's history, and
+the file it is written to is deleted at once (with .NET's `File.Delete`:
+`Remove-Item` can't find the file when the user's folder has an accented
+letter, such as `C:\Users\Serôdio`):
+
+```powershell
+gcloud services enable secretmanager.googleapis.com
+$project = gcloud config get-value project
+$file = "$env:TEMP\rowen-database-url.txt"
+Read-Host "The API's address" | Set-Content -NoNewline -Path $file
+gcloud secrets create rowen-database-url --replication-policy=automatic --data-file=$file
+[System.IO.File]::Delete($file)
+gcloud secrets add-iam-policy-binding rowen-database-url --member="serviceAccount:rowen-run@$project.iam.gserviceaccount.com" --role=roles/secretmanager.secretAccessor
+```
+
+Cloud Run reads it when an instance starts (`deploy/cloud-run.yaml`). To
+change it later, `gcloud secrets versions add rowen-database-url
+--data-file=...`, then deploy again.
+
+**On GitHub**, in the environment `production` (*Settings* → *Environments*),
+under *Environment secrets* (not variables: this one gives access), add
+`MIGRATION_DATABASE_URL` with the address for the migrations. The *Deploy*
+job runs `alembic upgrade head` with it before each deployment.
+
 ## Every deployment by hand
 
 When CI cannot deploy. Deploy a commit of `main` with nothing changed on top, so the images match the
@@ -165,9 +233,15 @@ versions of its own.
 
 `services replace` creates a new revision of the service, starts it, and
 sends it all the requests once its containers' startup probes pass. Adding
-`--dry-run` to it checks the file without deploying. Matches in memory are
-lost with every deployment, until the database (#55). CI runs the same
-commands.
+`--dry-run` to it checks the file without deploying. CI runs the same
+commands. If the deployment brings a migration, run it first, in `backend`,
+with the address for the migrations:
+
+```powershell
+$env:DATABASE_URL = Read-Host "The address for the migrations"
+uv run alembic upgrade head
+Remove-Item Env:DATABASE_URL
+```
 
 ## The first time only: open it to everyone
 
