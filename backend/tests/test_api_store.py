@@ -6,41 +6,50 @@ from uuid import uuid4
 
 import pytest
 
-from rowen.api.store import FIRST_VERSION, MAX_MATCHES, MatchStore, StoredMatch
-from rowen.data import deck_ids, load_deck
-from rowen.engine.public import GameState, start_match
+from rowen.api.store import (
+    FIRST_VERSION,
+    MAX_MATCHES,
+    MatchStore,
+    StoredMatch,
+)
+from rowen.engine.public import Action, EndRedraw, Pass, Redraw
 
-DECKS = tuple(load_deck(deck_id) for deck_id in deck_ids())
+# The store doesn't check the actions: the API does. These are just some.
+DECKS = ("humans", "robots")
+SOME_ACTIONS: tuple[Action, ...] = (Redraw(card="soldier"), EndRedraw())
 
 
-def new_state(seed: int = 0) -> GameState:
-    """Return the state of a new match."""
-    return start_match((DECKS[0], DECKS[1]), seed=seed)
+def create(store: MatchStore, seed: int = 0) -> StoredMatch:
+    """Keep a new match with the humans against the robots, and return it."""
+    return store.create(DECKS, seed, SOME_ACTIONS)
 
 
 def test_a_match_is_kept_under_its_id_at_the_first_version() -> None:
     store = MatchStore()
-    state = new_state()
 
-    match = store.create(state)
+    match = store.create(DECKS, 12, SOME_ACTIONS)
 
-    assert match.state is state
-    assert match.version == FIRST_VERSION
+    assert match == StoredMatch(
+        id=match.id,
+        decks=DECKS,
+        seed=12,
+        actions=SOME_ACTIONS,
+        version=FIRST_VERSION,
+    )
     assert store.get(match.id) == match
 
 
 def test_there_is_no_match_under_an_unknown_id() -> None:
     store = MatchStore()
-    store.create(new_state())
+    create(store)
 
     assert store.get(uuid4()) is None
 
 
 def test_each_match_gets_a_random_id_of_its_own() -> None:
     store = MatchStore()
-    state = new_state()
 
-    ids = {store.create(state).id for _ in range(100)}
+    ids = {create(store).id for _ in range(100)}
 
     assert len(ids) == 100
     # Version 4 is the kind of UUID made of random bits.
@@ -49,12 +58,12 @@ def test_each_match_gets_a_random_id_of_its_own() -> None:
 
 def test_a_full_store_pushes_out_the_match_left_unused_the_longest() -> None:
     store = MatchStore(max_matches=2)
-    first = store.create(new_state(0))
-    second = store.create(new_state(1))
+    first = create(store, 0)
+    second = create(store, 1)
     # Seeing the first match again makes the second one the least recently used.
     store.get(first.id)
 
-    third = store.create(new_state(2))
+    third = create(store, 2)
 
     assert store.get(second.id) is None
     assert store.get(first.id) == first
@@ -63,108 +72,112 @@ def test_a_full_store_pushes_out_the_match_left_unused_the_longest() -> None:
 
 def test_a_store_holds_max_matches_by_default() -> None:
     store = MatchStore()
-    state = new_state()
-    matches = [store.create(state) for _ in range(MAX_MATCHES + 1)]
+    matches = [create(store) for _ in range(MAX_MATCHES + 1)]
 
     assert store.get(matches[0].id) is None
     assert all(store.get(match.id) == match for match in matches[1:])
 
 
-def test_a_match_still_at_the_version_is_replaced_at_the_next_one() -> None:
+def test_actions_are_added_after_the_others_at_the_next_version() -> None:
     store = MatchStore()
-    old = store.create(new_state(0))
-    state = new_state(1)
+    old = create(store, 7)
 
-    new = store.replace(old.id, old.version, state)
+    new = store.add_actions(old.id, old.version, (Pass(),))
 
-    assert new == StoredMatch(id=old.id, state=state, version=old.version + 1)
+    assert new == StoredMatch(
+        id=old.id,
+        decks=DECKS,
+        seed=7,
+        actions=(*SOME_ACTIONS, Pass()),
+        version=old.version + 1,
+    )
     assert store.get(old.id) == new
 
 
-def test_each_replacement_takes_the_match_to_the_next_version() -> None:
+def test_each_time_actions_are_added_the_match_goes_to_the_next_version() -> None:
     store = MatchStore()
-    match = store.create(new_state(0))
+    match = create(store)
 
-    for seed in range(1, 4):
-        replaced = store.replace(match.id, match.version, new_state(seed))
-        assert replaced is not None
-        match = replaced
+    for _ in range(3):
+        added = store.add_actions(match.id, match.version, (Pass(),))
+        assert added is not None
+        match = added
 
     assert match.version == FIRST_VERSION + 3
+    assert match.actions == (*SOME_ACTIONS, Pass(), Pass(), Pass())
 
 
 @pytest.mark.parametrize("offset", [-1, 1])
-def test_a_match_at_another_version_is_not_replaced(offset: int) -> None:
+def test_no_actions_are_added_to_a_match_at_another_version(offset: int) -> None:
     # The move was chosen from an older view, or its version is made up.
     store = MatchStore()
-    old = store.create(new_state(0))
-    kept = store.replace(old.id, old.version, new_state(1))
+    old = create(store)
+    kept = store.add_actions(old.id, old.version, (Pass(),))
     assert kept is not None
 
-    replaced = store.replace(old.id, kept.version + offset, new_state(2))
+    added = store.add_actions(old.id, kept.version + offset, (EndRedraw(),))
 
-    assert replaced is None
+    assert added is None
     assert store.get(old.id) == kept
 
 
-def test_a_match_another_request_replaced_first_is_not_replaced() -> None:
+def test_no_actions_are_added_once_another_request_added_its_own() -> None:
     # Two requests got the same match at once. The first one has already kept
-    # its result.
+    # its actions.
     store = MatchStore()
-    old = store.create(new_state(0))
-    first = store.replace(old.id, old.version, new_state(1))
+    old = create(store)
+    first = store.add_actions(old.id, old.version, (Pass(),))
 
-    second = store.replace(old.id, old.version, new_state(2))
+    second = store.add_actions(old.id, old.version, (EndRedraw(),))
 
     assert second is None
     assert store.get(old.id) == first
 
 
-def test_an_unknown_match_is_not_replaced() -> None:
+def test_no_actions_are_added_to_an_unknown_match() -> None:
     store = MatchStore()
-    store.create(new_state(0))
+    create(store)
     match_id = uuid4()
 
-    replaced = store.replace(match_id, FIRST_VERSION, new_state(1))
+    added = store.add_actions(match_id, FIRST_VERSION, (Pass(),))
 
-    assert replaced is None
+    assert added is None
     assert store.get(match_id) is None
 
 
-def test_a_match_pushed_out_is_not_replaced() -> None:
+def test_no_actions_are_added_to_a_match_pushed_out() -> None:
     # The match was pushed out while its request was being played.
     store = MatchStore(max_matches=1)
-    old = store.create(new_state(0))
-    store.create(new_state(1))
+    old = create(store, 0)
+    create(store, 1)
 
-    replaced = store.replace(old.id, old.version, new_state(2))
+    added = store.add_actions(old.id, old.version, (Pass(),))
 
-    assert replaced is None
+    assert added is None
     assert store.get(old.id) is None
 
 
-def test_a_match_replaced_counts_as_used() -> None:
+def test_a_match_played_counts_as_used() -> None:
     store = MatchStore(max_matches=2)
-    first = store.create(new_state(0))
-    second = store.create(new_state(1))
+    first = create(store, 0)
+    second = create(store, 1)
     # Playing the first match makes the second one the least recently used.
-    played = store.replace(first.id, first.version, new_state(2))
+    played = store.add_actions(first.id, first.version, (Pass(),))
 
-    store.create(new_state(3))
+    create(store, 2)
 
     assert store.get(second.id) is None
     assert store.get(first.id) == played
 
 
-@pytest.mark.parametrize("method", ["create", "get", "replace"])
+@pytest.mark.parametrize("method", ["create", "get", "add_actions"])
 def test_a_thread_waits_while_another_one_uses_the_store(method: str) -> None:
     store = MatchStore()
-    state = new_state()
-    match = store.create(state)
+    match = create(store)
     arguments = {
-        "create": (state,),
+        "create": (DECKS, 0, SOME_ACTIONS),
         "get": (match.id,),
-        "replace": (match.id, match.version, new_state(1)),
+        "add_actions": (match.id, match.version, (Pass(),)),
     }[method]
     thread = threading.Thread(target=getattr(store, method), args=arguments)
 
@@ -183,13 +196,12 @@ def test_many_threads_can_use_the_store_at_once() -> None:
     # one thread would soon push out a match that another one is reading, for
     # example in ``get``, between finding the match and moving it to the end.
     store = MatchStore(max_matches=4)
-    state = new_state()
     errors: list[Exception] = []
 
     def use_store() -> None:
         try:
             for _ in range(2000):
-                store.get(store.create(state).id)
+                store.get(create(store).id)
         # An error in a thread doesn't fail the test by itself, so it is kept.
         except Exception as error:
             errors.append(error)
