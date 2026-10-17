@@ -6,11 +6,10 @@ A turn-based card game inspired by the Gwent minigame from *The Witcher 3*, buil
 as a full-stack web application: a pure Python rules engine behind a FastAPI API,
 PostgreSQL, and a React + TypeScript frontend.
 
-> **Status:** Phase 1 is done and released as
-> [`v0.1.0`](https://github.com/Serodio1/Rowen/releases): the game engine, a
-> baseline AI and a full match against it in the terminal. Phase 2, a first
-> version that can be played online, is under way: a match against the AI can
-> already be played in the browser, online.
+> **Status:** Phase 2 is done and released as
+> [`v0.2.0`](https://github.com/Serodio1/Rowen/releases): a match against the
+> AI can be played online, in the browser, through a web API, with the matches
+> kept in PostgreSQL. Phase 3, a real interface with card art, comes next.
 
 ## Play online
 
@@ -29,6 +28,8 @@ after the server sleeps, and when a new version goes online.
 - [Deploying to Google Cloud Run](docs/deploy.md)
 - [Phase 1 retrospective](docs/retrospectives/phase-1.md): what the game
   engine release built, and what it taught.
+- [Phase 2 retrospective](docs/retrospectives/phase-2.md): what the first
+  version online built, and what it taught.
 
 ## Play with Docker
 
