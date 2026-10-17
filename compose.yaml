@@ -5,6 +5,49 @@
 # the older one).
 
 services:
+  # PostgreSQL, where the API keeps its matches, so they survive a restart.
+  # Only the other containers reach it: its port is not published. The
+  # password is for this computer only; online, the database is elsewhere
+  # (docs/deploy.md).
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: rowen
+      POSTGRES_PASSWORD: rowen
+      POSTGRES_DB: rowen
+    # The matches, kept on this computer between runs: docker compose down -v
+    # deletes them.
+    volumes:
+      - db-data:/var/lib/postgresql
+    # Ready once it takes connections.
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username=rowen", "--dbname=rowen"]
+      interval: 5s
+      start_period: 10s
+      start_interval: 1s
+    # The same safer settings as the API's, below. PostgreSQL runs as its own
+    # user (70, postgres), so it needs no right to change who owns a file,
+    # and writes only to its data and two folders in memory.
+    user: "70:70"
+    read_only: true
+    tmpfs: [/var/run/postgresql, /tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  # Brings the database's tables up to date (backend/migrations), then stops:
+  # the API starts only once it did.
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://rowen:rowen@db:5432/rowen
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
   # The web API (backend/Dockerfile). The page's nginx shares its network
   # (network_mode below), so only nginx reaches it, on 127.0.0.1:8000, as in
   # Cloud Run (deploy/cloud-run.yaml).
@@ -16,6 +59,11 @@ services:
     # network. The API's port 8000 is not published.
     ports:
       - "127.0.0.1:8080:8080"
+    environment:
+      DATABASE_URL: postgresql+psycopg://rowen:rowen@db:5432/rowen
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     # Safer settings: the container's files cannot be changed, it keeps none of
     # the Linux capabilities (special rights, such as changing who owns a
     # file), and it can never gain more (no-new-privileges).
@@ -43,3 +91,6 @@ services:
     tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
+
+volumes:
+  db-data:

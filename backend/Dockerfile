@@ -38,6 +38,13 @@ RUN useradd --system --no-create-home rowen
 COPY --from=build /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
+# The database's migrations, for "alembic upgrade head" in this image, as
+# Docker Compose runs it before the API starts (compose.yaml). The server
+# itself never runs them.
+WORKDIR /app
+COPY alembic.ini ./
+COPY migrations ./migrations
+
 USER rowen
 EXPOSE 8000
 
@@ -48,14 +55,14 @@ EXPOSE 8000
 HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --start-interval=1s --retries=5 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/decks', timeout=2)"]
 
-# One process only: matches are kept in that process's memory, so a second
-# worker would not know them. Only nginx, which shares the API's network,
-# reaches it (compose.yaml, deploy/cloud-run.yaml). 0.0.0.0 rather than
-# 127.0.0.1 so that Cloud Run's startup probe surely reaches it too: its
-# documentation does not say from where the probe asks. --root-path tells the
-# API that nginx serves it under /api, for the addresses it gives out (a new
-# match's Location, and /api/docs). --no-proxy-headers: uvicorn trusts the
-# X-Forwarded-For and X-Forwarded-Proto headers of requests from 127.0.0.1,
-# which is now nginx, and nginx passes on whatever the browser sent; so a
-# visitor could choose the address the API sees and logs.
+# One process only: without DATABASE_URL, matches are kept in that process's
+# memory, so a second worker would not know them. Only nginx, which shares the
+# API's network, reaches it (compose.yaml, deploy/cloud-run.yaml). 0.0.0.0
+# rather than 127.0.0.1 so that Cloud Run's startup probe surely reaches it
+# too: its documentation does not say from where the probe asks. --root-path
+# tells the API that nginx serves it under /api, for the addresses it gives
+# out (a new match's Location, and /api/docs). --no-proxy-headers: uvicorn
+# trusts the X-Forwarded-For and X-Forwarded-Proto headers of requests from
+# 127.0.0.1, which is now nginx, and nginx passes on whatever the browser
+# sent; so a visitor could choose the address the API sees and logs.
 CMD ["uvicorn", "rowen.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--root-path", "/api", "--no-proxy-headers"]
