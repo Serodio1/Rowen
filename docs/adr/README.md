@@ -25,6 +25,7 @@ plus a section on the alternatives that were considered.
 | [0010](0010-deploy-on-cloud-run.md) | Deploy the game on Google Cloud Run, nginx and the API in one service | Accepted |
 | [0011](0011-limit-requests-per-address.md) | Limit the API's requests per visitor's address, in nginx | Accepted |
 | [0012](0012-deploy-from-ci.md) | Deploy from CI on every merge, signed in to Google with no stored key | Accepted |
+| [0013](0013-keep-matches-in-postgresql.md) | Keep each match in PostgreSQL as its seed and actions | Accepted |
 
 ## Writing a new ADR
 

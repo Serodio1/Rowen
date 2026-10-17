@@ -25,6 +25,20 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # A PostgreSQL of its own, for the tests of the store in PostgreSQL
+    # (backend/tests/conftest.py). The job's steps start once it is ready.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: test
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready --host=127.0.0.1 --username=postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
     steps:
       - uses: actions/checkout@v7
 
@@ -51,7 +65,11 @@ jobs:
       - name: Check imports
         run: uv run lint-imports
 
+      # With the database, every test runs: one skipped would leave lines
+      # untested, and coverage below 100% fails the step.
       - name: Test
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://postgres:test@127.0.0.1:5432/postgres
         run: uv run pytest --cov
 
   frontend:
@@ -119,14 +137,16 @@ jobs:
       # behind Cloud Run), the API's docs under /api, the decks, then a whole
       # match (at most 100 moves), always playing the first legal move with the
       # match's version, read back at the end, and then the first move again,
-      # which comes too late: 409. A move every quarter of a second stays under
-      # nginx's limit of 5 requests a second. Then, that the API ignores an
-      # address a visitor writes in X-Forwarded-For. Last, nginx's limits (they
-      # use up the buckets, so they come last): a request over 16 KB, for a new
-      # match and for a move, new matches in a row, each with another address in
-      # X-Forwarded-For, until nginx answers 429 with its error, and then
-      # requests for the decks in a row, until the same 429. The first request
-      # tries again for a few seconds, in case nginx is not listening yet.
+      # which comes too late: 409. The API then restarts (nginx with it), and
+      # the match is still there, kept in PostgreSQL. A move every quarter of a
+      # second stays under nginx's limit of 5 requests a second. Then, that the
+      # API ignores an address a visitor writes in X-Forwarded-For. Last,
+      # nginx's limits (they use up the buckets, so they come last): a request
+      # over 16 KB, for a new match and for a move, new matches in a row, each
+      # with another address in X-Forwarded-For, until nginx answers 429 with
+      # its error, and then requests for the decks in a row, until the same 429.
+      # The first request tries again for a few seconds, in case nginx is not
+      # listening yet.
       - name: Smoke test
         run: |
           url=http://localhost:8080
@@ -156,6 +176,10 @@ jobs:
             --data "$first" "$url/api/matches/$id/actions")
           [ "$(tail --lines 1 <<< "$answer")" = 409 ]
           head --lines 1 <<< "$answer" | jq --exit-status '.code == "match_changed"'
+          version=$(jq .version <<< "$match")
+          docker compose restart api
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 1 "$url/api/matches/$id" \
+            | jq --exit-status ".version == $version and .view.match_over"
           curl --fail --silent --show-error --output /dev/null --header 'X-Forwarded-For: 203.0.113.9' "$url/api/decks"
           if docker compose logs api | grep --quiet 203.0.113.9; then
             echo "The API took the address in X-Forwarded-For"; exit 1

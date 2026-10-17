@@ -1,4 +1,10 @@
-"""Where the web API keeps its matches: in memory, for now.
+"""Where the web API keeps its matches: in memory, or in PostgreSQL.
+
+``MatchStore`` is what the API needs from a store, and there are two:
+``MemoryMatchStore``, here, which keeps the matches in the server's memory,
+and ``PostgresMatchStore`` (``rowen.api.database``), which keeps them in a
+database, so they survive a restart. The same tests run against both
+(``tests/test_api_store.py``).
 
 A match is kept as what it takes to play it again: the ids of the two decks,
 the seed, and every action played so far, the player's and the AI's, in
@@ -6,37 +12,35 @@ order. The engine is deterministic, so the same decks, seed and actions always
 make the same state (ADR 0003): the API plays the actions again to get it, in
 a millisecond or two. The store never sees a state.
 
-A ``MatchStore`` maps the id of each match to that record and its version
-(below). The id is a random UUID (version 4): 122 random bits from the
-operating system, so nobody can guess the id of a match that isn't theirs.
-Whoever has the id can see the match and play it, so the id is all the player
-needs.
+A store maps the id of each match to that record and its version (below). The
+id is a random UUID (version 4): 122 random bits from the operating system, so
+nobody can guess the id of a match that isn't theirs. Whoever has the id can
+see the match and play it, so the id is all the player needs.
 
-Anyone can start a match, so the store holds at most ``max_matches`` of them:
-otherwise, starting matches without end would fill the server's memory. When
-it is full, a new match pushes out the one left unused the longest.
+Anyone can start a match, so the store in memory holds at most
+``max_matches`` of them: otherwise, starting matches without end would fill
+the server's memory. When it is full, a new match pushes out the one left
+unused the longest.
 
 The web server handles requests in threads, so two of them can use the store
-at the same time. A lock lets one thread in at a time: without it, one thread
-could push out a match while another is reading it.
+at the same time. In memory, a lock lets one thread in at a time: without it,
+one thread could push out a match while another is reading it.
 
 Each match has a version number, which goes up by one each time actions are
 added to it. A move says which version of the match it was chosen from, and
 ``add_actions`` adds its actions only if the match is still at that version.
 So a move chosen from an old view is never played: not when another request
 played first, while this one was being played (the AI takes a while to think,
-and the lock isn't held meanwhile), nor when it reaches the server late,
-after the browser gave up on it and the player played again.
-
-PostgreSQL takes its place later in this milestone, behind the same methods,
-so the endpoints don't change. There, ``add_actions`` will be an ``UPDATE ...
-WHERE id = :id AND version = :version``.
+and nothing is locked meanwhile), nor when it reaches the server late, after
+the browser gave up on it and the player played again. In PostgreSQL this is
+an ``UPDATE ... WHERE id = :id AND version = :version``.
 """
 
 import threading
 import uuid
 from collections import OrderedDict
 from dataclasses import dataclass
+from typing import Protocol
 from uuid import UUID
 
 from rowen.engine.public import Action
@@ -68,8 +72,37 @@ class StoredMatch:
     version: int
 
 
-class MatchStore:
-    """The matches being played, each under its id."""
+class MatchStore(Protocol):
+    """What the API needs from a store: what each store does."""
+
+    def create(
+        self, decks: tuple[str, str], seed: int, actions: tuple[Action, ...]
+    ) -> StoredMatch:
+        """Keep a new match, at its first version, and return it.
+
+        ``actions`` are those played before the match is kept: the AI's
+        first moves, if it starts.
+        """
+        ...
+
+    def get(self, match_id: UUID) -> StoredMatch | None:
+        """Return a match, or None if there is no match with that id."""
+        ...
+
+    def add_actions(
+        self, match_id: UUID, version: int, actions: tuple[Action, ...]
+    ) -> StoredMatch | None:
+        """Add actions to a match, but only if it is still at ``version``.
+
+        Return the match as it is now kept, at the next version, or None if
+        nothing was added: the match is at another version, or there is no
+        match with that id.
+        """
+        ...
+
+
+class MemoryMatchStore:
+    """The matches being played, each under its id, in the server's memory."""
 
     def __init__(self, max_matches: int = MAX_MATCHES) -> None:
         """Make an empty store.

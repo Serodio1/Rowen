@@ -485,7 +485,7 @@ def from_view(view: engine.PlayerView) -> PlayerView:
         current=view.current,
         round=view.round,
         reviving=view.reviving,
-        legal_actions=tuple(_action(action) for action in view.legal_actions),
+        legal_actions=tuple(from_action(action) for action in view.legal_actions),
         match_over=view.match_over,
         winner=view.winner,
     )
@@ -559,7 +559,7 @@ def _special(card: engine.SpecialCard) -> SpecialCard:
     )
 
 
-def _action(action: engine.Action) -> Action:
+def from_action(action: engine.Action) -> Action:
     """Return an action as the API sends it.
 
     Every kind of action is here, so mypy reports a missing return when a new
@@ -702,7 +702,7 @@ def _event(event: engine.EventView) -> EventView:
 def to_action(action: Action) -> engine.Action:
     """Return the action the player sent as the engine's own.
 
-    It is the other way round from ``_action``. Whether the action is legal is
+    It is the other way round from ``from_action``. Whether the action is legal is
     for the engine to say: it works out the legal actions of each view.
 
     Every kind of action is here, so mypy reports a missing return when a new

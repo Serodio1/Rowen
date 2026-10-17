@@ -41,20 +41,25 @@ folder:
 docker compose up --build    # build the images, then start the game
 ```
 
-Then open <http://localhost:8080> and choose a deck. `Ctrl+C` stops the game
-(and ends the match, since matches are kept in memory), and
-`docker compose down` removes its containers. The first build downloads
+Then open <http://localhost:8080> and choose a deck. `Ctrl+C` stops the game,
+and `docker compose down` removes its containers. The matches are kept in
+PostgreSQL, on this computer: a match goes on after the game starts again,
+until `docker compose down -v` deletes them. The first build downloads
 the base images and takes a few minutes; later ones reuse what did not change.
 If `docker` says it cannot find `dockerDesktopLinuxEngine`, Docker Desktop is
 not running: start it and wait until it says the engine is running. Every 5
 seconds, the API's log shows a `GET /api/decks`: that is Docker checking that
 the API answers.
 
-Two containers run (`compose.yaml`, [ADR 0009](docs/adr/0009-docker-images-behind-nginx.md)):
-`web`, where nginx serves the page and passes its requests for `/api` on to
-the API, and `api`, the web API, whose endpoints are listed at
-<http://localhost:8080/api/docs>. These are the images a server would run; for
-development, run the API and the page without Docker, as below.
+Three containers run (`compose.yaml`, [ADR
+0009](docs/adr/0009-docker-images-behind-nginx.md)): `web`, where nginx serves
+the page and passes its requests for `/api` on to the API; `api`, the web API,
+whose endpoints are listed at <http://localhost:8080/api/docs>; and `db`,
+PostgreSQL. Before the API starts, a fourth one, `migrate`, brings the
+database's tables up to date and stops ([ADR
+0013](docs/adr/0013-keep-matches-in-postgresql.md)). These are the images a
+server would run; for development, run the API and the page without Docker, as
+below.
 
 ## Play in the terminal
 
@@ -92,8 +97,11 @@ turn, the AI plays before the server responds, and the response holds the new
 view and what happened. When the API turns a request down, it answers with a
 `code` and a `message`, such as `illegal_action`. `--reload` restarts the
 server whenever the Python code in `src` changes.
-Matches are kept in memory for now, so they are lost when the server stops or
-restarts.
+Run like this, the API keeps its matches in memory, so they are lost when it
+stops or restarts. With `DATABASE_URL` set to a PostgreSQL database
+(`postgresql+psycopg://user:password@host/database`), whose tables
+`uv run alembic upgrade head` made, it keeps them there, as in Docker Compose
+and online.
 
 ## Run the frontend
 
@@ -121,7 +129,8 @@ development server passes the page's requests for
 `/api` on to the web API at 127.0.0.1:8000, where uvicorn listens by default
 (`vite.config.ts`), and updates the page whenever the code changes. If the page
 says "Could not reach the server.", start the API and try again. Restarting the
-API ends the match being played, since matches are kept in memory.
+API ends the match being played, since without `DATABASE_URL` matches are kept
+in memory.
 
 On Windows, if PowerShell says that running scripts is disabled, run
 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
@@ -134,12 +143,32 @@ right Python version (3.14) automatically.
 ```sh
 cd backend
 uv sync                 # create the virtual environment and install dependencies
-uv run pytest           # run the tests
+uv run pytest           # run the tests (those that need PostgreSQL are skipped)
 uv run ruff check       # lint
 uv run ruff format      # format the code
 uv run mypy             # type-check
 uv run lint-imports     # check which modules may import which
 ```
+
+The tests of the store in PostgreSQL run only when `TEST_DATABASE_URL` gives
+a database they may wipe, as in CI. With Docker, in PowerShell, wait until
+the database is ready (the first time, PostgreSQL starts twice):
+
+```powershell
+docker run --rm -d --name rowen-test-db -p 127.0.0.1:5433:5432 -e POSTGRES_PASSWORD=test --health-cmd "pg_isready --host=127.0.0.1 --username=postgres" --health-interval 1s postgres:18-alpine
+while ((docker inspect --format "{{.State.Health.Status}}" rowen-test-db) -ne "healthy") { Start-Sleep 1 }
+$env:TEST_DATABASE_URL = "postgresql+psycopg://postgres:test@127.0.0.1:5433/postgres"
+uv run pytest
+docker stop rowen-test-db
+Remove-Item Env:TEST_DATABASE_URL
+```
+
+A change to the tables is a migration (Alembic, in `backend/migrations`):
+change the model in `rowen/api/database.py`; then, with `DATABASE_URL` set to
+a database brought up to date (`uv run alembic upgrade head`), write the
+migration with `uv run alembic revision --autogenerate -m "What it does"`.
+Read it, and commit it with the change. With `TEST_DATABASE_URL` set, as in
+CI, the tests fail if the models and the migrations make different tables.
 
 The frontend has the same kind of checks, run with npm:
 

@@ -22,6 +22,7 @@ To run the server on your computer, in ``backend``:
 ``uv run uvicorn rowen.api.app:app --reload --reload-dir src``.
 """
 
+import os
 import secrets
 from collections.abc import Mapping
 from importlib.metadata import version
@@ -35,6 +36,7 @@ from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException
 
 from rowen.ai.baseline import choose_action
+from rowen.api.database import PostgresMatchStore, create_engine
 from rowen.api.schemas import (
     Decks,
     DeckSummary,
@@ -48,7 +50,7 @@ from rowen.api.schemas import (
     from_view,
     to_action,
 )
-from rowen.api.store import MatchStore, StoredMatch
+from rowen.api.store import MatchStore, MemoryMatchStore, StoredMatch
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
     Action,
@@ -66,8 +68,9 @@ AI = 1
 
 # How many random bits a seed has. Whoever knows the seed can work out the
 # AI's hand, and a small seed can be found by trying every one against the
-# cards in the player's hand. 2**64 seeds are far too many to try.
-SEED_BITS = 64
+# cards in the player's hand. 2**63 seeds are far too many to try. 63 and not
+# 64, so that a seed fits PostgreSQL's BIGINT, whose largest value is 2**63 - 1.
+SEED_BITS = 63
 
 
 def _operation_id(route: APIRoute) -> str:
@@ -89,11 +92,26 @@ app = FastAPI(
     redirect_slashes=False,
 )
 
-# All the server's matches, in the memory of its process. So the server must
-# run as a single process, as uvicorn does unless told otherwise: with several
-# workers, each would have a store of its own, and a match started in one
-# would be unknown to the others.
-_store = MatchStore()
+
+def make_store(environ: Mapping[str, str]) -> MatchStore:
+    """Return the store the server keeps its matches in.
+
+    In PostgreSQL if ``DATABASE_URL`` gives its address, so they survive a
+    restart, as in Docker Compose and online. Otherwise in the memory of the
+    server's process, as when it runs on a computer for development. Then the
+    server must run as a single process, as uvicorn does unless told
+    otherwise: with several workers, each would have a store of its own, and a
+    match started in one would be unknown to the others.
+    """
+    url = environ.get("DATABASE_URL")
+    if url:
+        return PostgresMatchStore(create_engine(url))
+    return MemoryMatchStore()
+
+
+# All the server's matches. No connection to the database is made until a
+# request needs one.
+_store = make_store(os.environ)
 
 
 def get_store() -> MatchStore:

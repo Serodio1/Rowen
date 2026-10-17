@@ -20,8 +20,18 @@ from hypothesis import strategies as st
 from rowen import data
 from rowen.ai.baseline import choose_action
 from rowen.api import schemas
-from rowen.api.app import AI, HUMAN, _ai_plays, _replay, app, get_store, new_seed
-from rowen.api.store import FIRST_VERSION, MatchStore, StoredMatch
+from rowen.api.app import (
+    AI,
+    HUMAN,
+    _ai_plays,
+    _replay,
+    app,
+    get_store,
+    make_store,
+    new_seed,
+)
+from rowen.api.database import PostgresMatchStore
+from rowen.api.store import FIRST_VERSION, MatchStore, MemoryMatchStore, StoredMatch
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
     Action,
@@ -55,7 +65,7 @@ DECKS = {deck_id: load_deck(deck_id) for deck_id in deck_ids()}
 @pytest.fixture
 def store() -> MatchStore:
     """Return an empty store, for the app to keep the matches of one test."""
-    return MatchStore()
+    return MemoryMatchStore()
 
 
 @pytest.fixture
@@ -406,10 +416,27 @@ def test_seeds_are_big_and_random() -> None:
     seeds = {new_seed() for _ in range(100)}
 
     assert len(seeds) == 100
-    assert all(0 <= seed < 2**64 for seed in seeds)
-    # A seed of 64 random bits is below 2**63 half the time, so all 100 of
+    # They fit PostgreSQL's BIGINT, whose largest value is 2**63 - 1.
+    assert all(0 <= seed < 2**63 for seed in seeds)
+    # A seed of 63 random bits is below 2**62 half the time, so all 100 of
     # them are below it once in 2**100: only if they have fewer bits.
-    assert max(seeds) >= 2**63
+    assert max(seeds) >= 2**62
+
+
+@pytest.mark.parametrize("environ", [{}, {"DATABASE_URL": ""}])
+def test_without_a_database_the_matches_are_kept_in_memory(
+    environ: dict[str, str],
+) -> None:
+    assert isinstance(make_store(environ), MemoryMatchStore)
+
+
+def test_with_a_database_the_matches_are_kept_there() -> None:
+    # No connection is made until a match is asked for, so none here.
+    url = "postgresql+psycopg://rowen:secret@db.example/rowen"
+
+    store = make_store({"DATABASE_URL": url})
+
+    assert isinstance(store, PostgresMatchStore)
 
 
 def test_the_app_keeps_its_matches_in_a_store_of_its_own() -> None:
@@ -571,14 +598,14 @@ def test_the_player_never_gets_the_cards_the_ai_drew_or_swapped(
 @settings(max_examples=20, deadline=None)
 @given(
     deck=st.sampled_from(["humans", "robots"]),
-    seed=st.integers(0, 2**64 - 1),
+    seed=st.integers(0, 2**63 - 1),
     choices=st.data(),
 )
 def test_any_legal_action_can_be_played_through_the_api(
     deck: str, seed: int, choices: st.DataObject
 ) -> None:
     # A store and a client of its own for each match Hypothesis tries.
-    store = MatchStore()
+    store = MemoryMatchStore()
     app.dependency_overrides[get_store] = lambda: store
     try:
         client = TestClient(app)
