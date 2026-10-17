@@ -94,9 +94,15 @@ gcloud artifacts repositories add-iam-policy-binding rowen --location=europe-wes
 gcloud iam service-accounts add-iam-policy-binding "rowen-run@$project.iam.gserviceaccount.com" --member=$member --role=roles/iam.serviceAccountUser
 ```
 
-Trust GitHub's tokens from this repository only (`1393642354` is its ID:
-`https://api.github.com/repos/Serodio1/Rowen` shows it), then let the jobs in
-`production` act as `rowen-deploy`:
+Trust GitHub's tokens from this repository only, then let the jobs in
+`production` act as `rowen-deploy`. `1393642354` is the repository's ID and
+`91077172` its owner's (`https://api.github.com/repos/Serodio1/Rowen` shows
+both). GitHub names a job in a token's subject by these IDs as well as the
+names, `repo:Serodio1@91077172/Rowen@1393642354:environment:production`, for
+repositories created after 15 July 2026, such as this one; older ones use
+`repo:Serodio1/Rowen:environment:production` unless they opt in. A subject
+that does not match exactly is turned down with
+`Permission 'iam.serviceAccounts.getAccessToken' denied`.
 
 ```powershell
 gcloud iam workload-identity-pools create github --location=global
@@ -104,7 +110,7 @@ $issuer = "https://token.actions.githubusercontent.com"
 $mapping = "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id"
 $condition = "assertion.repository_id=='1393642354'"
 gcloud iam workload-identity-pools providers create-oidc rowen --location=global --workload-identity-pool=github --issuer-uri=$issuer --attribute-mapping=$mapping --attribute-condition=$condition
-$principal = "principal://iam.googleapis.com/projects/$number/locations/global/workloadIdentityPools/github/subject/repo:Serodio1/Rowen:environment:production"
+$principal = "principal://iam.googleapis.com/projects/$number/locations/global/workloadIdentityPools/github/subject/repo:Serodio1@91077172/Rowen@1393642354:environment:production"
 gcloud iam service-accounts add-iam-policy-binding $deployer --role=roles/iam.workloadIdentityUser --member=$principal
 
 gcloud iam workload-identity-pools providers describe rowen --location=global --workload-identity-pool=github --format="value(name)"
