@@ -1,7 +1,8 @@
 """The web API: start a match against the AI, play it, and see it as the player may.
 
-The server keeps the state of each match and never sends it: a response holds
-only the player's view, and the events of the moves just played (the AI's
+The server keeps each match, as its seed and every action played (``store``),
+and never sends it, nor the state they make: a response holds only the
+player's view, and the events of the moves just played (the AI's
 first moves in a new match, or the player's action and the AI's answer) as the
 player may see them. So the AI's hand, the order of the decks and the
 seed stay on the server (ADR 0002). The human player is player 0 and the AI
@@ -50,6 +51,7 @@ from rowen.api.schemas import (
 from rowen.api.store import MatchStore, StoredMatch
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
+    Action,
     Event,
     GameState,
     apply,
@@ -170,8 +172,8 @@ def create_match(
         )
     ai_deck = next(deck for deck in decks if deck != new_match.deck)
     state = start_match((load_deck(new_match.deck), load_deck(ai_deck)), seed=seed)
-    state, events = _ai_plays(state)
-    match = store.create(state)
+    state, actions, events = _ai_plays(state)
+    match = store.create((new_match.deck, ai_deck), seed, actions)
     # url_path_for leaves out root_path, which behind nginx is /api (uvicorn's
     # --root-path in backend/Dockerfile), so it is added here.
     path = app.url_path_for("get_match", match_id=str(match.id))
@@ -194,7 +196,7 @@ def get_match(match_id: UUID, store: Store) -> Match:
     return Match(
         id=match.id,
         version=match.version,
-        view=from_view(player_view(match.state, HUMAN)),
+        view=from_view(player_view(_replay(match), HUMAN)),
     )
 
 
@@ -222,26 +224,27 @@ def play(match_id: UUID, move: Move, store: Store) -> Played:
     if move.version != old.version:
         raise _match_changed()
     played = to_action(move.action)
+    state = _replay(old)
     # The engine works out the legal actions of the player's view. When it
     # isn't the player's turn there are none, so the player can never make a
     # move of the AI's.
-    if played not in player_view(old.state, HUMAN).legal_actions:
+    if played not in player_view(state, HUMAN).legal_actions:
         raise ApiError(
             status.HTTP_409_CONFLICT,
             "illegal_action",
             "This action isn't legal now: it isn't one of the legal actions in "
             "the view.",
         )
-    state, events = apply(old.state, played)
-    state, answer = _ai_plays(state)
-    new = store.replace(match_id, old.version, state)
+    state, events = apply(state, played)
+    state, answer, answer_events = _ai_plays(state)
+    new = store.add_actions(match_id, old.version, (played, *answer))
     if new is None:
         raise _match_changed()
     return Played(
         id=new.id,
         version=new.version,
-        view=from_view(player_view(new.state, HUMAN)),
-        events=from_events(events + answer, HUMAN),
+        view=from_view(player_view(state, HUMAN)),
+        events=from_events(events + answer_events, HUMAN),
     )
 
 
@@ -266,19 +269,37 @@ def _match_changed() -> ApiError:
     )
 
 
-def _ai_plays(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
+def _replay(match: StoredMatch) -> GameState:
+    """Return the state of a match: its actions played again from the start.
+
+    The engine is deterministic, so this is the state they made when they
+    were played (ADR 0003).
+    """
+    player_deck, ai_deck = match.decks
+    state = start_match((load_deck(player_deck), load_deck(ai_deck)), seed=match.seed)
+    for action in match.actions:
+        state, _ = apply(state, action)
+    return state
+
+
+def _ai_plays(
+    state: GameState,
+) -> tuple[GameState, tuple[Action, ...], tuple[Event, ...]]:
     """Let the AI play until it is the player's turn or the match is over.
 
-    Return the new state and the events of the AI's moves, in order. The AI
-    chooses from its own view, as the player does (ADR 0006).
+    Return the new state, the AI's actions and the events of its moves, in
+    order. The AI chooses from its own view, as the player does (ADR 0006).
     """
+    actions: tuple[Action, ...] = ()
     events: tuple[Event, ...] = ()
     view = player_view(state, AI)
     while view.current == AI and not view.match_over:
-        state, new_events = apply(state, choose_action(view))
+        action = choose_action(view)
+        state, new_events = apply(state, action)
+        actions += (action,)
         events += new_events
         view = player_view(state, AI)
-    return state, events
+    return state, actions, events
 
 
 @app.exception_handler(ApiError)
