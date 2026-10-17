@@ -7,15 +7,17 @@
 
 The API kept its matches in the memory of its one process
 (`rowen.api.store`). A restart, a new deployment or Cloud Run stopping an idle
-instance lost every match being played ([ADR 0010](0010-deploy-on-cloud-run.md)).
+instance lost every match being played
+([ADR 0010](0010-deploy-on-cloud-run.md)).
 The project also means to show a backend with SQL and migrations.
 
 Three things had to be chosen: what to keep for each match, which database,
 and where the code goes. The author does not want a monthly cost.
 
 The engine is deterministic ([ADR 0003](0003-pure-immutable-engine.md)): the
-same decks, seed and actions always make the same state. Measured: a whole
-match has 24 to 37 actions, and playing them all again takes 1 to 2 ms.
+same decks, seed and actions always make the same state. Measured on a
+laptop-sized container: a whole match has about 15 to 40 actions, and playing
+them all again takes a few milliseconds.
 
 ## Decision
 
@@ -38,7 +40,8 @@ match has 24 to 37 actions, and playing them all again takes 1 to 2 ms.
   tests: with `DATABASE_URL` the API uses PostgreSQL (Docker Compose, CI,
   online); without it, memory (`uv run uvicorn` on a computer, and the fast
   API tests).
-- **Online, the database is Neon's free plan, in Frankfurt** (`aws-eu-central-1`,
+- **Online, the database is Neon's free plan, in Frankfurt**
+  (`aws-eu-central-1`,
   near Cloud Run's `europe-west1`): 1 GB and 100 compute hours a month, at no
   cost. It sleeps after 5 idle minutes. Its password is in Google's Secret
   Manager, and the migrations run in CI before each deployment
@@ -71,15 +74,27 @@ match has 24 to 37 actions, and playing them all again takes 1 to 2 ms.
 
 - A match survives a restart of the API: CI's smoke test restarts it in the
   middle and finds the match.
-- Each request plays the match again: 1 to 2 ms more, and `apply` must keep
-  depending on nothing but the state and the action (ADR 0003).
-- A whole match is 1 to 2 KB of JSON (measured over 20 matches). Nothing deletes old matches yet, so the
-  table only grows; at that size 1 GB holds hundreds of thousands, and
+- Each request plays the match again: a few milliseconds more, and `apply`
+  must keep depending on nothing but the state and the action (ADR 0003).
+- Each request also waits on the database: reading a match is one statement,
+  and a move one more, each in a transaction of its own (about 4 round trips
+  each, with the check that the connection is still open). Doing without the
+  transactions would halve them; that is for when the time online is
+  measured.
+- A whole match is at most about 2 KB of JSON (measured over 20 matches).
+  Nothing deletes old matches yet, so the table only grows; at that size
+  1 GB holds hundreds of thousands, and
   nginx's limit on new matches ([ADR 0011](0011-limit-requests-per-address.md))
   slows anyone filling it. Deleting matches left alone for long is for later.
 - A change to the rules or the cards can make a match started before it play
-  differently, or not at all, once matches outlive a deployment. Old matches
-  are then lost, as they were before.
+  differently, once matches outlive a deployment, or fail on every request
+  (a 500, since an action of its list is no longer legal): the match is then
+  lost. Answering such a match with "not found" instead is for later.
+- The API's image carries Alembic and the migrations, for Docker Compose's
+  `migrate`. The API itself never runs them.
+- A database that can't be reached makes a request fail after 5 seconds
+  (`connect_timeout`), rather than hold the server for minutes; the health
+  check (`GET /decks`) doesn't use the database, so it still answers.
 - The tests of the store in PostgreSQL need a database (`TEST_DATABASE_URL`):
   CI has one, and on a computer they are skipped unless Docker runs one.
 - Online, the first request after Neon slept waits about half a second more,

@@ -6,8 +6,10 @@ version. The actions are a JSON list, each one in the shape the API sends it
 (``schemas.Action``), so the database holds no Python objects.
 
 The table is made by the migrations in ``backend/migrations`` (Alembic), never
-by this module: ``MatchRow`` only says what the table looks like, and CI checks
-that the migrations make the same table (``alembic check``).
+by this module: ``MatchRow`` only says what the table looks like, and a test
+checks that the migrations make the same table, as ``alembic check`` does.
+That check sees columns and their types, but not everything: not a CHECK
+constraint, for one, which its own test covers.
 
 SQLAlchemy keeps a few connections open and lends one to each request, so a
 request doesn't wait for a new connection (a pool). A connection that the
@@ -70,12 +72,31 @@ class MatchRow(Base):
     )
 
 
+# How long a request waits to connect to the database, and then for a free
+# connection, in seconds. Without a limit, a database that can't be reached
+# (rather than one that refuses) holds each request for minutes, until every
+# thread of the server waits, and even GET /decks, the health check, gets no
+# answer. Neon wakes up in about half a second, well within it.
+CONNECT_TIMEOUT = 5
+POOL_TIMEOUT = 10
+
+
 def create_engine(url: str) -> Engine:
     """Return the connections to the database at ``url``, through psycopg.
 
     ``url`` is like ``postgresql+psycopg://user:password@host/database``.
+
+    When a statement fails, SQLAlchemy's error holds the statement's values,
+    and the error goes to the server's log: ``hide_parameters`` leaves them
+    out, since they include the seed of a match, which must stay secret.
     """
-    return _create_engine(url, pool_pre_ping=True)
+    return _create_engine(
+        url,
+        pool_pre_ping=True,
+        hide_parameters=True,
+        pool_timeout=POOL_TIMEOUT,
+        connect_args={"connect_timeout": CONNECT_TIMEOUT},
+    )
 
 
 class PostgresMatchStore:

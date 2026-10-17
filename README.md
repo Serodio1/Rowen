@@ -51,13 +51,15 @@ not running: start it and wait until it says the engine is running. Every 5
 seconds, the API's log shows a `GET /api/decks`: that is Docker checking that
 the API answers.
 
-Three containers run (`compose.yaml`, [ADR 0009](docs/adr/0009-docker-images-behind-nginx.md)):
-`web`, where nginx serves the page and passes its requests for `/api` on to
-the API; `api`, the web API, whose endpoints are listed at
-<http://localhost:8080/api/docs>; and `db`, PostgreSQL. Before the API
-starts, a fourth one, `migrate`, brings the database's tables up to date and
-stops ([ADR 0013](docs/adr/0013-keep-matches-in-postgresql.md)). These are the images a server would run; for
-development, run the API and the page without Docker, as below.
+Three containers run (`compose.yaml`, [ADR
+0009](docs/adr/0009-docker-images-behind-nginx.md)): `web`, where nginx serves
+the page and passes its requests for `/api` on to the API; `api`, the web API,
+whose endpoints are listed at <http://localhost:8080/api/docs>; and `db`,
+PostgreSQL. Before the API starts, a fourth one, `migrate`, brings the
+database's tables up to date and stops ([ADR
+0013](docs/adr/0013-keep-matches-in-postgresql.md)). These are the images a
+server would run; for development, run the API and the page without Docker, as
+below.
 
 ## Play in the terminal
 
@@ -149,20 +151,24 @@ uv run lint-imports     # check which modules may import which
 ```
 
 The tests of the store in PostgreSQL run only when `TEST_DATABASE_URL` gives
-a database they may empty, as in CI. With Docker, in PowerShell:
+a database they may wipe, as in CI. With Docker, in PowerShell, wait until
+the database is ready (the first time, PostgreSQL starts twice):
 
 ```powershell
-docker run --rm -d --name rowen-test-db -p 127.0.0.1:5433:5432 -e POSTGRES_PASSWORD=test postgres:18-alpine
+docker run --rm -d --name rowen-test-db -p 127.0.0.1:5433:5432 -e POSTGRES_PASSWORD=test --health-cmd "pg_isready --host=127.0.0.1 --username=postgres" --health-interval 1s postgres:18-alpine
+while ((docker inspect --format "{{.State.Health.Status}}" rowen-test-db) -ne "healthy") { Start-Sleep 1 }
 $env:TEST_DATABASE_URL = "postgresql+psycopg://postgres:test@127.0.0.1:5433/postgres"
 uv run pytest
 docker stop rowen-test-db
+Remove-Item Env:TEST_DATABASE_URL
 ```
 
 A change to the tables is a migration (Alembic, in `backend/migrations`):
-change the model in `rowen/api/database.py`, then write the migration with
-`uv run alembic revision --autogenerate -m "What it does"`, read it, and commit
-it with the change. The tests fail if the models and the migrations make
-different tables.
+change the model in `rowen/api/database.py`; then, with `DATABASE_URL` set to
+a database brought up to date (`uv run alembic upgrade head`), write the
+migration with `uv run alembic revision --autogenerate -m "What it does"`.
+Read it, and commit it with the change. With `TEST_DATABASE_URL` set, as in
+CI, the tests fail if the models and the migrations make different tables.
 
 The frontend has the same kind of checks, run with npm:
 

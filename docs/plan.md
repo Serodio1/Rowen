@@ -70,8 +70,7 @@ rowen/
 │   │   ├── engine/      # rules, state, turns, scoring (stdlib only)
 │   │   ├── data/        # card definitions (JSON)
 │   │   ├── ai/          # AI opponent (depends only on engine)
-│   │   ├── api/         # FastAPI routes and schemas
-│   │   ├── db/          # SQLAlchemy models and repositories
+│   │   ├── api/         # FastAPI routes, schemas, match stores (memory, PostgreSQL)
 │   │   └── cli/         # play in the terminal (dev tool, no rules)
 │   ├── migrations/      # Alembic
 │   ├── tests/
@@ -125,12 +124,13 @@ rule has tests.
 
 - FastAPI endpoints: start a match against the AI, get the player view, submit an
   action. Consistent error responses.
-- PostgreSQL + SQLAlchemy + Alembic: `matches` table (state + action log).
+- PostgreSQL + SQLAlchemy + Alembic: `matches` table (decks, seed, action log
+  and version; ADR 0013).
 - React app: basic board, hand, play a card, pass, round and match results
   (no art yet).
 - TypeScript types generated from OpenAPI.
 - Docker images and Docker Compose: the whole game with one command
-  (API + frontend, later the DB).
+  (API, frontend and the database).
 - Deployment to a public URL and CD on merge to `main`.
 
 Done when: anyone with the link can play a full match as a guest.

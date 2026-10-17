@@ -2,7 +2,7 @@
 
 The tests that need PostgreSQL run only when ``TEST_DATABASE_URL`` gives the
 address of a database they may empty, as CI does; otherwise they are skipped
-(``pytest -ra`` lists them). The README says how to run one with Docker.
+(pytest lists them). The README says how to run one with Docker.
 """
 
 import os
@@ -18,6 +18,11 @@ from rowen.api.database import PostgresMatchStore, create_engine
 from rowen.api.store import MatchStore, MemoryMatchStore
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
+
+# The API picks its store from DATABASE_URL as it is imported, which the test
+# files do after this one. A database set in the terminal to run the API must
+# never be the one the tests write to.
+os.environ.pop("DATABASE_URL", None)
 
 
 def alembic_config(url: str) -> Config:

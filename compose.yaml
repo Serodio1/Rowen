@@ -8,7 +8,7 @@ services:
   # PostgreSQL, where the API keeps its matches, so they survive a restart.
   # Only the other containers reach it: its port is not published. The
   # password is for this computer only; online, the database is elsewhere
-  # (docs/deploy.md).
+  # (ADR 0013).
   db:
     image: postgres:18-alpine
     environment:
@@ -21,7 +21,9 @@ services:
       - db-data:/var/lib/postgresql
     # Ready once it takes connections.
     healthcheck:
-      test: ["CMD", "pg_isready", "--username=rowen", "--dbname=rowen"]
+      # On TCP, as the API connects: the first time it starts, PostgreSQL
+      # listens on its socket alone for a moment, then starts again.
+      test: ["CMD", "pg_isready", "--host=127.0.0.1", "--username=rowen", "--dbname=rowen"]
       interval: 5s
       start_period: 10s
       start_interval: 1s

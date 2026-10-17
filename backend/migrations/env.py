@@ -20,7 +20,12 @@ if config.config_file_name is not None:
 if context.is_offline_mode():
     raise SystemExit("The migrations only run against a database (no --sql).")
 
-url = config.attributes.get("url") or os.environ["DATABASE_URL"]
+url = config.attributes.get("url") or os.environ.get("DATABASE_URL")
+if not url:
+    raise SystemExit(
+        "Set DATABASE_URL to the database's address, such as "
+        "postgresql+psycopg://user:password@host/database."
+    )
 engine = create_engine(url)
 with engine.connect() as connection:
     context.configure(connection=connection, target_metadata=Base.metadata)

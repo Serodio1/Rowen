@@ -78,7 +78,7 @@ name = "The engine only imports allowed standard library modules"
 type = "forbidden"
 source_modules = ["rowen.engine"]
 # "*" is every top-level package: the standard library and third-party ones.
-forbidden_modules = ["*", "rowen.ai", "rowen.api", "rowen.cli", "rowen.data", "rowen.db"]
+forbidden_modules = ["*", "rowen.ai", "rowen.api", "rowen.cli", "rowen.data"]
 # The allowed modules. Import-linter has no allow list, so they are written as
 # imports to ignore. A module listed here that the engine stops using is an
 # error, so the list always matches the code.
