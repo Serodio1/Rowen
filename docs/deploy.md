@@ -78,17 +78,20 @@ gcloud services enable sts.googleapis.com iamcredentials.googleapis.com
 
 Create the account CI deploys as, and let it do only what a deployment needs:
 update the `rowen` service, push to the `rowen` image store, and run the
-service as `rowen-run`:
+service as `rowen-run`. Paste one line at a time: a long line pasted with
+others can be cut short. The lines that start with `$` keep a value for the
+next ones, so run them all in the same terminal.
 
 ```powershell
 $project = gcloud config get-value project
 $number = gcloud projects describe $project --format="value(projectNumber)"
 $deployer = "rowen-deploy@$project.iam.gserviceaccount.com"
+$member = "serviceAccount:$deployer"
 
 gcloud iam service-accounts create rowen-deploy --display-name="Rowen's deployments from GitHub"
-gcloud run services add-iam-policy-binding rowen --region=europe-west1 --member="serviceAccount:$deployer" --role=roles/run.developer
-gcloud artifacts repositories add-iam-policy-binding rowen --location=europe-west1 --member="serviceAccount:$deployer" --role=roles/artifactregistry.writer
-gcloud iam service-accounts add-iam-policy-binding "rowen-run@$project.iam.gserviceaccount.com" --member="serviceAccount:$deployer" --role=roles/iam.serviceAccountUser
+gcloud run services add-iam-policy-binding rowen --region=europe-west1 --member=$member --role=roles/run.developer
+gcloud artifacts repositories add-iam-policy-binding rowen --location=europe-west1 --member=$member --role=roles/artifactregistry.writer
+gcloud iam service-accounts add-iam-policy-binding "rowen-run@$project.iam.gserviceaccount.com" --member=$member --role=roles/iam.serviceAccountUser
 ```
 
 Trust GitHub's tokens from this repository only (`1393642354` is its ID:
@@ -96,9 +99,13 @@ Trust GitHub's tokens from this repository only (`1393642354` is its ID:
 `production` act as `rowen-deploy`:
 
 ```powershell
-gcloud iam workload-identity-pools create github --location=global --display-name="GitHub Actions"
-gcloud iam workload-identity-pools providers create-oidc rowen --location=global --workload-identity-pool=github --display-name="Rowen's CI" --issuer-uri="https://token.actions.githubusercontent.com" --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id" --attribute-condition="assertion.repository_id == '1393642354'"
-gcloud iam service-accounts add-iam-policy-binding $deployer --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/projects/$number/locations/global/workloadIdentityPools/github/subject/repo:Serodio1/Rowen:environment:production"
+gcloud iam workload-identity-pools create github --location=global
+$issuer = "https://token.actions.githubusercontent.com"
+$mapping = "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id"
+$condition = "assertion.repository_id=='1393642354'"
+gcloud iam workload-identity-pools providers create-oidc rowen --location=global --workload-identity-pool=github --issuer-uri=$issuer --attribute-mapping=$mapping --attribute-condition=$condition
+$principal = "principal://iam.googleapis.com/projects/$number/locations/global/workloadIdentityPools/github/subject/repo:Serodio1/Rowen:environment:production"
+gcloud iam service-accounts add-iam-policy-binding $deployer --role=roles/iam.workloadIdentityUser --member=$principal
 
 gcloud iam workload-identity-pools providers describe rowen --location=global --workload-identity-pool=github --format="value(name)"
 $deployer
