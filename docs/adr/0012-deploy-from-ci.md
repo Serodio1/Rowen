@@ -32,7 +32,9 @@ do that is a way into the project, and the repository is public.
 - **Google trusts only this repository and only its `production`
   environment.** The pool admits only tokens with this repository's ID,
   which, unlike its name, a new repository can never take. Only tokens whose
-  subject is `repo:Serodio1/Rowen:environment:production` may act as
+  subject is `repo:Serodio1@91077172/Rowen@1393642354:environment:production`
+  (the owner and the repository with their IDs, as GitHub names them for
+  repositories created after 15 July 2026) may act as
   `rowen-deploy`, and on GitHub only `main` may run a job in `production`.
   A pull request's run cannot get such a token.
 - **`rowen-deploy` may do only what a deployment needs:** Cloud Run Developer
