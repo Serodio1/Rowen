@@ -59,7 +59,7 @@ Principles:
 | Frontend quality | ESLint (typescript-eslint, strict type-checked), Prettier |
 | API contract | OpenAPI → generated TypeScript types (openapi-typescript), typed client (openapi-fetch) |
 | Infra | Docker, Docker Compose, GitHub Actions (CI + CD) |
-| Hosting | Decided in Phase 2 (recorded as an ADR) |
+| Hosting | Google Cloud Run, and PostgreSQL on Neon (ADRs 0010 and 0013) |
 
 ## Repository layout
 
@@ -203,6 +203,6 @@ Done when: it looks good enough for the README GIF.
 |---|---|
 | Scope grows too large | Every milestone is demo-able on its own; cut *Could* items first. |
 | Code written faster than it is understood | Small PRs, each explained part by part; Rui must be able to explain a PR before merging it; milestone retrospectives. |
-| Free hosting limits (cold starts, database expiry) | Choose hosting in an ADR in Phase 2; everything runs in Docker so it can move. |
+| Free hosting limits (cold starts, database expiry) | Hosting chosen in ADRs 0010 and 0013, with its limits; everything runs in Docker so it can move. |
 | AI-generated card art | Consistent style, no imitation of the original game's characters, tool documented in the README. |
 | Windows vs Linux differences | LF line endings via `.gitattributes`, PostgreSQL in Docker. |
