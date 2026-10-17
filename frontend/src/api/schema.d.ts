@@ -84,10 +84,11 @@ export interface paths {
      * @description Play the player's action, and then let the AI answer.
      *
      *     The action is one of the legal actions in the player's view, sent back as
-     *     it is. If it isn't legal now, the answer is a 409 and the match doesn't
-     *     change. If another request for the same match kept its result while this
-     *     action was played, the answer is a 409 too: get the match again to see
-     *     where it is.
+     *     it is, with the version of the match that came with that view. If the
+     *     match is at another version, the answer is a 409 and the match doesn't
+     *     change: get it again to see where it is. That is so also when another
+     *     request for the same match is played first, while this one is. If the
+     *     action isn't legal now, the answer is a 409 too.
      */
     post: operations["play"];
     delete?: never;
@@ -250,10 +251,11 @@ export interface components {
     };
     /**
      * Match
-     * @description A match as the player may see it: its id and the player's view of it.
+     * @description A match as the player may see it: its id, its version and the view.
      *
      *     The id is all it takes to see and play the match, so only its player gets
-     *     it.
+     *     it. The version goes up each time the match changes: a move sends back the
+     *     version of the view it was chosen from.
      */
     Match: {
       /**
@@ -261,6 +263,8 @@ export interface components {
        * Format: uuid
        */
       id: string;
+      /** Version */
+      version: number;
       view: components["schemas"]["PlayerView"];
     };
     /**
@@ -275,6 +279,19 @@ export interface components {
       type: "match_ended";
       /** Winner */
       winner: number | null;
+    };
+    /**
+     * Move
+     * @description What the player sends to play: an action, and the version it was chosen at.
+     *
+     *     ``action`` is one of the legal actions of the view, sent back as it is,
+     *     and ``version`` is the version of the match that came with that view. If
+     *     the match is at another version by then, the move isn't played.
+     */
+    Move: {
+      /** Version */
+      version: number;
+      action: components["schemas"]["Action"];
     };
     /**
      * NewMatch
@@ -395,6 +412,8 @@ export interface components {
        * Format: uuid
        */
       id: string;
+      /** Version */
+      version: number;
       view: components["schemas"]["PlayerView"];
       /** Events */
       events: components["schemas"]["EventView"][];
@@ -865,15 +884,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json":
-          | components["schemas"]["PlayUnit"]
-          | components["schemas"]["PlaySpecial"]
-          | components["schemas"]["PlayHorn"]
-          | components["schemas"]["PlayScarecrow"]
-          | components["schemas"]["Pass"]
-          | components["schemas"]["Revive"]
-          | components["schemas"]["Redraw"]
-          | components["schemas"]["EndRedraw"];
+        "application/json": components["schemas"]["Move"];
       };
     };
     responses: {

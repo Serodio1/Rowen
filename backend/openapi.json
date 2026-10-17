@@ -117,7 +117,7 @@
     "/matches/{match_id}/actions": {
       "post": {
         "summary": "Play",
-        "description": "Play the player's action, and then let the AI answer.\n\nThe action is one of the legal actions in the player's view, sent back as\nit is. If it isn't legal now, the answer is a 409 and the match doesn't\nchange. If another request for the same match kept its result while this\naction was played, the answer is a 409 too: get the match again to see\nwhere it is.",
+        "description": "Play the player's action, and then let the AI answer.\n\nThe action is one of the legal actions in the player's view, sent back as\nit is, with the version of the match that came with that view. If the\nmatch is at another version, the answer is a 409 and the match doesn't\nchange: get it again to see where it is. That is so also when another\nrequest for the same match is played first, while this one is. If the\naction isn't legal now, the answer is a 409 too.",
         "operationId": "play",
         "parameters": [
           {
@@ -136,46 +136,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/PlayUnit"
-                  },
-                  {
-                    "$ref": "#/components/schemas/PlaySpecial"
-                  },
-                  {
-                    "$ref": "#/components/schemas/PlayHorn"
-                  },
-                  {
-                    "$ref": "#/components/schemas/PlayScarecrow"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Pass"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Revive"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Redraw"
-                  },
-                  {
-                    "$ref": "#/components/schemas/EndRedraw"
-                  }
-                ],
-                "discriminator": {
-                  "propertyName": "type",
-                  "mapping": {
-                    "play_unit": "#/components/schemas/PlayUnit",
-                    "play_special": "#/components/schemas/PlaySpecial",
-                    "play_horn": "#/components/schemas/PlayHorn",
-                    "play_scarecrow": "#/components/schemas/PlayScarecrow",
-                    "pass": "#/components/schemas/Pass",
-                    "revive": "#/components/schemas/Revive",
-                    "redraw": "#/components/schemas/Redraw",
-                    "end_redraw": "#/components/schemas/EndRedraw"
-                  }
-                },
-                "title": "Action"
+                "$ref": "#/components/schemas/Move"
               }
             }
           }
@@ -559,6 +520,10 @@
             "format": "uuid",
             "title": "Id"
           },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
           "view": {
             "$ref": "#/components/schemas/PlayerView"
           }
@@ -567,10 +532,11 @@
         "type": "object",
         "required": [
           "id",
+          "version",
           "view"
         ],
         "title": "Match",
-        "description": "A match as the player may see it: its id and the player's view of it.\n\nThe id is all it takes to see and play the match, so only its player gets\nit."
+        "description": "A match as the player may see it: its id, its version and the view.\n\nThe id is all it takes to see and play the match, so only its player gets\nit. The version goes up each time the match changes: a move sends back the\nversion of the view it was chosen from."
       },
       "MatchEnded": {
         "properties": {
@@ -599,6 +565,25 @@
         ],
         "title": "MatchEnded",
         "description": "A player has no lives left: ``engine.MatchEnded``."
+      },
+      "Move": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "action": {
+            "$ref": "#/components/schemas/Action"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "action"
+        ],
+        "title": "Move",
+        "description": "What the player sends to play: an action, and the version it was chosen at.\n\n``action`` is one of the legal actions of the view, sent back as it is,\nand ``version`` is the version of the match that came with that view. If\nthe match is at another version by then, the move isn't played."
       },
       "NewMatch": {
         "properties": {
@@ -786,6 +771,10 @@
             "format": "uuid",
             "title": "Id"
           },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
           "view": {
             "$ref": "#/components/schemas/PlayerView"
           },
@@ -801,6 +790,7 @@
         "type": "object",
         "required": [
           "id",
+          "version",
           "view",
           "events"
         ],

@@ -85,7 +85,9 @@ Then open <http://127.0.0.1:8000/docs>: it lists the endpoints and lets you
 try them. `GET /decks` lists the decks, and `POST /matches` with
 `{"deck": "humans"}` starts a match (if the AI starts, it swaps its cards first,
 and the response says so). To play, send one of the `legal_actions`
-of the view, as it is, to `POST /matches/{id}/actions`: if it is then the AI's
+of the view, as it is, with the match's `version`, to
+`POST /matches/{id}/actions`: `{"version": 1, "action": {"type": "pass"}}`.
+A move from an old version is turned down (`match_changed`). If it is then the AI's
 turn, the AI plays before the server responds, and the response holds the new
 view and what happened. When the API turns a request down, it answers with a
 `code` and a `message`, such as `illegal_action`. `--reload` restarts the

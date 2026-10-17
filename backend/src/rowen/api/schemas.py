@@ -408,13 +408,15 @@ class NewMatch(Schema):
 
 
 class Match(Schema):
-    """A match as the player may see it: its id and the player's view of it.
+    """A match as the player may see it: its id, its version and the view.
 
     The id is all it takes to see and play the match, so only its player gets
-    it.
+    it. The version goes up each time the match changes: a move sends back the
+    version of the view it was chosen from.
     """
 
     id: UUID
+    version: int
     view: PlayerView
 
 
@@ -428,6 +430,18 @@ class Played(Match):
     """
 
     events: tuple[EventView, ...]
+
+
+class Move(Schema):
+    """What the player sends to play: an action, and the version it was chosen at.
+
+    ``action`` is one of the legal actions of the view, sent back as it is,
+    and ``version`` is the version of the match that came with that view. If
+    the match is at another version by then, the move isn't played.
+    """
+
+    version: int
+    action: Action
 
 
 # What went wrong, for a program to read: the browser can show its own text.
