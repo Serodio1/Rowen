@@ -117,16 +117,16 @@ jobs:
       # Through nginx, as the browser does: the page with its security headers,
       # its JavaScript with nosniff, a redirect that names only the path (as
       # behind Cloud Run), the API's docs under /api, the decks, then a whole
-      # match (at most 100 moves), always playing the first legal move, read
-      # back at the end. A move every quarter of a second stays under nginx's
-      # limit of 5 requests a second. Then, that the API ignores an address a
-      # visitor writes in X-Forwarded-For. Last, nginx's limits (they use up
-      # the buckets, so they come last): a request over 16 KB, for a new
-      # match and for a move, new matches in a row, each with another address
-      # in X-Forwarded-For, until nginx answers 429 with its error, and then
-      # requests for the decks in a row, until the same 429. The first
-      # request tries again for a few seconds, in case nginx is not listening
-      # yet. Moves are never sent twice.
+      # match (at most 100 moves), always playing the first legal move with the
+      # match's version, read back at the end, and then the first move again,
+      # which comes too late: 409. A move every quarter of a second stays under
+      # nginx's limit of 5 requests a second. Then, that the API ignores an
+      # address a visitor writes in X-Forwarded-For. Last, nginx's limits (they
+      # use up the buckets, so they come last): a request over 16 KB, for a new
+      # match and for a move, new matches in a row, each with another address in
+      # X-Forwarded-For, until nginx answers 429 with its error, and then
+      # requests for the decks in a row, until the same 429. The first request
+      # tries again for a few seconds, in case nginx is not listening yet.
       - name: Smoke test
         run: |
           url=http://localhost:8080
@@ -143,14 +143,19 @@ jobs:
           match=$(curl --fail --silent --show-error --header 'Content-Type: application/json' \
             --data '{"deck": "humans"}' "$url/api/matches")
           id=$(jq --raw-output .id <<< "$match")
-          for move in $(seq 100); do
+          first=$(jq --compact-output '{version, action: .view.legal_actions[0]}' <<< "$match")
+          for n in $(seq 100); do
             jq --exit-status .view.match_over <<< "$match" > /dev/null && break
-            action=$(jq --compact-output '.view.legal_actions[0]' <<< "$match")
+            move=$(jq --compact-output '{version, action: .view.legal_actions[0]}' <<< "$match")
             match=$(curl --fail --silent --show-error --header 'Content-Type: application/json' \
-              --data "$action" "$url/api/matches/$id/actions")
+              --data "$move" "$url/api/matches/$id/actions")
             sleep 0.25
           done
           curl --fail --silent --show-error "$url/api/matches/$id" | jq --exit-status .view.match_over
+          answer=$(curl --silent --show-error --write-out '\n%{http_code}' --header 'Content-Type: application/json' \
+            --data "$first" "$url/api/matches/$id/actions")
+          [ "$(tail --lines 1 <<< "$answer")" = 409 ]
+          head --lines 1 <<< "$answer" | jq --exit-status '.code == "match_changed"'
           curl --fail --silent --show-error --output /dev/null --header 'X-Forwarded-For: 203.0.113.9' "$url/api/decks"
           if docker compose logs api | grep --quiet 203.0.113.9; then
             echo "The API took the address in X-Forwarded-For"; exit 1

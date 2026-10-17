@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from rowen.api.store import MAX_MATCHES, MatchStore
+from rowen.api.store import FIRST_VERSION, MAX_MATCHES, MatchStore, StoredMatch
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import GameState, start_match
 
@@ -18,13 +18,15 @@ def new_state(seed: int = 0) -> GameState:
     return start_match((DECKS[0], DECKS[1]), seed=seed)
 
 
-def test_a_match_is_kept_under_its_id() -> None:
+def test_a_match_is_kept_under_its_id_at_the_first_version() -> None:
     store = MatchStore()
     state = new_state()
 
-    match_id = store.create(state)
+    match = store.create(state)
 
-    assert store.get(match_id) is state
+    assert match.state is state
+    assert match.version == FIRST_VERSION
+    assert store.get(match.id) == match
 
 
 def test_there_is_no_match_under_an_unknown_id() -> None:
@@ -38,7 +40,7 @@ def test_each_match_gets_a_random_id_of_its_own() -> None:
     store = MatchStore()
     state = new_state()
 
-    ids = {store.create(state) for _ in range(100)}
+    ids = {store.create(state).id for _ in range(100)}
 
     assert len(ids) == 100
     # Version 4 is the kind of UUID made of random bits.
@@ -47,114 +49,122 @@ def test_each_match_gets_a_random_id_of_its_own() -> None:
 
 def test_a_full_store_pushes_out_the_match_left_unused_the_longest() -> None:
     store = MatchStore(max_matches=2)
-    states = [new_state(seed) for seed in range(3)]
-    first = store.create(states[0])
-    second = store.create(states[1])
+    first = store.create(new_state(0))
+    second = store.create(new_state(1))
     # Seeing the first match again makes the second one the least recently used.
-    store.get(first)
+    store.get(first.id)
 
-    third = store.create(states[2])
+    third = store.create(new_state(2))
 
-    assert store.get(second) is None
-    assert store.get(first) is states[0]
-    assert store.get(third) is states[2]
+    assert store.get(second.id) is None
+    assert store.get(first.id) == first
+    assert store.get(third.id) == third
 
 
 def test_a_store_holds_max_matches_by_default() -> None:
     store = MatchStore()
     state = new_state()
-    ids = [store.create(state) for _ in range(MAX_MATCHES + 1)]
+    matches = [store.create(state) for _ in range(MAX_MATCHES + 1)]
 
-    assert store.get(ids[0]) is None
-    assert all(store.get(match_id) is state for match_id in ids[1:])
+    assert store.get(matches[0].id) is None
+    assert all(store.get(match.id) == match for match in matches[1:])
 
 
-def test_a_match_is_replaced_if_it_is_still_the_old_one() -> None:
+def test_a_match_still_at_the_version_is_replaced_at_the_next_one() -> None:
     store = MatchStore()
-    old, new = new_state(0), new_state(1)
-    match_id = store.create(old)
+    old = store.create(new_state(0))
+    state = new_state(1)
 
-    replaced = store.replace(match_id, old, new)
+    new = store.replace(old.id, old.version, state)
 
-    assert replaced
-    assert store.get(match_id) is new
+    assert new == StoredMatch(id=old.id, state=state, version=old.version + 1)
+    assert store.get(old.id) == new
+
+
+def test_each_replacement_takes_the_match_to_the_next_version() -> None:
+    store = MatchStore()
+    match = store.create(new_state(0))
+
+    for seed in range(1, 4):
+        replaced = store.replace(match.id, match.version, new_state(seed))
+        assert replaced is not None
+        match = replaced
+
+    assert match.version == FIRST_VERSION + 3
+
+
+@pytest.mark.parametrize("offset", [-1, 1])
+def test_a_match_at_another_version_is_not_replaced(offset: int) -> None:
+    # The move was chosen from an older view, or its version is made up.
+    store = MatchStore()
+    old = store.create(new_state(0))
+    kept = store.replace(old.id, old.version, new_state(1))
+    assert kept is not None
+
+    replaced = store.replace(old.id, kept.version + offset, new_state(2))
+
+    assert replaced is None
+    assert store.get(old.id) == kept
 
 
 def test_a_match_another_request_replaced_first_is_not_replaced() -> None:
     # Two requests got the same match at once. The first one has already kept
     # its result.
     store = MatchStore()
-    old, first, second = new_state(0), new_state(1), new_state(2)
-    match_id = store.create(old)
-    store.replace(match_id, old, first)
+    old = store.create(new_state(0))
+    first = store.replace(old.id, old.version, new_state(1))
 
-    replaced = store.replace(match_id, old, second)
+    second = store.replace(old.id, old.version, new_state(2))
 
-    assert not replaced
-    assert store.get(match_id) is first
-
-
-def test_an_equal_state_is_not_the_old_one() -> None:
-    # The same seed makes an equal state, but not the one the store holds.
-    store = MatchStore()
-    old, equal, new = new_state(0), new_state(0), new_state(1)
-    assert equal == old
-    match_id = store.create(old)
-
-    replaced = store.replace(match_id, equal, new)
-
-    assert not replaced
-    assert store.get(match_id) is old
+    assert second is None
+    assert store.get(old.id) == first
 
 
 def test_an_unknown_match_is_not_replaced() -> None:
     store = MatchStore()
-    old, new = new_state(0), new_state(1)
-    store.create(old)
+    store.create(new_state(0))
     match_id = uuid4()
 
-    replaced = store.replace(match_id, old, new)
+    replaced = store.replace(match_id, FIRST_VERSION, new_state(1))
 
-    assert not replaced
+    assert replaced is None
     assert store.get(match_id) is None
 
 
 def test_a_match_pushed_out_is_not_replaced() -> None:
     # The match was pushed out while its request was being played.
     store = MatchStore(max_matches=1)
-    old, other, new = new_state(0), new_state(1), new_state(2)
-    match_id = store.create(old)
-    store.create(other)
+    old = store.create(new_state(0))
+    store.create(new_state(1))
 
-    replaced = store.replace(match_id, old, new)
+    replaced = store.replace(old.id, old.version, new_state(2))
 
-    assert not replaced
-    assert store.get(match_id) is None
+    assert replaced is None
+    assert store.get(old.id) is None
 
 
 def test_a_match_replaced_counts_as_used() -> None:
     store = MatchStore(max_matches=2)
-    states = [new_state(seed) for seed in range(4)]
-    first = store.create(states[0])
-    second = store.create(states[1])
+    first = store.create(new_state(0))
+    second = store.create(new_state(1))
     # Playing the first match makes the second one the least recently used.
-    store.replace(first, states[0], states[2])
+    played = store.replace(first.id, first.version, new_state(2))
 
-    store.create(states[3])
+    store.create(new_state(3))
 
-    assert store.get(second) is None
-    assert store.get(first) is states[2]
+    assert store.get(second.id) is None
+    assert store.get(first.id) == played
 
 
 @pytest.mark.parametrize("method", ["create", "get", "replace"])
 def test_a_thread_waits_while_another_one_uses_the_store(method: str) -> None:
     store = MatchStore()
     state = new_state()
-    match_id = store.create(state)
+    match = store.create(state)
     arguments = {
         "create": (state,),
-        "get": (match_id,),
-        "replace": (match_id, state, new_state(1)),
+        "get": (match.id,),
+        "replace": (match.id, match.version, new_state(1)),
     }[method]
     thread = threading.Thread(target=getattr(store, method), args=arguments)
 
@@ -179,7 +189,7 @@ def test_many_threads_can_use_the_store_at_once() -> None:
     def use_store() -> None:
         try:
             for _ in range(2000):
-                store.get(store.create(state))
+                store.get(store.create(state).id)
         # An error in a thread doesn't fail the test by itself, so it is kept.
         except Exception as error:
             errors.append(error)

@@ -8,7 +8,7 @@
  * sent when the page says so.
  */
 import { QueryClient, queryOptions } from "@tanstack/react-query";
-import type { Action, Api, ErrorCode } from "./client.ts";
+import type { Api, ErrorCode, Move } from "./client.ts";
 
 // What a request says when no answer came, or none from the API: the network
 // is down, the API isn't running, or a proxy answered in its place.
@@ -86,23 +86,21 @@ export function decksQuery(api: Api) {
 }
 
 /**
- * The player's view of the match with the id `matchId`.
+ * The match with the id `matchId`: its version and the player's view.
  *
- * Starting the match and playing a move put the view of their answer here,
+ * Starting the match and playing a move put the match of their answer here,
  * so the page only asks for it when its view may be out of date: after a
  * move that didn't work.
  */
 export function matchQuery(api: Api, matchId: string) {
   return queryOptions({
     queryKey: ["match", matchId],
-    queryFn: async () => {
-      const match = await send(
+    queryFn: () =>
+      send(
         api.GET("/matches/{match_id}", {
           params: { path: { match_id: matchId } },
         }),
-      );
-      return match.view;
-    },
+      ),
   });
 }
 
@@ -112,14 +110,16 @@ export function startMatch(api: Api, deck: string) {
 }
 
 /**
- * Play `action`, one of the legal actions in the view, as the view lists it.
- * The answer has the view after the AI's answer.
+ * Play `move`: one of the legal actions in a view, as the view lists it, with
+ * the version of the match that came with the view. The answer has the match
+ * after the AI's answer. If the match is at another version by then, the
+ * move isn't played: the API answers `match_changed`.
  */
-export function playAction(api: Api, matchId: string, action: Action) {
+export function playMove(api: Api, matchId: string, move: Move) {
   return send(
     api.POST("/matches/{match_id}/actions", {
       params: { path: { match_id: matchId } },
-      body: action,
+      body: move,
     }),
   );
 }

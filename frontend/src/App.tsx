@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
-import type { Action, Api, Played, View } from "./api/client.ts";
+import type { Action, Api, Match, Move, Played, View } from "./api/client.ts";
 import {
   decksQuery,
   matchQuery,
-  playAction,
+  playMove,
   startMatch,
   type RequestError,
 } from "./api/requests.ts";
@@ -170,9 +170,10 @@ function PlayMatch({
 }) {
   const queryClient = useQueryClient();
   const query = matchQuery(api, started.id);
-  // The view starts as the one that came with the match, so the page doesn't
-  // ask for it. Each move then puts the view of its answer in the cache.
-  const match = useQuery({ ...query, initialData: started.view });
+  // The match starts as the one that came when it started, so the page
+  // doesn't ask for it. Each move then puts the match of its answer in the
+  // cache.
+  const match = useQuery({ ...query, initialData: matchOf(started) });
   // What happened, the latest first.
   const [log, setLog] = useState<Entry[]>(() =>
     started.events.length === 0
@@ -192,12 +193,12 @@ function PlayMatch({
   const resultId = useId();
   const play = useMutation({
     mutationKey: ["play"],
-    mutationFn: (action: Action) => playAction(api, started.id, action),
+    mutationFn: (move: Move) => playMove(api, started.id, move),
     onSuccess: (played) => {
       // The view the move was played from: the events start in its round.
       // (The cache always has one, from `initialData`: `undefined` is only
       // for the types.)
-      const before = queryClient.getQueryData(query.queryKey);
+      const before = queryClient.getQueryData(query.queryKey)?.view;
       // Events name their cards by id. A card can leave the view, such as a
       // unit a Scarecrow takes back to the AI's hand, but it was in the view
       // before.
@@ -212,12 +213,13 @@ function PlayMatch({
         before?.round ?? played.view.round,
       );
       setLog((log) => [{ number: log.length + 1, ...entry }, ...log]);
-      queryClient.setQueryData(query.queryKey, played.view);
+      queryClient.setQueryData(query.queryKey, matchOf(played));
     },
     onError: (error) => {
       // Ask for the match as it is now, unless it is gone. When no answer
       // came, or the server failed, the move may have been played all the
-      // same: a move from the old view could then be played twice.
+      // same, and the view on the page is then out of date: a move chosen
+      // from it would be turned down.
       if (error.code !== "match_not_found") {
         void queryClient.invalidateQueries({ queryKey: query.queryKey });
       }
@@ -242,7 +244,7 @@ function PlayMatch({
     );
   }
 
-  const view = match.data;
+  const view = match.data.view;
   // How the last round went, until the next move.
   const round = log[0]?.round ?? null;
   return (
@@ -314,7 +316,10 @@ function PlayMatch({
             if (queryClient.isMutating({ mutationKey: ["play"] }) > 0) {
               return;
             }
-            play.mutate(action);
+            // With the version of the view these moves come from: if the
+            // match is at another one when the move reaches the server, the
+            // move isn't played, however late it gets there.
+            play.mutate({ version: match.data.version, action });
           }}
         />
       )}
@@ -443,8 +448,13 @@ function Log({ entries }: { entries: Entry[] }) {
 
 /**
  * Whether the API turned a move down because the page's view of the match is
- * out of date: the move isn't legal now, or the match changed meanwhile.
+ * out of date: the move isn't legal now, or the match is at another version.
  */
 function outOfDate(error: RequestError): boolean {
   return error.code === "illegal_action" || error.code === "match_changed";
+}
+
+/** The match of an answer, without what happened, as the cache keeps it. */
+function matchOf(played: Played): Match {
+  return { id: played.id, version: played.version, view: played.view };
 }

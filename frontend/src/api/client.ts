@@ -11,7 +11,10 @@ export type Api = Client<paths>;
 /** A deck the player can choose: its id, to start a match, and its name. */
 export type Deck = MethodResponse<Api, "get", "/decks">["decks"][number];
 
-/** A match: its id and the player's view of it. */
+/**
+ * A match: its id, its version and the player's view of it. The version goes
+ * up each time the match changes.
+ */
 export type Match = MethodResponse<Api, "get", "/matches/{match_id}">;
 
 /**
@@ -32,6 +35,13 @@ export type Card = View["hand"][number];
 
 /** One of the moves the player can make, as the view lists them. */
 export type Action = View["legal_actions"][number];
+
+/**
+ * What the page sends to play: one of the legal actions of a view, and the
+ * version of the match that came with that view.
+ */
+export type Move =
+  paths["/matches/{match_id}/actions"]["post"]["requestBody"]["content"]["application/json"];
 
 /**
  * What went wrong with a request, as the API says it: `"match_not_found"`.

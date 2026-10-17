@@ -21,7 +21,7 @@ from rowen import data
 from rowen.ai.baseline import choose_action
 from rowen.api import schemas
 from rowen.api.app import AI, HUMAN, _ai_plays, app, get_store, new_seed
-from rowen.api.store import MatchStore
+from rowen.api.store import FIRST_VERSION, MatchStore, StoredMatch
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
     Action,
@@ -75,14 +75,19 @@ def start(
 
 
 def play(client: TestClient, response: httpx2.Response, action: Any) -> httpx2.Response:
-    """Send an action for the match in a response, and return the new response."""
-    return client.post(f"/matches/{response.json()['id']}/actions", json=action)
+    """Play an action from the view in a response, and return the new response.
+
+    The move sends back the version of the match that came with the view.
+    """
+    move = {"version": response.json()["version"], "action": action}
+    return client.post(f"/matches/{response.json()['id']}/actions", json=move)
 
 
 def match_text(response: httpx2.Response) -> str:
-    """Return the match in a response, its id and view, as GET sends it."""
+    """Return the match in a response, its id, version and view, as GET sends it."""
     played = schemas.Played.model_validate_json(response.text)
-    return schemas.Match(id=played.id, view=played.view).model_dump_json()
+    match = schemas.Match(id=played.id, version=played.version, view=played.view)
+    return match.model_dump_json()
 
 
 def first_action(response: httpx2.Response) -> Any:
@@ -105,9 +110,9 @@ def ai_answers(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
 
 def state_of(store: MatchStore, response: httpx2.Response) -> GameState:
     """Return the state the store keeps for the match in a response."""
-    state = store.get(UUID(response.json()["id"]))
-    assert state is not None
-    return state
+    match = store.get(UUID(response.json()["id"]))
+    assert match is not None
+    return match.state
 
 
 def test_the_decks_are_the_ones_in_the_data_files(client: TestClient) -> None:
@@ -183,6 +188,7 @@ def test_the_player_gets_their_view_and_the_events_of_the_ais_first_moves(
 
     sent = schemas.Played(
         id=UUID(response.json()["id"]),
+        version=FIRST_VERSION,
         view=schemas.from_view(player_view(state, HUMAN)),
         events=schemas.from_events(events, HUMAN),
     )
@@ -482,6 +488,7 @@ def test_the_events_are_the_players_action_and_then_the_ais_answer(
     state = start_match((DECKS["humans"], DECKS["robots"]), seed=AI_DRAWS_AND_REDRAWS)
     state, _ = ai_answers(state)
     response = start(client, seed=AI_DRAWS_AND_REDRAWS)
+    version = FIRST_VERSION
 
     while not response.json()["view"]["match_over"]:
         action = first_action(response)
@@ -489,9 +496,11 @@ def test_the_events_are_the_players_action_and_then_the_ais_answer(
         state, answer = ai_answers(state)
 
         response = play(client, response, action)
+        version += 1
 
         sent = schemas.Played(
             id=UUID(response.json()["id"]),
+            version=version,
             view=schemas.from_view(player_view(state, HUMAN)),
             events=schemas.from_events(events + answer, HUMAN),
         )
@@ -573,17 +582,18 @@ def test_the_player_can_never_make_a_move_of_the_ais(
     # seed the AI wins the coin flip, and nobody lets it play.
     state = start_match((DECKS["humans"], DECKS["robots"]), seed=AI_STARTS)
     assert player_view(state, HUMAN).legal_actions == ()
-    match_id = store.create(state)
+    match = store.create(state)
     ai_view = schemas.from_view(player_view(state, AI)).model_dump(mode="json")
 
-    for move in ai_view["legal_actions"]:
-        response = client.post(f"/matches/{match_id}/actions", json=move)
+    for action in ai_view["legal_actions"]:
+        move = {"version": match.version, "action": action}
+        response = client.post(f"/matches/{match.id}/actions", json=move)
 
         # Otherwise 200 and 409 would also tell the player the AI's cards.
         assert response.status_code == 409
         assert response.json()["code"] == "illegal_action"
     assert ai_view["legal_actions"]
-    assert store.get(match_id) is state
+    assert store.get(match.id) == match
 
 
 @pytest.mark.parametrize(
@@ -612,6 +622,31 @@ def test_an_action_of_the_wrong_shape_is_turned_down(
     assert state_of(store, response) is before
 
 
+@pytest.mark.parametrize(
+    "move",
+    [
+        # An action alone, as moves were sent before they had a version.
+        {"type": "pass"},
+        {"action": {"type": "pass"}},
+        {"version": "first", "action": {"type": "pass"}},
+        {"version": None, "action": {"type": "pass"}},
+        {"version": FIRST_VERSION},
+        {"version": FIRST_VERSION, "action": {"type": "pass"}, "player": 0},
+    ],
+)
+def test_a_move_without_a_version_and_an_action_is_turned_down(
+    client: TestClient, store: MatchStore, move: Any
+) -> None:
+    response = start(client)
+    before = state_of(store, response)
+
+    turned_down = client.post(f"/matches/{response.json()['id']}/actions", json=move)
+
+    assert turned_down.status_code == 422
+    assert turned_down.json()["code"] == "invalid_request"
+    assert state_of(store, response) is before
+
+
 def test_a_request_turned_down_says_where_its_first_mistake_is(
     client: TestClient,
 ) -> None:
@@ -623,12 +658,15 @@ def test_a_request_turned_down_says_where_its_first_mistake_is(
 
     assert turned_down.json() == {
         "code": "invalid_request",
-        "message": "The request isn't valid at body.play_unit.card: string_type.",
+        "message": (
+            "The request isn't valid at body.action.play_unit.card: string_type."
+        ),
     }
 
 
 def test_an_action_for_an_unknown_match_is_turned_down(client: TestClient) -> None:
-    response = client.post(f"/matches/{uuid4()}/actions", json={"type": "pass"})
+    move = {"version": FIRST_VERSION, "action": {"type": "pass"}}
+    response = client.post(f"/matches/{uuid4()}/actions", json=move)
 
     assert response.status_code == 404
     assert response.json()["code"] == "match_not_found"
@@ -640,15 +678,14 @@ def test_an_action_on_a_match_that_changed_meanwhile_is_turned_down(
     # Two requests get the same match at once, and the other one keeps its
     # result first, while this one plays its action.
     response = start(client)
-    match_id = UUID(response.json()["id"])
     other = start_match((DECKS["humans"], DECKS["robots"]), seed=1)
     get = store.get
 
-    def get_then_the_other_request_wins(match_id: UUID) -> GameState | None:
-        state = get(match_id)
-        assert state is not None
-        assert store.replace(match_id, state, other)
-        return state
+    def get_then_the_other_request_wins(match_id: UUID) -> StoredMatch | None:
+        match = get(match_id)
+        assert match is not None
+        assert store.replace(match_id, match.version, other) is not None
+        return match
 
     monkeypatch.setattr(store, "get", get_then_the_other_request_wins)
 
@@ -658,7 +695,75 @@ def test_an_action_on_a_match_that_changed_meanwhile_is_turned_down(
     assert turned_down.json()["code"] == "match_changed"
     # The other request's result is kept, not undone.
     monkeypatch.undo()
-    assert store.get(match_id) is other
+    assert state_of(store, response) is other
+
+
+def test_each_move_takes_the_match_to_the_next_version(client: TestClient) -> None:
+    response = start(client, seed=PLAYER_STARTS)
+    assert response.json()["version"] == FIRST_VERSION
+
+    for version in range(FIRST_VERSION + 1, FIRST_VERSION + 4):
+        response = play(client, response, first_action(response))
+
+        assert response.json()["version"] == version
+        seen = client.get(f"/matches/{response.json()['id']}")
+        assert seen.text == match_text(response)
+
+
+def test_a_move_that_comes_late_is_not_played_again(
+    client: TestClient, store: MatchStore
+) -> None:
+    # The player redraws a card, and the answer is lost on its way back. The
+    # page gets the match again, the player redraws the same card, and then
+    # the first move reaches the server once more, as a proxy can send it
+    # again: the same move, still legal, chosen from the first view.
+    # With this seed the player has two soldiers.
+    started = start(client, seed=PLAYER_STARTS)
+    redraw = {"type": "redraw", "card": "soldier"}
+    played = play(client, started, redraw)
+    assert played.status_code == 200
+    assert redraw in played.json()["view"]["legal_actions"]
+    before = state_of(store, played)
+
+    late = play(client, started, redraw)
+
+    assert late.status_code == 409
+    assert late.json()["code"] == "match_changed"
+    assert state_of(store, played) is before
+
+
+@pytest.mark.parametrize("offset", [-1, 1, 1000])
+def test_a_move_from_another_version_is_turned_down_and_changes_nothing(
+    client: TestClient, store: MatchStore, offset: int
+) -> None:
+    response = start(client)
+    before = state_of(store, response)
+    move = {
+        "version": response.json()["version"] + offset,
+        "action": first_action(response),
+    }
+
+    turned_down = client.post(f"/matches/{response.json()['id']}/actions", json=move)
+
+    assert turned_down.status_code == 409
+    assert turned_down.json() == {
+        "code": "match_changed",
+        "message": "The match changed since this action was chosen. Get it again.",
+    }
+    assert state_of(store, response) is before
+
+
+def test_the_version_is_checked_before_whether_the_action_is_legal(
+    client: TestClient,
+) -> None:
+    # An illegal action from an old view: the view is what is out of date.
+    response = start(client, seed=PLAYER_STARTS)
+    move = {"version": FIRST_VERSION + 1, "action": {"type": "pass"}}
+
+    turned_down = client.post(f"/matches/{response.json()['id']}/actions", json=move)
+
+    assert turned_down.status_code == 409
+    assert turned_down.json()["code"] == "match_changed"
 
 
 @pytest.mark.parametrize(

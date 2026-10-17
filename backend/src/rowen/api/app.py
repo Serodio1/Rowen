@@ -35,19 +35,19 @@ from starlette.exceptions import HTTPException
 
 from rowen.ai.baseline import choose_action
 from rowen.api.schemas import (
-    Action,
     Decks,
     DeckSummary,
     Error,
     ErrorCode,
     Match,
+    Move,
     NewMatch,
     Played,
     from_events,
     from_view,
     to_action,
 )
-from rowen.api.store import MatchStore
+from rowen.api.store import MatchStore, StoredMatch
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
     Event,
@@ -171,13 +171,14 @@ def create_match(
     ai_deck = next(deck for deck in decks if deck != new_match.deck)
     state = start_match((load_deck(new_match.deck), load_deck(ai_deck)), seed=seed)
     state, events = _ai_plays(state)
-    match_id = store.create(state)
+    match = store.create(state)
     # url_path_for leaves out root_path, which behind nginx is /api (uvicorn's
     # --root-path in backend/Dockerfile), so it is added here.
-    path = app.url_path_for("get_match", match_id=str(match_id))
+    path = app.url_path_for("get_match", match_id=str(match.id))
     response.headers["Location"] = request.scope.get("root_path", "") + path
     return Played(
-        id=match_id,
+        id=match.id,
+        version=match.version,
         view=from_view(player_view(state, HUMAN)),
         events=from_events(events, HUMAN),
     )
@@ -189,8 +190,12 @@ def create_match(
 )
 def get_match(match_id: UUID, store: Store) -> Match:
     """Return a match as the player may see it."""
-    state = _state(store, match_id)
-    return Match(id=match_id, view=from_view(player_view(state, HUMAN)))
+    match = _match(store, match_id)
+    return Match(
+        id=match.id,
+        version=match.version,
+        view=from_view(player_view(match.state, HUMAN)),
+    )
 
 
 @app.post(
@@ -201,52 +206,64 @@ def get_match(match_id: UUID, store: Store) -> Match:
         status.HTTP_422_UNPROCESSABLE_CONTENT,
     ),
 )
-def play(match_id: UUID, action: Action, store: Store) -> Played:
+def play(match_id: UUID, move: Move, store: Store) -> Played:
     """Play the player's action, and then let the AI answer.
 
     The action is one of the legal actions in the player's view, sent back as
-    it is. If it isn't legal now, the answer is a 409 and the match doesn't
-    change. If another request for the same match kept its result while this
-    action was played, the answer is a 409 too: get the match again to see
-    where it is.
+    it is, with the version of the match that came with that view. If the
+    match is at another version, the answer is a 409 and the match doesn't
+    change: get it again to see where it is. That is so also when another
+    request for the same match is played first, while this one is. If the
+    action isn't legal now, the answer is a 409 too.
     """
-    old = _state(store, match_id)
-    played = to_action(action)
+    old = _match(store, match_id)
+    # Checked first: an action chosen from an old view may also be legal now,
+    # and it would be played twice.
+    if move.version != old.version:
+        raise _match_changed()
+    played = to_action(move.action)
     # The engine works out the legal actions of the player's view. When it
     # isn't the player's turn there are none, so the player can never make a
     # move of the AI's.
-    if played not in player_view(old, HUMAN).legal_actions:
+    if played not in player_view(old.state, HUMAN).legal_actions:
         raise ApiError(
             status.HTTP_409_CONFLICT,
             "illegal_action",
             "This action isn't legal now: it isn't one of the legal actions in "
             "the view.",
         )
-    state, events = apply(old, played)
+    state, events = apply(old.state, played)
     state, answer = _ai_plays(state)
-    if not store.replace(match_id, old, state):
-        raise ApiError(
-            status.HTTP_409_CONFLICT,
-            "match_changed",
-            "The match changed while this action was played. Get it again.",
-        )
+    new = store.replace(match_id, old.version, state)
+    if new is None:
+        raise _match_changed()
     return Played(
-        id=match_id,
-        view=from_view(player_view(state, HUMAN)),
+        id=new.id,
+        version=new.version,
+        view=from_view(player_view(new.state, HUMAN)),
         events=from_events(events + answer, HUMAN),
     )
 
 
-def _state(store: MatchStore, match_id: UUID) -> GameState:
-    """Return the state of a match, or turn the request down if there is none."""
-    state = store.get(match_id)
-    if state is None:
+def _match(store: MatchStore, match_id: UUID) -> StoredMatch:
+    """Return a match, or turn the request down if there is none."""
+    match = store.get(match_id)
+    if match is None:
         raise ApiError(
             status.HTTP_404_NOT_FOUND,
             "match_not_found",
             "There is no match with this id.",
         )
-    return state
+    return match
+
+
+def _match_changed() -> ApiError:
+    """Return the error for a move chosen from another version of the match."""
+    return ApiError(
+        status.HTTP_409_CONFLICT,
+        "match_changed",
+        "The match changed since this action was chosen. Get it again.",
+    )
 
 
 def _ai_plays(state: GameState) -> tuple[GameState, tuple[Event, ...]]:

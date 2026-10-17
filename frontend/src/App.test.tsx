@@ -12,6 +12,7 @@ import {
   createApi,
   type Card,
   type Event,
+  type Match,
   type Played,
   type View,
 } from "./api/client.ts";
@@ -89,7 +90,12 @@ const A_MATCH = {
   ...THE_DECKS,
   "POST /api/matches": {
     status: 201,
-    body: { id: "a-match", view: view(), events: [] } satisfies Played,
+    body: {
+      id: "a-match",
+      version: 1,
+      view: view(),
+      events: [],
+    } satisfies Played,
   },
 };
 
@@ -105,12 +111,20 @@ const ROUND_1 = view({
   ],
 });
 
-/** Return the API's answer to a move: the view after it, and its events. */
-function played(after: View, events: Event[] = []) {
+/**
+ * Return the API's answer to a move: the match after it, at `version`, and
+ * its events.
+ */
+function played(after: View, events: Event[] = [], version = 2) {
   return {
     status: 200,
-    body: { id: "a-match", view: after, events } satisfies Played,
+    body: { id: "a-match", version, view: after, events } satisfies Played,
   };
+}
+
+/** Return the match "a-match" as the API sends it when asked for it. */
+function aMatch(view: View, version: number): Match {
+  return { id: "a-match", version, view };
 }
 
 /** Return an answer of the API that turns a request down. */
@@ -305,8 +319,11 @@ test("clicking a move plays it, and the page shows the view of the answer", asyn
     await screen.findByRole("heading", { name: "Round 2" }),
   ).toBeInTheDocument();
   const [move] = sent(requests, PLAY);
-  // The action goes back as the view listed it.
-  expect(await move?.json()).toEqual({ type: "end_redraw" });
+  // The action goes back as the view listed it, with the match's version.
+  expect(await move?.json()).toEqual({
+    version: 1,
+    action: { type: "end_redraw" },
+  });
   expect(hand()).toEqual(["Hoarfrost (weather on melee)"]);
   expect(moves()).toEqual(["Pass"]);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -323,6 +340,57 @@ test("a move can be made with the keyboard, which gives a click no count", async
 
   await screen.findByRole("button", { name: "Pass" });
   expect(sent(requests, PLAY)).toHaveLength(1);
+});
+
+test("each move sends the version of the match its view came with", async () => {
+  // The match starts at version 1, and the first move takes it to 2.
+  const { api, requests } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
+  renderApp(api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Pass" }));
+
+  await waitFor(() => {
+    expect(sent(requests, PLAY)).toHaveLength(2);
+  });
+  const [first, second] = sent(requests, PLAY);
+  expect(await first?.json()).toEqual({
+    version: 1,
+    action: { type: "end_redraw" },
+  });
+  expect(await second?.json()).toEqual({
+    version: 2,
+    action: { type: "pass" },
+  });
+});
+
+test("after asking for the match again, a move sends the version that came with it", async () => {
+  // The first move was chosen from an old view. The match the page then gets
+  // is at version 5.
+  const { api, requests } = fakeApi({
+    ...A_MATCH,
+    [PLAY]: turnedDown(409, "match_changed"),
+    "GET /api/matches/a-match": { status: 200, body: aMatch(ROUND_1, 5) },
+  });
+  renderApp(api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  const pass = await screen.findByRole("button", { name: "Pass" });
+  await waitFor(() => {
+    expect(pass).toBeEnabled();
+  });
+  fireEvent.click(pass);
+
+  await waitFor(() => {
+    expect(sent(requests, PLAY)).toHaveLength(2);
+  });
+  const [, second] = sent(requests, PLAY);
+  expect(await second?.json()).toEqual({
+    version: 5,
+    action: { type: "pass" },
+  });
 });
 
 test("no move can be made while one is on its way", async () => {
@@ -394,7 +462,10 @@ test("two clicks in the same instant make one move", async () => {
   await settle();
   const [move, ...others] = sent(requests, PLAY);
   expect(others).toHaveLength(0);
-  expect(await move?.json()).toEqual({ type: "redraw", card: "soldier" });
+  expect(await move?.json()).toEqual({
+    version: 1,
+    action: { type: "redraw", card: "soldier" },
+  });
 });
 
 test.each<[number | null, string]>([
@@ -499,7 +570,7 @@ test.each(["illegal_action", "match_changed"])(
     }
     expect(sent(requests, "GET /api/matches/a-match")).toHaveLength(1);
 
-    answer.answer(Response.json({ id: "a-match", view: ROUND_1 }));
+    answer.answer(Response.json(aMatch(ROUND_1, 3)));
 
     expect(await screen.findByRole("button", { name: "Pass" })).toBeEnabled();
     expect(moves()).toEqual([
@@ -543,7 +614,7 @@ test("when the match can't be asked for again, no move can be made until it can"
   expect(sent(requests, "GET /api/matches/a-match")).toHaveLength(2);
   expect(sent(requests, PLAY)).toHaveLength(1);
 
-  answer.answer(Response.json({ id: "a-match", view: ROUND_1 }));
+  answer.answer(Response.json(aMatch(ROUND_1, 3)));
 
   expect(await screen.findByRole("button", { name: "Pass" })).toBeEnabled();
   expect(
@@ -599,7 +670,7 @@ test.each<[string, Answer | undefined, string]>([
     expect(sent(requests, "GET /api/matches/a-match")).toHaveLength(1);
 
     // The move was played: the match is in round 1.
-    answer.answer(Response.json({ id: "a-match", view: ROUND_1 }));
+    answer.answer(Response.json(aMatch(ROUND_1, 3)));
 
     expect(await screen.findByRole("button", { name: "Pass" })).toBeEnabled();
     expect(screen.getByRole("alert")).toHaveTextContent(
@@ -645,6 +716,7 @@ test("when the AI starts the match, the page says what it did", async () => {
       status: 201,
       body: {
         id: "a-match",
+        version: 1,
         view: view(),
         events: [
           { type: "opponent_redrew", player: 1 },
@@ -744,7 +816,12 @@ test("a card that left the view is still named, as the page saw it before", asyn
     ...THE_DECKS,
     "POST /api/matches": {
       status: 201,
-      body: { id: "a-match", view: before, events: [] } satisfies Played,
+      body: {
+        id: "a-match",
+        version: 1,
+        view: before,
+        events: [],
+      } satisfies Played,
     },
     [PLAY]: played(after, [
       {
@@ -922,7 +999,7 @@ test("after a move that didn't work, the focus goes to the first move once the m
     expect(button).toBeDisabled();
   });
   // The match is as it was: the move wasn't played.
-  answer.answer(Response.json({ id: "a-match", view: view() }));
+  answer.answer(Response.json(aMatch(view(), 3)));
 
   await waitFor(() => {
     expect(screen.getByRole("button", { name: "Swap Soldier" })).toHaveFocus();
