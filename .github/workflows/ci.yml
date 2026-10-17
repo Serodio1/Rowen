@@ -4,14 +4,19 @@ on:
   push:
     branches: [main]
   pull_request:
+  # A button on the Actions tab, to run CI and the deployment again.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# A new push to the same branch cancels the run that is still in progress.
+# One run at a time for each branch. On a pull request, a new push cancels the
+# run that is still in progress. On main, a run never stops halfway through a
+# deployment: a new one waits, and a waiting run makes way for a newer one, so
+# the last commit is always deployed last.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
@@ -174,3 +179,69 @@ jobs:
         run: |
           docker compose ps --all
           docker compose logs
+
+  # Online, after the three jobs above pass on main: the same steps as
+  # docs/deploy.md, signed in to Google with no stored key (ADR 0012).
+  deploy:
+    name: Deploy
+    needs: [backend, frontend, docker]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Only main may use this environment (its rule on GitHub), and Google only
+    # trusts jobs that run in it. Its variables say which project and account.
+    environment:
+      name: production
+      url: ${{ steps.check.outputs.url }}
+    permissions:
+      contents: read
+      # Lets the job ask GitHub for a signed token that says which repository,
+      # branch and environment it runs for. Google checks it instead of a key.
+      id-token: write
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGISTRY: europe-west1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/rowen
+    steps:
+      - uses: actions/checkout@v7
+
+      # Built before signing in, so no image can hold the credentials.
+      - name: Build images
+        run: |
+          tag=$(git rev-parse --short HEAD)
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          docker build --platform=linux/amd64 --provenance=false --tag "$REGISTRY/api:$tag" backend
+          docker build --platform=linux/amd64 --provenance=false --tag "$REGISTRY/web:$tag" frontend
+
+      # Trades GitHub's token for an hour of access as the account
+      # rowen-deploy, which may only push images and update the service.
+      # gcloud, already on the runner, uses it in the next steps.
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Push images
+        run: |
+          gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+          docker push "$REGISTRY/api:$TAG"
+          docker push "$REGISTRY/web:$TAG"
+
+      # Waits until the new revision's containers start and it gets all the
+      # requests; fails if they do not start.
+      - name: Deploy
+        run: |
+          sed -e "s/PROJECT_ID/$PROJECT_ID/g" -e "s/IMAGE_TAG/$TAG/g" deploy/cloud-run.yaml > "$RUNNER_TEMP/rowen-run.yaml"
+          gcloud run services replace "$RUNNER_TEMP/rowen-run.yaml" --region=europe-west1
+
+      # The game answers online: the page with its security header, then the
+      # decks through nginx. No new match, so no visitor's limit is used up.
+      # The first request tries again for a while, in case the instance is
+      # still starting.
+      - name: Check the game online
+        id: check
+        run: |
+          url=$(gcloud run services describe rowen --region=europe-west1 --format='value(status.url)')
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          page=$(curl --fail --silent --show-error --head --retry 5 --retry-all-errors --retry-delay 3 "$url/")
+          grep --quiet --ignore-case "content-security-policy: default-src 'self'" <<< "$page"
+          curl --fail --silent --show-error "$url/api/decks" | grep --quiet '"humans"'

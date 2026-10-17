@@ -3,14 +3,20 @@
 The game runs on [Cloud Run](https://cloud.google.com/run) as one service,
 `rowen`, in the `europe-west1` region: nginx with the page and the web API run
 side by side in each instance ([ADR 0010](adr/0010-deploy-on-cloud-run.md),
-[`deploy/cloud-run.yaml`](../deploy/cloud-run.yaml)). The images are built on
-a computer with Docker and kept in Artifact Registry, Google's store for
-images. Deploying from CI on every merge comes later (#56).
+[`deploy/cloud-run.yaml`](../deploy/cloud-run.yaml)). The images are kept in
+Artifact Registry, Google's store for images.
+
+**Every merge to `main` deploys itself**: once CI passes on `main`, the
+*Deploy* job builds the images, pushes them, updates the service and checks
+that the game answers ([`ci.yml`](../.github/workflows/ci.yml),
+[ADR 0012](adr/0012-deploy-from-ci.md)). To deploy `main` again, open
+*Actions* → *CI* → *Run workflow* on GitHub and run it on `main`. Deploying
+by hand, below, is the fallback.
 
 The commands below are for PowerShell on Windows, run from the repository's
 folder, with the [gcloud CLI](https://cloud.google.com/sdk/docs/install)
 signed in (`gcloud init`) as the project's owner, and the project chosen as its
-default. Docker Desktop must be running.
+default. Docker Desktop must be running to deploy by hand.
 
 ## Once per project
 
@@ -54,9 +60,69 @@ Let Docker push to the store, with gcloud's sign-in:
 gcloud auth configure-docker europe-west1-docker.pkg.dev
 ```
 
-## Every deployment
+## Once per project: deploying from CI
 
-Deploy a commit of `main` with nothing changed on top, so the images match the
+CI signs in to Google with no stored key, through *Workload Identity
+Federation*: each run of the *Deploy* job gets a token from GitHub, signed by
+GitHub, that says which repository and environment it runs for, and Google
+trades it for an hour of access as the account `rowen-deploy`. Google only
+trusts tokens from this repository (its ID never changes, unlike its name)
+and from jobs in the GitHub environment `production`, which only `main` may
+use.
+
+Turn on the two APIs that trade the token:
+
+```powershell
+gcloud services enable sts.googleapis.com iamcredentials.googleapis.com
+```
+
+Create the account CI deploys as, and let it do only what a deployment needs:
+update the `rowen` service, push to the `rowen` image store, and run the
+service as `rowen-run`:
+
+```powershell
+$project = gcloud config get-value project
+$number = gcloud projects describe $project --format="value(projectNumber)"
+$deployer = "rowen-deploy@$project.iam.gserviceaccount.com"
+
+gcloud iam service-accounts create rowen-deploy --display-name="Rowen's deployments from GitHub"
+gcloud run services add-iam-policy-binding rowen --region=europe-west1 --member="serviceAccount:$deployer" --role=roles/run.developer
+gcloud artifacts repositories add-iam-policy-binding rowen --location=europe-west1 --member="serviceAccount:$deployer" --role=roles/artifactregistry.writer
+gcloud iam service-accounts add-iam-policy-binding "rowen-run@$project.iam.gserviceaccount.com" --member="serviceAccount:$deployer" --role=roles/iam.serviceAccountUser
+```
+
+Trust GitHub's tokens from this repository only (`1393642354` is its ID:
+`https://api.github.com/repos/Serodio1/Rowen` shows it), then let the jobs in
+`production` act as `rowen-deploy`:
+
+```powershell
+gcloud iam workload-identity-pools create github --location=global --display-name="GitHub Actions"
+gcloud iam workload-identity-pools providers create-oidc rowen --location=global --workload-identity-pool=github --display-name="Rowen's CI" --issuer-uri="https://token.actions.githubusercontent.com" --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id" --attribute-condition="assertion.repository_id == '1393642354'"
+gcloud iam service-accounts add-iam-policy-binding $deployer --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/projects/$number/locations/global/workloadIdentityPools/github/subject/repo:Serodio1/Rowen:environment:production"
+
+gcloud iam workload-identity-pools providers describe rowen --location=global --workload-identity-pool=github --format="value(name)"
+$deployer
+$project
+```
+
+The last three lines print the values GitHub needs. On GitHub, under the
+repository's *Settings* → *Environments*, create the environment
+`production`. Under *Deployment branches and tags*, choose *Selected branches
+and tags* and add `main`, so no other branch can run a job in it. Under
+*Environment variables* (not secrets: none of them gives access), add:
+
+| Name | Value |
+|---|---|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | what `providers describe` printed, `projects/…/providers/rowen` |
+| `GCP_SERVICE_ACCOUNT` | `rowen-deploy@<the project's ID>.iam.gserviceaccount.com` |
+| `GCP_PROJECT_ID` | the project's ID |
+
+Google may take a few minutes to apply new permissions: if the first
+deployment from CI is denied, run it again with *Run workflow*.
+
+## Every deployment by hand
+
+When CI cannot deploy. Deploy a commit of `main` with nothing changed on top, so the images match the
 commit they are named after:
 
 ```powershell
@@ -87,7 +153,8 @@ versions of its own.
 `services replace` creates a new revision of the service, starts it, and
 sends it all the requests once its containers' startup probes pass. Adding
 `--dry-run` to it checks the file without deploying. Matches in memory are
-lost with every deployment, until the database (#55).
+lost with every deployment, until the database (#55). CI runs the same
+commands.
 
 ## The first time only: open it to everyone
 
@@ -138,6 +205,10 @@ work from a computer far from the server:
   and Google's front end answers 411 before nginx sees it.
 
 ## When something goes wrong
+
+When the *Deploy* job fails, GitHub sends an email. If it failed in *Check
+the game online*, the new revision already gets the requests: look at the
+logs, and go back to the earlier revision (below) until a fix is merged.
 
 What the containers printed (each request, and any error):
 
