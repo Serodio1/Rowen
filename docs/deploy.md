@@ -178,7 +178,9 @@ and Ubuntu keep the certificates they trust):
 
 **In Secret Manager**, keep the API's address, readable by `rowen-run` only.
 `Read-Host` asks for it, so it never goes into the terminal's history, and
-the file it is written to is deleted at once:
+the file it is written to is deleted at once (with .NET's `File.Delete`:
+`Remove-Item` can't find the file when the user's folder has an accented
+letter, such as `C:\Users\Serôdio`):
 
 ```powershell
 gcloud services enable secretmanager.googleapis.com
@@ -186,7 +188,7 @@ $project = gcloud config get-value project
 $file = "$env:TEMP\rowen-database-url.txt"
 Read-Host "The API's address" | Set-Content -NoNewline -Path $file
 gcloud secrets create rowen-database-url --replication-policy=automatic --data-file=$file
-Remove-Item $file
+[System.IO.File]::Delete($file)
 gcloud secrets add-iam-policy-binding rowen-database-url --member="serviceAccount:rowen-run@$project.iam.gserviceaccount.com" --role=roles/secretmanager.secretAccessor
 ```
 
