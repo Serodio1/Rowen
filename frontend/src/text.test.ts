@@ -3,7 +3,6 @@ import type { Action, Card, Event } from "./api/client.ts";
 import { HOARFROST, SOLDIER, WAR_HORN, side, view } from "./test-data.ts";
 import {
   actionText,
-  cardLabels,
   cardNames,
   cardText,
   eventText,
@@ -146,18 +145,6 @@ test.each<[number, string]>([
     expect(unitText({ card: SOLDIER, strength })).toBe(text);
   },
 );
-
-test.each<[Card, string[]]>([
-  [{ ...SOLDIER, rows: ["siege"], ability: "muster" }, ["Siege", "Muster"]],
-  [{ ...SOLDIER, rows: ["ranged"], ability: null }, ["Ranged"]],
-  // Only what it does: "Melee/Ranged" doesn't fit on the card.
-  [SOLDIER, ["Agile"]],
-  [{ ...SOLDIER, ability: null }, []],
-  [HOARFROST, ["Weather", "Melee"]],
-  [WAR_HORN, ["Special"]],
-])("a card shows short words on what it is: %j", (card, labels) => {
-  expect(cardLabels(card)).toEqual(labels);
-});
 
 const CARD_NAMES = new Map([
   ["soldier", "Soldier"],

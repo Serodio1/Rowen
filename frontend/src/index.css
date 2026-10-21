@@ -29,6 +29,18 @@
   /* The back of a deck's cards. */
   --color-card-back: #5a2320;
   --color-card-back-dark: #2b100e;
+  /* A card with no art yet: a colour for each row, and for each kind of
+     special card (src/CardFace.tsx). */
+  --color-melee: #7d3328;
+  --color-ranged: #35643f;
+  --color-siege: #34557a;
+  --color-hoarfrost: #5d8ba3;
+  --color-thick-fog: #6a7075;
+  --color-downpour: #2f4466;
+  --color-clear-skies: #b58a2e;
+  --color-war-horn: #845c27;
+  --color-wildfire: #a9431a;
+  --color-scarecrow: #8f7744;
 
   /* Fonts most computers have: Palatino on Windows and macOS, else Georgia. */
   --font-display: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
