@@ -132,11 +132,19 @@ function turnedDown(status: number, code: string): Answer {
   return { status, body: { code, message: `The API says ${code}.` } };
 }
 
-/** Return the button of each move the page offers. */
-function movesButtons() {
-  return within(
-    screen.getByRole("list", { name: "What you can do" }),
-  ).getAllByRole("button");
+/**
+ * Return the buttons of the cards the player may choose, in the hand, then
+ * of the other moves (Pass, Keep this hand).
+ */
+function choiceButtons() {
+  return [
+    ...within(screen.getByRole("list", { name: "Your hand" })).queryAllByRole(
+      "button",
+    ),
+    ...within(screen.getByRole("group", { name: "Moves" })).queryAllByRole(
+      "button",
+    ),
+  ];
 }
 
 /** Return each card in the player's hand, by its accessible name, which screen readers read. */
@@ -146,9 +154,23 @@ function hand() {
     .map((card) => card.getAttribute("aria-label"));
 }
 
-/** Return the text of each move the page offers. */
-function moves() {
-  return movesButtons().map((button) => button.textContent);
+/** Return the name of each card the player may choose, then of the other moves. */
+function choices() {
+  return choiceButtons().map(
+    (button) => button.getAttribute("aria-label") ?? button.textContent,
+  );
+}
+
+/**
+ * Swap the first Soldier in the hand: choose it, then click it again, with
+ * clicks of a count of 1.
+ */
+function swapSoldier() {
+  const [soldier] = screen.getAllByRole("button", { name: /^Soldier/ });
+  fireEvent.click(soldier as HTMLElement, { detail: 1 });
+  fireEvent.click(screen.getByRole("button", { name: "Swap Soldier" }), {
+    detail: 1,
+  });
 }
 
 /** Start a match with the humans and wait until it shows. */
@@ -195,7 +217,13 @@ test("choosing a deck starts a match with it, and shows the round, the hand and 
     "Soldier (4 melee/ranged, agile)",
     "Hoarfrost (weather on melee)",
   ]);
-  expect(moves()).toEqual(["Swap Soldier", "Swap Hoarfrost", "Keep this hand"]);
+  // Each card may be swapped: the cards are buttons.
+  expect(choices()).toEqual([
+    "Soldier (4 melee/ranged, agile)",
+    "Soldier (4 melee/ranged, agile)",
+    "Hoarfrost (weather on melee)",
+    "Keep this hand",
+  ]);
   // The view came with the match: the page didn't ask for it.
   expect(sent(requests, "GET /api/matches/a-match")).toHaveLength(0);
 });
@@ -325,7 +353,7 @@ test("clicking a move plays it, and the page shows the view of the answer", asyn
     action: { type: "end_redraw" },
   });
   expect(hand()).toEqual(["Hoarfrost (weather on melee)"]);
-  expect(moves()).toEqual(["Pass"]);
+  expect(choices()).toEqual(["Pass"]);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
@@ -399,16 +427,14 @@ test("no move can be made while one is on its way", async () => {
   renderApp(api);
   await startMatch();
 
-  fireEvent.click(screen.getByRole("button", { name: "Swap Soldier" }), {
-    detail: 1,
-  });
+  swapSoldier();
 
   await waitFor(() => {
     expect(
       screen.getByRole("button", { name: "Keep this hand" }),
     ).toBeDisabled();
   });
-  for (const button of movesButtons()) {
+  for (const button of choiceButtons()) {
     expect(button).toBeDisabled();
   }
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }), {
@@ -441,7 +467,7 @@ test.each([
 
   await settle();
   expect(sent(requests, PLAY)).toHaveLength(1);
-  expect(moves()).toContain("Pass");
+  expect(choices()).toContain("Pass");
 });
 
 test("two clicks in the same instant make one move", async () => {
@@ -451,9 +477,7 @@ test("two clicks in the same instant make one move", async () => {
 
   // No person can, but a script can click twice before the page shows the
   // moves disabled.
-  fireEvent.click(screen.getByRole("button", { name: "Swap Soldier" }), {
-    detail: 1,
-  });
+  swapSoldier();
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }), {
     detail: 1,
   });
@@ -485,9 +509,15 @@ test.each<[number | null, string]>([
     expect(await screen.findByText(result)).toBeInTheDocument();
     // The board stays, to show how the match ended.
     expect(screen.getByRole("region", { name: "Board" })).toBeInTheDocument();
+    // No card or move can be chosen.
     expect(
-      screen.queryByRole("list", { name: "What you can do" }),
+      screen.queryByRole("group", { name: "Moves" }),
     ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("list", { name: "Your hand" })).queryAllByRole(
+        "button",
+      ),
+    ).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Play again" }));
 
@@ -565,7 +595,7 @@ test.each(["illegal_action", "match_changed"])(
       "The match changed. This is where it is now.",
     );
     // No move until the page knows where the match is.
-    for (const button of movesButtons()) {
+    for (const button of choiceButtons()) {
       expect(button).toBeDisabled();
     }
     expect(sent(requests, "GET /api/matches/a-match")).toHaveLength(1);
@@ -573,9 +603,10 @@ test.each(["illegal_action", "match_changed"])(
     answer.answer(Response.json(aMatch(ROUND_1, 3)));
 
     expect(await screen.findByRole("button", { name: "Pass" })).toBeEnabled();
-    expect(moves()).toEqual([
-      "Play Soldier in the melee row",
-      "Play Soldier in the ranged row",
+    // The cards of the new view: the Soldiers may be played, not Hoarfrost.
+    expect(choices()).toEqual([
+      "Soldier (4 melee/ranged, agile)",
+      "Soldier (4 melee/ranged, agile)",
       "Pass",
     ]);
   },
@@ -599,7 +630,7 @@ test("when the match can't be asked for again, no move can be made until it can"
     "Could not reach the server.",
   );
   // The moves on the page may be out of date.
-  for (const button of movesButtons()) {
+  for (const button of choiceButtons()) {
     expect(button).toBeDisabled();
   }
 
@@ -664,7 +695,7 @@ test.each<[string, Answer | undefined, string]>([
     );
     // No move until the page knows where the match is: the moves on the page
     // may be out of date.
-    for (const button of movesButtons()) {
+    for (const button of choiceButtons()) {
       expect(button).toBeDisabled();
     }
     expect(sent(requests, "GET /api/matches/a-match")).toHaveLength(1);
@@ -743,7 +774,7 @@ test("before anything happened, the page says so", async () => {
   // No round is over: nothing between the round and the board.
   expect(
     screen.getByRole("heading", { name: "Round 1" }).nextElementSibling,
-  ).toBe(screen.getByRole("region", { name: "Board" }));
+  ).toContainElement(screen.getByRole("region", { name: "Board" }));
 });
 
 test("after each move, the page says what happened, the latest move first", async () => {
@@ -770,6 +801,9 @@ test("after each move, the page says what happened, the latest move first", asyn
     { type: "unit_played", player: 0, card: "soldier", row: "ranged", side: 0 },
     { type: "player_passed", player: 1 },
   ]);
+  // Choose a Soldier, then its row.
+  const [soldier] = screen.getAllByRole("button", { name: /^Soldier/ });
+  fireEvent.click(soldier as HTMLElement);
   fireEvent.click(
     screen.getByRole("button", { name: "Play Soldier in the melee row" }),
   );
@@ -885,30 +919,43 @@ test("when a round ends, the page says how it went over the board, until the nex
   expect(screen.getAllByText("Round 1: the AI won, 30 to 12.")).toHaveLength(1);
 });
 
-test("once a match starts, the focus is on the first move", async () => {
+/** Return the first card in the hand the player may choose. */
+function firstCardButton() {
+  return within(screen.getByRole("list", { name: "Your hand" })).getAllByRole(
+    "button",
+  )[0];
+}
+
+test("once a match starts, the focus is on the first card the player may choose", async () => {
   renderApp(fakeApi(A_MATCH).api);
 
   await startMatch();
 
   // The focus moves once the page is drawn.
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: "Swap Soldier" })).toHaveFocus();
+    expect(firstCardButton()).toHaveFocus();
   });
+  expect(firstCardButton()).toHaveAccessibleName(
+    "Soldier (4 melee/ranged, agile)",
+  );
 });
 
-test("after a move, the focus goes to the first move of the new view", async () => {
+test("after a move, the focus goes to the first card of the new view", async () => {
   const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
   renderApp(api);
   await startMatch();
 
+  // Hoarfrost is swapped: in the new view, it can't be chosen.
+  fireEvent.click(
+    screen.getByRole("button", { name: "Hoarfrost (weather on melee)" }),
+  );
   const button = screen.getByRole("button", { name: "Swap Hoarfrost" });
   button.focus();
   fireEvent.click(button);
 
+  await screen.findByRole("button", { name: "Pass" });
   await waitFor(() => {
-    expect(
-      screen.getByRole("button", { name: "Play Soldier in the melee row" }),
-    ).toHaveFocus();
+    expect(firstCardButton()).toHaveFocus();
   });
 });
 
@@ -981,7 +1028,7 @@ test("two clicks on the decks in the same instant start one match", async () => 
   expect(await started?.json()).toEqual({ deck: "humans" });
 });
 
-test("after a move that didn't work, the focus goes to the first move once the moves can be made", async () => {
+test("after a move that didn't work, the focus goes to the first card once moves can be made", async () => {
   const answer = later();
   const { api } = fakeApi({
     ...A_MATCH,
@@ -991,6 +1038,9 @@ test("after a move that didn't work, the focus goes to the first move once the m
   renderApp(api);
   await startMatch();
 
+  fireEvent.click(
+    screen.getByRole("button", { name: "Hoarfrost (weather on melee)" }),
+  );
   const button = screen.getByRole("button", { name: "Swap Hoarfrost" });
   button.focus();
   fireEvent.click(button);
@@ -998,12 +1048,16 @@ test("after a move that didn't work, the focus goes to the first move once the m
   await waitFor(() => {
     expect(button).toBeDisabled();
   });
-  // The match is as it was: the move wasn't played.
+  // The match is as it was: the move wasn't played. The new view lets the
+  // card chosen go.
   answer.answer(Response.json(aMatch(view(), 3)));
 
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: "Swap Soldier" })).toHaveFocus();
+    expect(firstCardButton()).toHaveFocus();
   });
+  expect(
+    screen.queryByRole("button", { pressed: true }),
+  ).not.toBeInTheDocument();
 });
 
 test("the second click of a double click on the last move doesn't leave the end of the match", async () => {
@@ -1021,4 +1075,33 @@ test("the second click of a double click on the last move doesn't leave the end 
 
   await settle();
   expect(screen.getByText("You won the match!")).toBeInTheDocument();
+});
+
+test("the page says what to do, and a card chosen can be let go with Cancel", async () => {
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
+  renderApp(api);
+  await startMatch();
+  expect(
+    screen.getByText("Choose a card to swap, or keep this hand."),
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByText("Choose a card to play, or pass.");
+
+  const [soldier] = screen.getAllByRole("button", { name: /^Soldier/ });
+  fireEvent.click(soldier as HTMLElement);
+
+  expect(
+    screen.getByText(
+      "Choose where to play Soldier, or click it again to put it back.",
+    ),
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+  expect(soldier).toHaveAttribute("aria-pressed", "false");
+  expect(
+    screen.queryByRole("button", { name: "Cancel" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByText("Choose a card to play, or pass."),
+  ).toBeInTheDocument();
 });
