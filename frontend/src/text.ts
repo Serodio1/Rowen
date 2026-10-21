@@ -235,3 +235,11 @@ export function eventText(
       return `${who(event.player)} finished swapping.`;
   }
 }
+
+/**
+ * Return what a card does in one text, as the API says it, or `undefined`
+ * if it does nothing more than its strength.
+ */
+export function describe(card: Card): string | undefined {
+  return card.description.length === 0 ? undefined : card.description.join(" ");
+}

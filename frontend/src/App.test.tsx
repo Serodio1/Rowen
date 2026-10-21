@@ -835,6 +835,7 @@ test("a card that left the view is still named, as the page saw it before", asyn
     name: "Scarecrow",
     kind: "scarecrow",
     weather_row: null,
+    description: [],
   } satisfies Card;
   const ranged = side().rows.ranged;
   const aiRows = (row: typeof ranged) =>
@@ -1236,4 +1237,85 @@ test.each([
   expect(document.querySelector('[data-cell="1:melee:0"]')).not.toHaveClass(
     "opacity-0",
   );
+});
+
+// A turn with a Hoarfrost, which says what it does, in the hand.
+const WITH_HOARFROST = played(
+  view({
+    hand: [
+      {
+        ...HOARFROST,
+        description: ["Weather: every unit in the melee rows has strength 1."],
+      },
+    ],
+    legal_actions: [
+      { type: "play_special", card: "hoarfrost" },
+      { type: "pass" },
+    ],
+  }),
+);
+
+/** Return the large card on the right that a card pointed at shows, if any. */
+function preview() {
+  return document.querySelector("[data-preview]");
+}
+
+test("a card pointed at or focused shows large on the right, with what it does, and the log fades out", async () => {
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: WITH_HOARFROST });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByText("Choose a card to play, or pass.");
+  const card = await screen.findByRole("button", {
+    name: "Hoarfrost (weather on melee)",
+  });
+  // Screen readers read what it does from the card itself.
+  expect(card).toHaveAttribute(
+    "aria-description",
+    "Weather: every unit in the melee rows has strength 1.",
+  );
+  expect(preview()).toBeNull();
+
+  fireEvent.mouseOver(card);
+
+  expect(preview()).toHaveAttribute("data-preview", "hoarfrost");
+  expect(preview()).toHaveTextContent(
+    "Weather: every unit in the melee rows has strength 1.",
+  );
+  expect(preview()?.closest("[aria-hidden]")).not.toBeNull();
+  const log = screen.getByRole("log", { name: "What happened" });
+  expect(log.closest("section")).toHaveClass("opacity-0");
+
+  fireEvent.mouseLeave(
+    screen.getByRole("region", { name: "Board" }).parentElement as HTMLElement,
+  );
+  expect(preview()).toBeNull();
+  expect(log.closest("section")).not.toHaveClass("opacity-0");
+
+  // The focus shows it only while the player uses the keyboard: the page
+  // moves the focus by itself after a move.
+  fireEvent.focus(card);
+  expect(preview()).toBeNull();
+  fireEvent.blur(card);
+  fireEvent.keyDown(card, { key: "Tab" });
+  fireEvent.focus(card);
+  expect(preview()).toHaveAttribute("data-preview", "hoarfrost");
+  fireEvent.blur(card);
+  expect(preview()).toBeNull();
+});
+
+test("a card played on its way comes before a card pointed at", async () => {
+  withMotion();
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: AI_PLAYED });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByText("The AI played Soldier in the melee row.");
+
+  fireEvent.mouseOver(
+    document.querySelector('[data-cell="1:melee:0"] [data-card]') as Element,
+  );
+
+  expect(showcase()).not.toBeNull();
+  expect(preview()).toBeNull();
 });

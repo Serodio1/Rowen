@@ -21,7 +21,7 @@ import {
   type Playing,
 } from "./plays.ts";
 import { cellOf, STILL, type Stage } from "./stage.ts";
-import { actionText, cardNames, cardText, unitText } from "./text.ts";
+import { actionText, cardNames, cardText, describe, unitText } from "./text.ts";
 
 type Side = View["players"][number];
 type Row = keyof Side["rows"];
@@ -762,6 +762,7 @@ function CardButton({
       aria-pressed={chosen}
       // Named as the move once it plays it, such as "Play Hoarfrost".
       aria-label={play === undefined ? cardText(card) : actionText(play, names)}
+      aria-description={describe(card)}
       disabled={playing.disabled}
       className="block rounded-md transition hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-200 disabled:cursor-not-allowed disabled:hover:translate-y-0 aria-pressed:-translate-y-2 aria-pressed:ring-2 aria-pressed:ring-gold-300"
       onClick={onFirstClick(() => {

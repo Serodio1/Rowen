@@ -32,6 +32,7 @@ const SCARECROW = {
   name: "Scarecrow",
   kind: "scarecrow",
   weather_row: null,
+  description: [],
 } satisfies Card;
 
 // A turn with a Soldier (melee or ranged), Hoarfrost, and passing.

@@ -1,6 +1,7 @@
 import type { Card } from "./api/client.ts";
 import { artOf, cardIcons, placeholderLook, type Look } from "./cards.ts";
 import { Icon } from "./icons.tsx";
+import { describe } from "./text.ts";
 
 /**
  * The colours of a card with no art yet, by what its big icon is: a unit's
@@ -60,6 +61,10 @@ export function CardFace({
     <div
       role="img"
       aria-label={name}
+      // What the card does, for screen readers; and its id, so the page
+      // can show it large when it is pointed at or focused.
+      aria-description={describe(card)}
+      data-card={card.id}
       className={`relative shrink-0 overflow-hidden rounded-md border-2 bg-wood-900 shadow-md shadow-black/50 ${
         size === "small" ? "h-20 w-14" : "h-24 w-16"
       } ${frame}`}

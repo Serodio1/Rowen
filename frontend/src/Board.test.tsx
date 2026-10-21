@@ -29,6 +29,7 @@ const DOWNPOUR = {
   name: "Downpour",
   kind: "downpour",
   weather_row: "siege",
+  description: [],
 } satisfies Card;
 
 const SCARECROW = {
@@ -37,6 +38,7 @@ const SCARECROW = {
   name: "Scarecrow",
   kind: "scarecrow",
   weather_row: null,
+  description: [],
 } satisfies Card;
 
 /** Return a row with nothing in it, with any changes given. */

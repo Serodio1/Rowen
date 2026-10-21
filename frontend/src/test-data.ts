@@ -19,6 +19,7 @@ export const SOLDIER = {
   group: null,
   legend: false,
   opponent_side: false,
+  description: [],
 } satisfies Card;
 
 export const CAPTAIN = {
@@ -37,6 +38,7 @@ export const HOARFROST = {
   name: "Hoarfrost",
   kind: "hoarfrost",
   weather_row: "melee",
+  description: [],
 } satisfies Card;
 
 export const WAR_HORN = {
@@ -45,6 +47,7 @@ export const WAR_HORN = {
   name: "War Horn",
   kind: "war-horn",
   weather_row: null,
+  description: [],
 } satisfies Card;
 
 type Side = View["players"][number];

@@ -115,3 +115,23 @@ test("a Legend has a gold frame, and its strength is gold on dark", () => {
   expect(screen.getByRole("img")).toHaveClass("border-gold-300", "ring-2");
   expect(strengthCircle(10)).toHaveClass("bg-ink", "text-gold-200");
 });
+
+test("a card says what it does to screen readers, if it does more than its strength", () => {
+  render(
+    <>
+      <CardFace
+        card={{ ...SOLDIER, description: ["Agile: melee or ranged.", "More."] }}
+        name="Soldier"
+      />
+      <CardFace card={{ ...SOLDIER, description: [] }} name="Plain" />
+    </>,
+  );
+
+  expect(screen.getByRole("img", { name: "Soldier" })).toHaveAttribute(
+    "aria-description",
+    "Agile: melee or ranged. More.",
+  );
+  expect(screen.getByRole("img", { name: "Plain" })).not.toHaveAttribute(
+    "aria-description",
+  );
+});

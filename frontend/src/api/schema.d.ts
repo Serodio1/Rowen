@@ -594,7 +594,8 @@ export interface components {
      *
      *     ``weather_row`` is the row a weather card hits, on both sides of the board,
      *     or null for any other special card. It is a rule, so the API says it: the
-     *     page doesn't know the rules (ADR 0002).
+     *     page doesn't know the rules (ADR 0002). So is ``description``: what the
+     *     card does.
      */
     SpecialCard: {
       /**
@@ -608,6 +609,8 @@ export interface components {
       name: string;
       kind: components["schemas"]["SpecialKind"];
       weather_row: components["schemas"]["Row"] | null;
+      /** Description */
+      description: string[];
     };
     /**
      * SpecialKind
@@ -628,7 +631,8 @@ export interface components {
      *
      *     ``opponent_side`` says whether the unit goes on the side of the opponent
      *     of who plays it or revives it, as a Spy does. It is a rule, so the API
-     *     says it: the page doesn't know the rules (ADR 0002).
+     *     says it: the page doesn't know the rules (ADR 0002). So is
+     *     ``description``: what the card does, one sentence per thing.
      */
     UnitCard: {
       /**
@@ -651,6 +655,8 @@ export interface components {
       legend: boolean;
       /** Opponent Side */
       opponent_side: boolean;
+      /** Description */
+      description: string[];
     };
     /**
      * UnitDestroyed
