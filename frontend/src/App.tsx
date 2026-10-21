@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
-import type { Api, Event, Match, Move, Played, View } from "./api/client.ts";
+import type {
+  Api,
+  Card,
+  Event,
+  Match,
+  Move,
+  Played,
+  View,
+} from "./api/client.ts";
 import {
   decksQuery,
   matchQuery,
@@ -9,6 +17,7 @@ import {
   type RequestError,
 } from "./api/requests.ts";
 import { Board } from "./Board.tsx";
+import { CardFace } from "./CardFace.tsx";
 import { Banner, CardPreview, Showcase } from "./Showcase.tsx";
 import {
   cardsById,
@@ -30,6 +39,7 @@ import {
 import {
   actionText,
   cardNames,
+  cardText,
   happened,
   resultText,
   type Happened,
@@ -211,6 +221,8 @@ function PlayMatch({
   const showing = steps[progress.step];
   // The card pointed at or focused, by id, to show it large.
   const [pointed, setPointed] = useState<string | null>(null);
+  // The player whose discard pile is listed, if one is.
+  const [pile, setPile] = useState<number | null>(null);
   // Whether the player is using the keyboard: the page moves the focus by
   // itself after each move, which must not show a card then.
   const typing = useRef(false);
@@ -419,6 +431,7 @@ function PlayMatch({
           view={view}
           playing={view.match_over ? undefined : playing}
           stage={stageOf(steps, progress)}
+          onPile={setPile}
         />
         {showing?.kind === "announce" && <Banner text={showing.text} />}
         {showing?.kind === "play" ? (
@@ -474,10 +487,26 @@ function PlayMatch({
       </div>
       {/* Out of sight while a card is shown on the right, which it would
           be under. */}
-      <Log
-        entries={log}
-        faded={showing?.kind === "play" || shown !== undefined}
-      />
+      {/* What happened, and above it the discard pile listed, if one is. */}
+      <div className="flex flex-col gap-2 lg:col-start-2 lg:row-start-3 lg:contain-size">
+        {pile !== null && (
+          <DiscardPile
+            cards={view.players[pile]?.discard ?? []}
+            name={
+              pile === view.player
+                ? "Your discard pile"
+                : "The AI's discard pile"
+            }
+            onClose={() => {
+              setPile(null);
+            }}
+          />
+        )}
+        <Log
+          entries={log}
+          faded={showing?.kind === "play" || shown !== undefined}
+        />
+      </div>
     </section>
   );
 }
@@ -568,7 +597,7 @@ function Log({ entries, faded }: { entries: Entry[]; faded: boolean }) {
     // and scrolls; its size doesn't count, so it never makes the page taller.
     // Faded, it only can't be seen: screen readers still read what is added.
     <section
-      className={`mx-auto flex w-full max-w-3xl flex-col rounded-lg p-2 transition-opacity duration-300 lg:col-start-2 lg:row-start-3 lg:contain-size ${
+      className={`mx-auto flex w-full max-w-3xl flex-col rounded-lg p-2 transition-opacity duration-300 lg:min-h-0 lg:flex-1 ${
         open
           ? "border border-wood-600 bg-wood-900/85 shadow-inner shadow-black/50"
           : ""
@@ -706,5 +735,67 @@ function Rounds({
         ))}
       </tbody>
     </table>
+  );
+}
+
+/**
+ * The cards in a discard pile, the most recent first, beside the board.
+ * Close or Escape puts it away; it takes the focus when it opens, so the
+ * keyboard can go through it.
+ */
+function DiscardPile({
+  cards,
+  name,
+  onClose,
+}: {
+  cards: readonly Card[];
+  name: string;
+  onClose: () => void;
+}) {
+  const id = useId();
+  return (
+    <section
+      aria-labelledby={id}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          onClose();
+        }
+      }}
+      className="mx-auto flex max-h-96 w-full max-w-3xl flex-col gap-2 rounded-lg border border-gold-600 bg-wood-900/95 p-2 shadow-lg shadow-black/60 lg:max-h-none lg:min-h-0 lg:flex-2"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h3
+          id={id}
+          className="font-display text-xs tracking-widest text-gold-300 uppercase"
+        >
+          {name}
+        </h3>
+        <button
+          type="button"
+          // Opened by a click on the pile: the keyboard goes on from here.
+          autoFocus
+          aria-keyshortcuts="Escape"
+          className="rounded border border-gold-600 px-2 py-0.5 font-display text-xs text-gold-200 hover:bg-wood-700 focus-visible:outline-2 focus-visible:outline-gold-300"
+          onClick={onClose}
+        >
+          Close
+        </button>
+      </div>
+      {cards.length === 0 ? (
+        <p className="text-sm italic opacity-70">No cards yet.</p>
+      ) : (
+        <ul
+          role="list"
+          className="flex min-h-0 flex-wrap content-start gap-1 overflow-y-auto"
+        >
+          {[...cards].reverse().map((card, index) => (
+            // Copies of a card share its id: the place in the pile is the key.
+            <li key={index}>
+              <CardFace card={card} name={cardText(card)} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

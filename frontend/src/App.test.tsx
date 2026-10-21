@@ -1407,3 +1407,54 @@ test("once the last move has played out, the end of the match shows each round a
   ).toEqual(["RoundYouThe AIWon by", "11012The AI", "294You", "377Tie"]);
   expect(within(end).getByRole("button", { name: "Play again" })).toHaveFocus();
 });
+
+test("clicking a discard pile lists its cards beside the board, the most recent first", async () => {
+  const sniper = { ...SOLDIER, id: "sniper", name: "Sniper" };
+  const turn = view({
+    players: [side({ discard: [SOLDIER, sniper] }), side({ discard: [] })],
+    legal_actions: [{ type: "pass" }],
+  });
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(turn) });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByText("Choose a card to play, or pass.");
+
+  fireEvent.click(
+    within(
+      screen.getByRole("group", { name: "Your deck and discard pile" }),
+    ).getByRole("button", { name: "Look through the discard pile: 2 cards" }),
+  );
+
+  const pile = screen.getByRole("region", { name: "Your discard pile" });
+  expect(
+    within(pile)
+      .getAllByRole("img")
+      .map((card) => card.ariaLabel),
+  ).toEqual([
+    "Sniper (4 melee/ranged, agile)",
+    "Soldier (4 melee/ranged, agile)",
+  ]);
+  const close = within(pile).getByRole("button", { name: "Close" });
+  expect(close).toHaveFocus();
+
+  fireEvent.click(close);
+  expect(
+    screen.queryByRole("region", { name: "Your discard pile" }),
+  ).not.toBeInTheDocument();
+
+  // The AI's, and Escape puts it away.
+  fireEvent.click(
+    within(
+      screen.getByRole("group", { name: "The AI's deck and discard pile" }),
+    ).getByRole("button", { name: "Look through the discard pile: 0 cards" }),
+  );
+  const theirs = screen.getByRole("region", { name: "The AI's discard pile" });
+  expect(theirs).toHaveTextContent("No cards yet.");
+  fireEvent.keyDown(within(theirs).getByRole("button", { name: "Close" }), {
+    key: "Escape",
+  });
+  expect(
+    screen.queryByRole("region", { name: "The AI's discard pile" }),
+  ).not.toBeInTheDocument();
+});

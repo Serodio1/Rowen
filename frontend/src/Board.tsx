@@ -63,10 +63,13 @@ export function Board({
   view,
   playing,
   stage = STILL,
+  onPile,
 }: {
   view: View;
   playing?: Playing;
   stage?: Stage;
+  /** Called with a player's index when their discard pile is clicked. */
+  onPile?: (side: number) => void;
 }) {
   const { you, ai } = sides(view);
   // The index of each side in the view, for the places on the board.
@@ -210,11 +213,23 @@ export function Board({
           name="The AI's deck and discard pile"
           side={ai}
           cell={cellOf.discard(theirSide)}
+          onOpen={
+            onPile &&
+            (() => {
+              onPile(theirSide);
+            })
+          }
         />
         <Piles
           name="Your deck and discard pile"
           side={you}
           cell={cellOf.discard(mine)}
+          onOpen={
+            onPile &&
+            (() => {
+              onPile(mine);
+            })
+          }
         />
       </div>
     </section>
@@ -785,15 +800,19 @@ function CardButton({
  *
  * @param cell - The discard pile's place on the board, where Clear Skies and
  *   Wildfire go once played.
+ * @param onOpen - If given, the discard pile is a button that lists its
+ *   cards.
  */
 function Piles({
   name,
   side,
   cell,
+  onOpen,
 }: {
   name: string;
   side: Side;
   cell: string;
+  onOpen?: (() => void) | undefined;
 }) {
   const id = useId();
   const top = side.discard.at(-1);
@@ -811,10 +830,17 @@ function Piles({
         <div className="flex flex-col items-center gap-1">
           <dt className="opacity-80">Discard pile</dt>
           <dd data-cell={cell} className="flex flex-col items-center gap-1">
-            {top === undefined ? (
-              <span className="h-20 w-14 rounded border border-dashed border-gold-600/40" />
+            {onOpen === undefined ? (
+              <DiscardTop top={top} />
             ) : (
-              <CardFace card={top} name={cardText(top)} />
+              <button
+                type="button"
+                aria-label={`Look through the discard pile: ${cards(side.discard.length)}`}
+                className="rounded-md transition hover:brightness-125 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-200"
+                onClick={onOpen}
+              >
+                <DiscardTop top={top} />
+              </button>
             )}
             <span>{cards(side.discard.length)}</span>
           </dd>
@@ -848,6 +874,15 @@ const SHOWN =
 /** Return the classes of the card in the place `cell` at `stage`. */
 function held(stage: Stage, cell: string): string {
   return stage.hidden.has(cell) ? HELD : SHOWN;
+}
+
+/** The top card of a discard pile, or its empty place. */
+function DiscardTop({ top }: { top: Card | undefined }) {
+  return top === undefined ? (
+    <span className="block h-20 w-14 rounded border border-dashed border-gold-600/40" />
+  ) : (
+    <CardFace card={top} name={cardText(top)} />
+  );
 }
 
 /** Return a number of cards in words: `1 card`, `12 cards`. */
