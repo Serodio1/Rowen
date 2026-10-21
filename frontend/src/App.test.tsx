@@ -970,7 +970,9 @@ test("after a move, the focus stays where the player put it, out of the moves", 
   await startMatch();
 
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
-  // While the move is on its way, the player goes to read what happened.
+  // While the move is on its way, the player opens the log to read what
+  // happened.
+  fireEvent.click(screen.getByRole("button", { name: "Show log" }));
   const what = screen.getByRole("log", { name: "What happened" });
   what.focus();
   answer.answer(Response.json(played(ROUND_1).body));
@@ -1318,4 +1320,90 @@ test("a card played on its way comes before a card pointed at", async () => {
 
   expect(showcase()).not.toBeNull();
   expect(preview()).toBeNull();
+});
+
+test("the log is out of sight until the player asks for it, but still read", async () => {
+  const { api } = fakeApi(A_MATCH);
+  renderApp(api);
+  await startMatch();
+  const log = screen.getByRole("log", { name: "What happened" });
+  const show = screen.getByRole("button", { name: "Show log" });
+
+  expect(log).toHaveClass("sr-only");
+  expect(log).not.toHaveAttribute("tabindex");
+  expect(show).toHaveAttribute("aria-expanded", "false");
+  expect(show).toHaveAttribute("aria-controls", log.id);
+
+  fireEvent.click(show);
+
+  expect(log).not.toHaveClass("sr-only");
+  expect(log).toHaveAttribute("tabindex", "0");
+  fireEvent.click(screen.getByRole("button", { name: "Hide log" }));
+  expect(log).toHaveClass("sr-only");
+});
+
+test("a player passing and the end of a round show over the whole page, one after the other", async () => {
+  withMotion();
+  const after = view({
+    round: 2,
+    legal_actions: [{ type: "pass" }],
+  });
+  const { api } = fakeApi({
+    ...A_MATCH,
+    [PLAY]: played(after, [
+      { type: "player_passed", player: 1 },
+      { type: "round_ended", scores: [5, 3], winner: 0 },
+    ]),
+  });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await waitFor(() => {
+    expect(document.querySelector("[data-banner]")).not.toBeNull();
+  });
+
+  // Only a picture: the log says the same.
+  const banner = () => document.querySelector("[data-banner]");
+  expect(banner()).toHaveTextContent("The AI passed.");
+  expect(banner()).toHaveAttribute("aria-hidden", "true");
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.announce));
+  expect(banner()).toHaveTextContent("Round 1: you won, 5 to 3.");
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.announce));
+  expect(banner()).toHaveTextContent("Round 2");
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.announce));
+  expect(banner()).toBeNull();
+});
+
+test("once the last move has played out, the end of the match shows each round and who won", async () => {
+  withMotion();
+  const over = view({ match_over: true, winner: 0, legal_actions: [] });
+  const { api } = fakeApi({
+    ...A_MATCH,
+    [PLAY]: played(over, [
+      { type: "round_ended", scores: [10, 12], winner: 1 },
+      { type: "round_ended", scores: [9, 4], winner: 0 },
+      { type: "round_ended", scores: [7, 7], winner: null },
+      { type: "match_ended", winner: 0 },
+    ]),
+  });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByText("Match over. You won the match.");
+
+  // Not while the rounds' ends are still showing.
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  // One wait for each round's end: each step starts once the last is over.
+  for (let step = 0; step < 3; step++) {
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(TIMES.announce));
+  }
+
+  const end = screen.getByRole("dialog", { name: "You won the match!" });
+  expect(
+    within(end)
+      .getAllByRole("row")
+      .map((row) => row.textContent),
+  ).toEqual(["RoundYouThe AIWon by", "11012The AI", "294You", "377Tie"]);
+  expect(within(end).getByRole("button", { name: "Play again" })).toHaveFocus();
 });

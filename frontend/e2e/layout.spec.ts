@@ -46,7 +46,9 @@ test("the match fits a laptop's screen, and nothing sticks out on a phone", asyn
   );
   expect(new Set(heights).size).toBe(1);
 
-  // The board, the hand, the moves and what happened: all on one screen.
+  // The board, the hand, the moves and what happened (once the player
+  // opens it): all on one screen.
+  await page.getByRole("button", { name: "Show log" }).click();
   expect(await scrolls(page)).toEqual({ across: 0, down: 0 });
   for (const shown of [
     page.getByRole("region", { name: "Board" }),

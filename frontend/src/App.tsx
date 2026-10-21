@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
-import type { Api, Match, Move, Played, View } from "./api/client.ts";
+import type { Api, Event, Match, Move, Played, View } from "./api/client.ts";
 import {
   decksQuery,
   matchQuery,
@@ -9,7 +9,7 @@ import {
   type RequestError,
 } from "./api/requests.ts";
 import { Board } from "./Board.tsx";
-import { CardPreview, Showcase } from "./Showcase.tsx";
+import { Banner, CardPreview, Showcase } from "./Showcase.tsx";
 import {
   cardsById,
   mayMove,
@@ -151,6 +151,14 @@ function ChooseDeck({
 /** What happened after one request, numbered from 1 in the match. */
 type Entry = Happened & { number: number };
 
+/** The end of a round, as the API sends it. */
+type RoundEnded = Extract<Event, { type: "round_ended" }>;
+
+/** Return whether an event is the end of a round. */
+function isRoundEnded(event: Event): event is RoundEnded {
+  return event.type === "round_ended";
+}
+
 /**
  * The match being played: the round, the board and the moves the player can
  * make, or who won once it is over, and what happened so far.
@@ -189,6 +197,10 @@ function PlayMatch({
             ),
           },
         ],
+  );
+  // How each round that ended went, for the end of the match.
+  const [rounds, setRounds] = useState<RoundEnded[]>(() =>
+    started.events.filter(isRoundEnded),
   );
   // The animation of the last move, or of the AI's first one: none with
   // reduced motion.
@@ -237,6 +249,7 @@ function PlayMatch({
       setSteps(
         mayMove() ? stepsOf(played.events, before, played.view) : NO_STEPS,
       );
+      setRounds((rounds) => [...rounds, ...played.events.filter(isRoundEnded)]);
       queryClient.setQueryData(query.queryKey, matchOf(played));
     },
     onError: (error) => {
@@ -407,6 +420,7 @@ function PlayMatch({
           playing={view.match_over ? undefined : playing}
           stage={stageOf(steps, progress)}
         />
+        {showing?.kind === "announce" && <Banner text={showing.text} />}
         {showing?.kind === "play" ? (
           // A new element for each card, which comes up from nothing.
           <Showcase
@@ -421,27 +435,39 @@ function PlayMatch({
       </div>
       <div ref={movesArea} className="lg:col-start-2 lg:row-start-2">
         {view.match_over ? (
-          <div className="flex flex-col items-center gap-3">
-            <p
-              id={resultId}
-              className="text-center font-display text-2xl text-gold-200"
+          // Once the last move has played out, the end of the match, over
+          // the whole page.
+          progress.step >= steps.length && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={resultId}
+              className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
             >
-              {resultText(view)}
-            </p>
-            <button
-              type="button"
-              className={BUTTON}
-              // The moves are gone: the focus goes on from here, and screen
-              // readers read who won with it.
-              autoFocus
-              aria-describedby={resultId}
-              // The second click of a double click on the last move could
-              // land here, and skip who won.
-              onClick={onFirstClick(onLeave)}
-            >
-              Play again
-            </button>
-          </div>
+              <div className="wood flex w-full max-w-md flex-col items-center gap-4 rounded-xl border-2 border-gold-400 p-6 shadow-2xl shadow-black">
+                <h2
+                  id={resultId}
+                  className="text-center font-display text-3xl text-gold-200"
+                >
+                  {resultText(view)}
+                </h2>
+                <Rounds rounds={rounds} viewer={view.player} />
+                <button
+                  type="button"
+                  className={BUTTON}
+                  // The moves are gone: the focus goes on from here, and
+                  // screen readers read who won with it.
+                  autoFocus
+                  aria-describedby={resultId}
+                  // The second click of a double click on the last move
+                  // could land here, and skip who won.
+                  onClick={onFirstClick(onLeave)}
+                >
+                  Play again
+                </button>
+              </div>
+            </div>
+          )
         ) : (
           <Controls view={view} playing={playing} />
         )}
@@ -533,26 +559,52 @@ function Controls({ view, playing }: { view: View; playing: Playing }) {
  */
 function Log({ entries, faded }: { entries: Entry[]; faded: boolean }) {
   const id = useId();
+  const logId = useId();
+  // Out of sight until the player asks for it: the cards and the big
+  // messages show what happens. Screen readers read it all the same.
+  const [open, setOpen] = useState(false);
   return (
     // On a wide screen, it fills the rest of the column beside the board,
     // and scrolls; its size doesn't count, so it never makes the page taller.
     // Faded, it only can't be seen: screen readers still read what is added.
     <section
-      className={`mx-auto flex w-full max-w-3xl flex-col rounded-lg border border-wood-600 bg-wood-900/85 p-2 shadow-inner shadow-black/50 transition-opacity duration-300 lg:col-start-2 lg:row-start-3 lg:contain-size ${faded ? "opacity-0" : ""}`}
+      className={`mx-auto flex w-full max-w-3xl flex-col rounded-lg p-2 transition-opacity duration-300 lg:col-start-2 lg:row-start-3 lg:contain-size ${
+        open
+          ? "border border-wood-600 bg-wood-900/85 shadow-inner shadow-black/50"
+          : ""
+      } ${faded ? "opacity-0" : ""}`}
     >
-      <h3
-        id={id}
-        className="mb-1 font-display text-xs tracking-widest text-gold-300/80 uppercase"
-      >
-        What happened
-      </h3>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <h3
+          id={id}
+          className="font-display text-xs tracking-widest text-gold-300/80 uppercase"
+        >
+          What happened
+        </h3>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={logId}
+          className="rounded border border-gold-600 px-2 py-0.5 font-display text-xs text-gold-200 hover:bg-wood-700 focus-visible:outline-2 focus-visible:outline-gold-300"
+          onClick={() => {
+            setOpen((open) => !open);
+          }}
+        >
+          {open ? "Hide log" : "Show log"}
+        </button>
+      </div>
       {/* A log: screen readers read what is added to it, but not what was
-          there already. It scrolls, so the keyboard can reach it too. */}
+          there already. Open, it scrolls, so the keyboard can reach it too. */}
       <div
+        id={logId}
         role="log"
         aria-labelledby={id}
-        tabIndex={0}
-        className="max-h-48 overflow-y-auto rounded-sm px-1 text-sm focus-visible:outline-2 focus-visible:outline-gold-300 lg:max-h-none lg:min-h-0 lg:flex-1"
+        tabIndex={open ? 0 : undefined}
+        className={
+          open
+            ? "max-h-48 overflow-y-auto rounded-sm px-1 text-sm focus-visible:outline-2 focus-visible:outline-gold-300 lg:max-h-none lg:min-h-0 lg:flex-1"
+            : "sr-only"
+        }
       >
         {entries.length === 0 ? (
           <p className="italic opacity-70">Nothing yet.</p>
@@ -609,4 +661,50 @@ function cardIn(target: EventTarget): string | null {
   const card =
     target.closest("[data-card]") ?? target.querySelector("[data-card]");
   return card?.getAttribute("data-card") ?? null;
+}
+
+/**
+ * How each round went, in a table: the player's score, the AI's and who
+ * won it.
+ *
+ * @param viewer - The player of the view: 0 or 1.
+ */
+function Rounds({
+  rounds,
+  viewer,
+}: {
+  rounds: readonly RoundEnded[];
+  viewer: number;
+}) {
+  return (
+    <table className="w-full text-center">
+      <caption className="sr-only">The rounds</caption>
+      <thead className="font-display text-sm text-gold-300">
+        <tr>
+          <th scope="col">Round</th>
+          <th scope="col">You</th>
+          <th scope="col">The AI</th>
+          <th scope="col">Won by</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rounds.map((round, index) => (
+          <tr key={index} className="border-t border-gold-600/60">
+            <th scope="row" className="py-1 font-normal">
+              {index + 1}
+            </th>
+            <td>{round.scores[viewer]}</td>
+            <td>{round.scores[1 - viewer]}</td>
+            <td>
+              {round.winner === null
+                ? "Tie"
+                : round.winner === viewer
+                  ? "You"
+                  : "The AI"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
