@@ -1,0 +1,3 @@
+# What Playwright writes when it runs (git ignores it too)
+playwright-report/
+test-results/
