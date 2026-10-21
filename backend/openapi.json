@@ -415,6 +415,9 @@
             "$ref": "#/components/schemas/UnitRevived"
           },
           {
+            "$ref": "#/components/schemas/NothingToRevive"
+          },
+          {
             "$ref": "#/components/schemas/UnitMustered"
           },
           {
@@ -467,6 +470,7 @@
             "cards_drawn": "#/components/schemas/CardsDrawn",
             "horn_played": "#/components/schemas/HornPlayed",
             "match_ended": "#/components/schemas/MatchEnded",
+            "nothing_to_revive": "#/components/schemas/NothingToRevive",
             "opponent_drew": "#/components/schemas/OpponentDrew",
             "opponent_redrew": "#/components/schemas/OpponentRedrew",
             "player_passed": "#/components/schemas/PlayerPassed",
@@ -621,6 +625,27 @@
         ],
         "title": "NewMatch",
         "description": "What the player sends to start a match: the id of their deck."
+      },
+      "NothingToRevive": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "nothing_to_revive",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player"
+        ],
+        "title": "NothingToRevive",
+        "description": "A Medic found no unit to revive: ``engine.NothingToRevive``."
       },
       "OpponentDrew": {
         "properties": {

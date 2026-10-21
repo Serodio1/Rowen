@@ -193,6 +193,8 @@ export function eventText(
       return `${who(event.player)} played ${name(event.card)} ${where(event.row, event.side, event.player)}.`;
     case "unit_revived":
       return `${who(event.player)} revived ${name(event.card)} ${where(event.row, event.side, event.player)}.`;
+    case "nothing_to_revive":
+      return `${who(event.player)} had nothing to revive.`;
     case "unit_mustered":
       return `${name(event.card)} came from ${whose(event.player)} ${event.from_hand ? "hand" : "deck"} to the ${event.row} row.`;
     case "cards_drawn":

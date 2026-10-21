@@ -243,7 +243,11 @@ test("the arrow keys go from card to card, and around", () => {
 });
 
 test("a Scarecrow goes over one of the player's units, which become buttons", () => {
-  const units = [{ card: SNIPER, strength: 6 }];
+  // A Legend beside it, which a Scarecrow can't take back.
+  const units = [
+    { card: SNIPER, strength: 6 },
+    { card: CAPTAIN, strength: 10 },
+  ];
   const played = renderPlaying(
     view({
       hand: [SCARECROW],
@@ -266,11 +270,15 @@ test("a Scarecrow goes over one of the player's units, which become buttons", ()
   );
 
   fireEvent.click(screen.getByRole("button", { name: /^Scarecrow/ }));
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: "Play Scarecrow in the ranged row, taking back Sniper",
-    }),
-  );
+  const target = screen.getByRole("button", {
+    name: "Play Scarecrow in the ranged row, taking back Sniper",
+  });
+  // The unit it can take back says so; the Legend is dimmed.
+  expect(target).toHaveTextContent("Take back");
+  const legend = screen.getByRole("img", { name: /^Captain/ }).closest("li");
+  expect(legend).toHaveClass("opacity-45");
+  expect(target.closest("li")).not.toHaveClass("opacity-45");
+  fireEvent.click(target);
 
   expect(played).toEqual([
     {
@@ -294,7 +302,8 @@ test("after a Medic, the units to revive are chosen from the discard pile, not t
     }),
   );
 
-  expect(buttonsIn("Your hand")).toHaveLength(0);
+  // The units to revive take the hand's place.
+  expect(screen.queryByRole("list", { name: "Your hand" })).toBeNull();
   const revivable = buttonsIn("Revive a unit from your discard pile");
   expect(revivable.map((button) => button.ariaLabel)).toEqual([
     "Sniper (6 ranged)",
@@ -339,4 +348,19 @@ test("without playing, the board has no buttons", () => {
   render(<Board view={TURN} />);
 
   expect(screen.queryByRole("button")).not.toBeInTheDocument();
+});
+
+test.each<[number, string]>([
+  [10, "gap-1.5"],
+  [11, ""],
+  [12, "-space-x-2"],
+])("%d cards in the hand fit side by side: %j", (count, spacing) => {
+  renderPlaying(
+    view({ ...TURN, hand: Array.from({ length: count }, () => SOLDIER) }),
+  );
+
+  const hand = screen.getByRole("list", { name: "Your hand" });
+  for (const name of ["gap-1.5", "-space-x-2"]) {
+    expect(hand.classList.contains(name)).toBe(name === spacing);
+  }
 });

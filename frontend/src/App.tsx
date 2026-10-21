@@ -66,6 +66,8 @@ const ALERT =
 export function App({ api }: { api: Api }) {
   // The match being played, as it started, or null while there is none.
   const [match, setMatch] = useState<Played | null>(null);
+  // Whether the player left a match: the focus then goes to the decks.
+  const [left, setLeft] = useState(false);
 
   return (
     <main className="mx-auto max-w-384 px-2 py-3 lg:px-4 lg:py-2">
@@ -73,13 +75,14 @@ export function App({ api }: { api: Api }) {
         Rowen
       </h1>
       {match === null ? (
-        <ChooseDeck api={api} onStart={setMatch} />
+        <ChooseDeck api={api} onStart={setMatch} focus={left} />
       ) : (
         <PlayMatch
           api={api}
           started={match}
           onLeave={() => {
             setMatch(null);
+            setLeft(true);
           }}
         />
       )}
@@ -91,15 +94,25 @@ export function App({ api }: { api: Api }) {
  * The decks the player can choose from: choosing one starts a match with it.
  *
  * @param onStart - Called with the match once it has started.
+ * @param focus - Whether to put the focus on the heading, as when the player
+ *   left a match: the button they pressed is gone.
  */
 function ChooseDeck({
   api,
   onStart,
+  focus,
 }: {
   api: Api;
   onStart: (match: Played) => void;
+  focus: boolean;
 }) {
   const queryClient = useQueryClient();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (focus) {
+      heading.current?.focus();
+    }
+  }, [focus]);
   const decks = useQuery(decksQuery(api));
   const start = useMutation({
     mutationKey: ["start"],
@@ -109,7 +122,13 @@ function ChooseDeck({
 
   return (
     <section className="wood mx-auto flex max-w-xl flex-col items-center gap-4 rounded-xl border-2 border-wood-600 p-6 shadow-2xl shadow-black/60">
-      <h2 className="font-display text-2xl text-gold-300">Choose your deck</h2>
+      <h2
+        ref={heading}
+        tabIndex={-1}
+        className="font-display text-2xl text-gold-300 outline-none"
+      >
+        Choose your deck
+      </h2>
       {start.isError && (
         <p role="alert" className={ALERT}>
           {start.error.message}
@@ -231,13 +250,25 @@ function PlayMatch({
   );
   const progress = usePlayOut(steps);
   const showing = steps[progress.step];
-  // The card pointed at or focused, by id, to show it large.
-  const [pointed, setPointed] = useState<string | null>(null);
+  // The card pointed at or focused, by id, to show it large, with its
+  // strength on the board.
+  const [pointed, setPointed] = useState<Pointed | null>(null);
+  /** Point at a card, or at none: the same card is no change. */
+  function point(next: Pointed | null) {
+    setPointed((last) =>
+      last?.id === next?.id && last?.strength === next?.strength ? last : next,
+    );
+  }
   // The player whose discard pile is listed, if one is.
   const [pile, setPile] = useState<number | null>(null);
   // Whether the player is using the keyboard: the page moves the focus by
   // itself after each move, which must not show a card then.
   const typing = useRef(false);
+  // Whether the page is moving the focus by itself, which must not show a
+  // card either, even while the player uses the keyboard.
+  const focusing = useRef(false);
+  // The button to ask for the match again, when the page couldn't.
+  const tryAgain = useRef<HTMLButtonElement>(null);
   const resultId = useId();
   // The card the player chose, with the version of the view it was chosen
   // in: a new view lets it go.
@@ -285,6 +316,8 @@ function PlayMatch({
       if (error.code !== "match_not_found") {
         void queryClient.invalidateQueries({ queryKey: query.queryKey });
       }
+      // The card chosen may not be the player's to play any more.
+      setChosen(null);
     },
   });
 
@@ -306,14 +339,23 @@ function PlayMatch({
       (focused === document.body ||
         areas.some((area) => area?.contains(focused)))
     ) {
+      focusing.current = true;
       (
         boardArea.current?.querySelector<HTMLElement>(
           "[data-choosable]:not(:disabled)",
         ) ??
         movesArea.current?.querySelector<HTMLElement>("button:not(:disabled)")
       )?.focus();
+      focusing.current = false;
     }
   }, [version, ready]);
+  const failed = match.isError;
+  useEffect(() => {
+    // The moves are disabled: the focus goes to what the player can do.
+    if (failed) {
+      tryAgain.current?.focus();
+    }
+  }, [failed]);
 
   if (
     play.error?.code === "match_not_found" ||
@@ -344,7 +386,7 @@ function PlayMatch({
       ? view
       : { ...view, round: then.round, players: then.players };
   const shown =
-    pointed === null ? undefined : cardsById([board, view]).get(pointed);
+    pointed === null ? undefined : cardsById([board, view]).get(pointed.id);
   const playing: Playing = {
     actions: view.legal_actions,
     chosen: chosen?.version === match.data.version ? chosen.chosen : null,
@@ -372,13 +414,17 @@ function PlayMatch({
   // in the last moves is still on the board, the one before.
   const round =
     (board.round === view.round ? log[0]?.round : log[1]?.round) ?? null;
+  // Once the match is over and its last move played out, the end of the
+  // match is over the whole page: the rest is out of reach meanwhile, for the
+  // keyboard too.
+  const over = view.match_over && progress.step >= steps.length;
   // On a wide screen, the board is on the left, and on its right the round,
   // how the last one went, what to do and what happened, so it all fits on
   // one screen. On a narrow one, they are in that order, with the board
   // after how the last round went.
   return (
     <section className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_17rem] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
-      <div className="flex flex-col gap-2 lg:col-start-2">
+      <div className="flex flex-col gap-2 lg:col-start-2" inert={over}>
         <h2 className="text-center font-display text-xl text-gold-300 lg:text-2xl">
           Round {board.round}
         </h2>
@@ -390,6 +436,7 @@ function PlayMatch({
               {match.error.message}
             </p>
             <button
+              ref={tryAgain}
               type="button"
               className={BUTTON}
               disabled={match.isFetching}
@@ -428,10 +475,11 @@ function PlayMatch({
       <div
         ref={boardArea}
         className="lg:col-start-1 lg:row-span-3 lg:row-start-1"
+        inert={over}
         // Any card on the board or in the hand, pointed at or focused, shows
         // large on the right, with what it does.
         onMouseOver={(event) => {
-          setPointed(cardIn(event.target));
+          point(cardIn(event.target));
         }}
         onMouseLeave={() => {
           setPointed(null);
@@ -443,8 +491,8 @@ function PlayMatch({
           typing.current = false;
         }}
         onFocus={(event) => {
-          if (typing.current) {
-            setPointed(cardIn(event.target));
+          if (typing.current && !focusing.current) {
+            point(cardIn(event.target));
           }
         }}
         onBlur={() => {
@@ -467,14 +515,14 @@ function PlayMatch({
           />
         ) : (
           // A card played comes first.
-          shown !== undefined && <CardPreview card={shown} />
+          shown !== undefined && (
+            <CardPreview card={shown} strength={pointed?.strength} />
+          )
         )}
       </div>
       <div ref={movesArea} className="lg:col-start-2 lg:row-start-2">
         {view.match_over ? (
-          // Once the last move has played out, the end of the match, over
-          // the whole page.
-          progress.step >= steps.length && (
+          over && (
             <div
               role="dialog"
               aria-modal="true"
@@ -512,10 +560,13 @@ function PlayMatch({
       {/* Out of sight while a card is shown on the right, which it would
           be under. */}
       {/* What happened, and above it the discard pile listed, if one is. */}
-      <div className="flex flex-col gap-2 lg:col-start-2 lg:row-start-3 lg:contain-size">
+      <div
+        className="flex flex-col gap-2 lg:col-start-2 lg:row-start-3 lg:contain-size"
+        inert={over}
+      >
         {pile !== null && (
           <DiscardPile
-            cards={view.players[pile]?.discard ?? []}
+            cards={board.players[pile]?.discard ?? []}
             name={
               pile === view.player
                 ? "Your discard pile"
@@ -556,16 +607,25 @@ function Controls({ view, playing }: { view: View; playing: Playing }) {
     hint =
       chosen === null
         ? "Choose a card to swap, or keep this hand."
-        : `Click ${name} again to swap it.`;
+        : `Choose ${name} again to swap it.`;
   } else if (
     chosen !== null &&
     selfPlay(playsOf(view.legal_actions, chosen.card)) !== undefined
   ) {
-    // Weather, Clear Skies and Wildfire have nowhere to choose: clicking
-    // the card again plays it.
-    hint = `Click ${name} again to play it.`;
+    // Weather, Clear Skies and Wildfire have nowhere to choose: choosing
+    // the card again, with a click or the keyboard, plays it.
+    hint = `Choose ${name} again to play it.`;
   } else if (chosen !== null) {
-    hint = `Choose where to play ${name}, or click it again to put it back.`;
+    // A Scarecrow goes in the place of a unit, which it takes back.
+    const scarecrow = view.hand.some(
+      (card) =>
+        card.id === chosen.card &&
+        card.type === "special" &&
+        card.kind === "scarecrow",
+    );
+    hint = scarecrow
+      ? `Choose a unit to take back with ${name}, or choose ${name} again to put it back.`
+      : `Choose where to play ${name}, or choose it again to put it back.`;
   }
   return (
     <div className="flex flex-col items-center gap-2">
@@ -710,7 +770,7 @@ function matchOf(played: Played): Match {
  * Only a button may hold the card: any other element around cards, such as
  * a row or a pile, isn't one of them.
  */
-function cardIn(target: EventTarget): string | null {
+function cardIn(target: EventTarget): Pointed | null {
   if (!(target instanceof Element)) {
     return null;
   }
@@ -719,7 +779,24 @@ function cardIn(target: EventTarget): string | null {
     (target instanceof HTMLButtonElement
       ? target.querySelector("[data-card]")
       : null);
-  return card?.getAttribute("data-card") ?? null;
+  const id = card?.getAttribute("data-card");
+  if (id === undefined || id === null) {
+    return null;
+  }
+  const strength = card?.getAttribute("data-strength");
+  return {
+    id,
+    strength:
+      strength === undefined || strength === null
+        ? undefined
+        : Number(strength),
+  };
+}
+
+/** A card pointed at: its id, and its strength on the board, if it has one. */
+interface Pointed {
+  id: string;
+  strength: number | undefined;
 }
 
 /**

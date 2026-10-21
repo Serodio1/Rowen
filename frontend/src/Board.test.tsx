@@ -451,6 +451,61 @@ test("while a move plays out, its cards are held back and the units destroyed bu
   expect(ghosts.every((ghost) => ghost.getAttribute("aria-hidden"))).toBe(true);
 });
 
+test("a unit destroyed burns where it was, with the strength it had", () => {
+  render(
+    <Board
+      view={view({
+        players: [
+          side(),
+          side({
+            rows: {
+              ...side().rows,
+              siege: row({
+                units: [
+                  { card: SOLDIER, strength: 4 },
+                  { card: SNIPER, strength: 6 },
+                ],
+              }),
+            },
+          }),
+        ],
+      })}
+      stage={{
+        hidden: new Set(),
+        ghosts: new Map([
+          [
+            "1:siege",
+            [
+              // Between the two left, and last, as it was.
+              {
+                card: SOLDIER,
+                burning: true,
+                burnt: { index: 1, strength: 8 },
+              },
+              {
+                card: SOLDIER,
+                burning: false,
+                burnt: { index: 3, strength: 8 },
+              },
+            ],
+          ],
+        ]),
+      }}
+    />,
+  );
+
+  const placed = [
+    ...screen
+      .getByRole("group", { name: /^The AI's siege row/ })
+      .querySelectorAll("li"),
+  ].map((li) =>
+    li.hasAttribute("data-ghost")
+      ? `ghost ${li.querySelector("[data-strength]")?.getAttribute("data-strength") ?? ""}`
+      : (li.querySelector("[data-card]")?.getAttribute("data-card") ?? ""),
+  );
+  expect(placed).toEqual(["soldier", "ghost 8", "sniper", "ghost 8"]);
+});
+
 test("a weather card still on its way doesn't hit its rows yet", () => {
   render(
     <Board

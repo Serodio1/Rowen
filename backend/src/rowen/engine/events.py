@@ -156,6 +156,17 @@ class UnitRevived:
 
 
 @dataclass(frozen=True, kw_only=True)
+class NothingToRevive:
+    """A player played a Medic, but no unit in their discard pile can be revived.
+
+    Attributes:
+        player: The index of the player who played the Medic.
+    """
+
+    player: int
+
+
+@dataclass(frozen=True, kw_only=True)
 class UnitMustered:
     """A Muster called a unit to the board from its player's deck or hand.
 
@@ -249,6 +260,7 @@ class RedrawEnded:
 type Event = (
     UnitPlayed
     | UnitRevived
+    | NothingToRevive
     | UnitMustered
     | CardsDrawn
     | WeatherPlayed

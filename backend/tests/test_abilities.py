@@ -11,6 +11,7 @@ from rowen.engine.actions import Action, Pass, PlayUnit, Revive
 from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.events import (
     CardsDrawn,
+    NothingToRevive,
     PlayerPassed,
     UnitMustered,
     UnitPlayed,
@@ -351,12 +352,12 @@ def test_agile_unit_can_be_revived_in_either_row() -> None:
     )
 
 
-def test_medic_without_a_unit_to_revive_does_nothing_more() -> None:
+def test_medic_without_a_unit_to_revive_only_says_so() -> None:
     state = make_state((MEDIC, KNIGHT), discard=(PRESIDENT, WAR_HORN))
 
     state, events = apply(state, PLAY_MEDIC)
 
-    assert events == (MEDIC_PLAYED,)
+    assert events == (MEDIC_PLAYED, NothingToRevive(player=0))
     assert not state.reviving
     assert state.current == 1
 

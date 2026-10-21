@@ -275,6 +275,7 @@ test.each<[Event, string]>([
     { type: "unit_destroyed", side: 0, row: "melee", card: "medic" },
     "Medic was destroyed in your melee row.",
   ],
+  [{ type: "nothing_to_revive", player: 0 }, "You had nothing to revive."],
   [{ type: "player_passed", player: 1 }, "The AI passed."],
   [{ type: "player_passed", player: 0 }, "You passed."],
   [

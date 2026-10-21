@@ -244,12 +244,51 @@ test("a unit destroyed burns in its row; a player passing is a big message; a ca
       card: SOLDIER,
       cell: cellOf.row(0, "melee"),
       hides: false,
+      // Where it was, with the strength it had.
+      burnt: { index: 0, strength: 4 },
       view: after,
       waiting: before,
     },
     // Once a card of the move is on its way, the board is the one after it.
     { kind: "announce", text: "The AI passed.", view: after },
   ]);
+});
+
+test("two copies destroyed in one row burn each in its own place", () => {
+  const before = view({
+    players: [withMelee([SOLDIER, SPY, SOLDIER]), side()],
+  });
+  const destroyed: Event = {
+    type: "unit_destroyed",
+    side: 0,
+    row: "melee",
+    card: "soldier",
+  };
+
+  const steps = cardSteps(stepsOf([destroyed, destroyed], before, view()));
+
+  expect(steps.map((step) => step.burnt?.index)).toEqual([0, 2]);
+});
+
+test("once both players are done swapping, round 1 begins, and its message says who goes first", () => {
+  const done = side({ redraws_left: 0 });
+  const ended: Event = { type: "redraw_ended", player: 1 };
+  const theAiFirst = view({ players: [done, done], current: 1 });
+
+  expect(stepsOf([ended], view(), theAiFirst)).toEqual<Step[]>([
+    {
+      kind: "announce",
+      text: "Round 1 · The AI goes first.",
+      view: theAiFirst,
+    },
+  ]);
+  expect(
+    stepsOf([ended], view(), view({ players: [done, done], current: 0 })),
+  ).toMatchObject([{ text: "Round 1 · You go first." }]);
+  // The player still has cards to swap: round 1 hasn't begun.
+  expect(stepsOf([ended], view(), view({ players: [side(), done] }))).toEqual(
+    [],
+  );
 });
 
 const BEFORE = view();
