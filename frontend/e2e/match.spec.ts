@@ -21,9 +21,6 @@ test("plays a whole match against the AI", async ({ page }) => {
     const count = await entries.count();
     await moves.first().click();
     await expect(entries).toHaveCount(count + 1);
-    // nginx answers 429 after 20 requests in a row beyond 5 a second
-    // (nginx.conf): a player clicks slower than this.
-    await page.waitForTimeout(250);
   }
 
   await expect(playAgain).toBeFocused();
