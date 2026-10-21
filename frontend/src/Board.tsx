@@ -112,7 +112,7 @@ export function Board({ view, playing }: { view: View; playing?: Playing }) {
       ref={board}
       aria-label="Board"
       onKeyDown={onKeyDown}
-      className="wood grid grid-cols-1 gap-3 rounded-xl border-2 border-wood-600 p-2 shadow-2xl shadow-black/60 lg:grid-cols-[12rem_minmax(0,1fr)_6rem] lg:gap-x-4 lg:p-4"
+      className="wood grid grid-cols-1 gap-3 rounded-xl border-2 border-wood-600 p-2 shadow-2xl shadow-black/60 lg:grid-cols-[12rem_minmax(0,1fr)_6rem] lg:gap-x-4 lg:p-3"
     >
       <div className="grid grid-cols-3 gap-2 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:grid-cols-1 lg:content-center lg:gap-6">
         <PlayerPanel name="The AI" side={ai} ahead={ai.total > you.total} />
@@ -313,7 +313,7 @@ function BoardRow({
     <div
       role="group"
       aria-label={name}
-      className="relative flex min-h-23 items-center gap-2 overflow-hidden rounded-md border border-wood-600/70 bg-black/25 p-1 lg:min-h-27"
+      className="relative flex min-h-23 items-center gap-2 overflow-hidden rounded-md border border-wood-600/70 bg-black/25 p-1"
     >
       {/* The weather first, so the cards are drawn over it. (The high
           contrast mode of Windows takes its look away: a dashed line shows
@@ -330,7 +330,7 @@ function BoardRow({
       >
         {row.score}
       </span>
-      <div className="relative grid h-20 w-14 shrink-0 place-items-center rounded border border-dashed border-gold-600/40 lg:h-24 lg:w-16">
+      <div className="relative grid h-20 w-14 shrink-0 place-items-center rounded border border-dashed border-gold-600/40">
         {row.horn !== null && (
           <CardFace card={row.horn} name={cardText(row.horn)} />
         )}
@@ -684,7 +684,7 @@ function Piles({ name, side }: { name: string; side: Side }) {
           <dt className="opacity-80">Discard pile</dt>
           <dd className="flex flex-col items-center gap-1">
             {top === undefined ? (
-              <span className="h-20 w-14 rounded border border-dashed border-gold-600/40 lg:h-24 lg:w-16" />
+              <span className="h-20 w-14 rounded border border-dashed border-gold-600/40" />
             ) : (
               <CardFace card={top} name={cardText(top)} />
             )}
@@ -696,7 +696,7 @@ function Piles({ name, side }: { name: string; side: Side }) {
           <dd className="flex flex-col items-center gap-1">
             <span
               aria-hidden
-              className="grid h-20 w-14 place-items-center rounded-md border-2 border-gold-400 bg-linear-to-b from-card-back to-card-back-dark font-display text-lg font-bold text-gold-200 shadow-md shadow-black/60 lg:h-24 lg:w-16"
+              className="grid h-20 w-14 place-items-center rounded-md border-2 border-gold-400 bg-linear-to-b from-card-back to-card-back-dark font-display text-lg font-bold text-gold-200 shadow-md shadow-black/60"
             >
               {side.deck_size}
             </span>

@@ -91,15 +91,21 @@ test("a special card has a dark frame; a unit, a gold one", () => {
 });
 
 test.each([
-  [5, "text-green-800"],
-  [4, "text-ink"],
-  [1, "text-red-700"],
+  [5, "text-green-800", "up"],
+  [4, "text-ink", null],
+  [1, "text-red-700", "down"],
 ])(
-  "a unit's strength of %s now, against its own 4, is in %s",
-  (strength, colour) => {
+  "a unit's strength of %s now, against its own 4, is in %s, with an arrow %s",
+  (strength, colour, arrow) => {
     render(<CardFace card={SOLDIER} strength={strength} name="Soldier" />);
 
     expect(strengthCircle(strength)).toHaveClass(colour);
+    // More than the colour says it: an arrow, which screen readers skip.
+    expect(
+      strengthCircle(strength)
+        .querySelector("[data-change]")
+        ?.getAttribute("data-change") ?? null,
+    ).toBe(arrow);
   },
 );
 

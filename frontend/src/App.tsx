@@ -41,8 +41,8 @@ export function App({ api }: { api: Api }) {
   const [match, setMatch] = useState<Played | null>(null);
 
   return (
-    <main className="mx-auto max-w-7xl px-2 py-3 lg:px-4">
-      <h1 className="mb-2 text-center font-display text-3xl font-bold tracking-wide text-gold-300 drop-shadow lg:text-4xl">
+    <main className="mx-auto max-w-384 px-2 py-3 lg:px-4 lg:py-2">
+      <h1 className="mb-2 text-center font-display text-3xl font-bold tracking-wide text-gold-300 drop-shadow lg:mb-1">
         Rowen
       </h1>
       {match === null ? (
@@ -181,7 +181,9 @@ function PlayMatch({
     version: number;
     chosen: Chosen;
   } | null>(null);
-  const area = useRef<HTMLDivElement>(null);
+  // Where the cards and the moves are: the board, and the buttons beside it.
+  const boardArea = useRef<HTMLDivElement>(null);
+  const movesArea = useRef<HTMLDivElement>(null);
   const play = useMutation({
     mutationKey: ["play"],
     mutationFn: (move: Move) => playMove(api, started.id, move),
@@ -229,14 +231,17 @@ function PlayMatch({
     // work, the view may be the same: the cards become usable again. While
     // they are disabled, none can take the focus.)
     const focused = document.activeElement;
+    const areas = [boardArea.current, movesArea.current];
     if (
       ready &&
-      (focused === document.body || area.current?.contains(focused))
+      (focused === document.body ||
+        areas.some((area) => area?.contains(focused)))
     ) {
       (
-        area.current?.querySelector<HTMLElement>(
+        boardArea.current?.querySelector<HTMLElement>(
           "[data-choosable]:not(:disabled)",
-        ) ?? area.current?.querySelector<HTMLElement>("button:not(:disabled)")
+        ) ??
+        movesArea.current?.querySelector<HTMLElement>("button:not(:disabled)")
       )?.focus();
     }
   }, [version, ready]);
@@ -286,48 +291,68 @@ function PlayMatch({
   };
   // How the last round went, until the next move.
   const round = log[0]?.round ?? null;
+  // On a wide screen, the board is on the left, and on its right the round,
+  // how the last one went, what to do and what happened, so it all fits on
+  // one screen. On a narrow one, they are in that order, with the board
+  // after how the last round went.
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-center font-display text-xl text-gold-300 lg:text-2xl">
-        Round {view.round}
-      </h2>
-      {match.isError ? (
-        // The page couldn't ask for the match after a move that didn't work,
-        // so its view may be out of date: no move until it can.
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <p role="alert" className={ALERT}>
-            {match.error.message}
-          </p>
-          <button
-            type="button"
-            className={BUTTON}
-            disabled={match.isFetching}
-            onClick={() => {
-              void match.refetch();
-            }}
-          >
-            Try again
-          </button>
+    <section className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_17rem] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
+      <div className="flex flex-col gap-2 lg:col-start-2">
+        <h2 className="text-center font-display text-xl text-gold-300 lg:text-2xl">
+          Round {view.round}
+        </h2>
+        {match.isError ? (
+          // The page couldn't ask for the match after a move that didn't
+          // work, so its view may be out of date: no move until it can.
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <p role="alert" className={ALERT}>
+              {match.error.message}
+            </p>
+            <button
+              type="button"
+              className={BUTTON}
+              disabled={match.isFetching}
+              onClick={() => {
+                void match.refetch();
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          play.isError && (
+            <p role="alert" className={`${ALERT} text-center`}>
+              {outOfDate(play.error)
+                ? "The match changed. This is where it is now."
+                : `${play.error.message} This is where the match is now.`}
+            </p>
+          )
+        )}
+        {/* How the last round went, in a place kept for it even while
+            there is none: nothing moves when it shows or goes. It holds the
+            longest sentence: one line on a narrow screen, two in the column
+            of a wide one. */}
+        <div className="flex min-h-11 items-center justify-center lg:min-h-18">
+          {round !== null && (
+            <p className="rounded-md border border-gold-400 bg-wood-900/90 px-4 py-1.5 text-center font-display text-lg text-gold-200 shadow-md shadow-black/50">
+              {round}
+            </p>
+          )}
         </div>
-      ) : (
-        play.isError && (
-          <p role="alert" className={`${ALERT} text-center`}>
-            {outOfDate(play.error)
-              ? "The match changed. This is where it is now."
-              : `${play.error.message} This is where the match is now.`}
-          </p>
-        )
-      )}
-      {round !== null && (
-        <p className="mx-auto rounded-md border border-gold-400 bg-wood-900/90 px-4 py-1.5 text-center font-display text-lg text-gold-200 shadow-md shadow-black/50">
-          {round}
-        </p>
-      )}
-      <div ref={area} className="flex flex-col gap-3">
+      </div>
+      <div
+        ref={boardArea}
+        className="lg:col-start-1 lg:row-span-3 lg:row-start-1"
+      >
         <Board view={view} playing={view.match_over ? undefined : playing} />
+      </div>
+      <div ref={movesArea} className="lg:col-start-2 lg:row-start-2">
         {view.match_over ? (
           <div className="flex flex-col items-center gap-3">
-            <p id={resultId} className="font-display text-2xl text-gold-200">
+            <p
+              id={resultId}
+              className="text-center font-display text-2xl text-gold-200"
+            >
               {resultText(view)}
             </p>
             <button
@@ -424,7 +449,9 @@ function Controls({ view, playing }: { view: View; playing: Playing }) {
 function Log({ entries }: { entries: Entry[] }) {
   const id = useId();
   return (
-    <section className="mx-auto w-full max-w-3xl rounded-lg border border-wood-600 bg-wood-900/85 p-2 shadow-inner shadow-black/50">
+    // On a wide screen, it fills the rest of the column beside the board,
+    // and scrolls; its size doesn't count, so it never makes the page taller.
+    <section className="mx-auto flex w-full max-w-3xl flex-col rounded-lg border border-wood-600 bg-wood-900/85 p-2 shadow-inner shadow-black/50 lg:col-start-2 lg:row-start-3 lg:contain-size">
       <h3
         id={id}
         className="mb-1 font-display text-xs tracking-widest text-gold-300/80 uppercase"
@@ -437,7 +464,7 @@ function Log({ entries }: { entries: Entry[] }) {
         role="log"
         aria-labelledby={id}
         tabIndex={0}
-        className="max-h-48 overflow-y-auto rounded-sm px-1 text-sm focus-visible:outline-2 focus-visible:outline-gold-300"
+        className="max-h-48 overflow-y-auto rounded-sm px-1 text-sm focus-visible:outline-2 focus-visible:outline-gold-300 lg:max-h-none lg:min-h-0 lg:flex-1"
       >
         {entries.length === 0 ? (
           <p className="italic opacity-70">Nothing yet.</p>
