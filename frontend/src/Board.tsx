@@ -20,6 +20,7 @@ import {
   type Chosen,
   type Playing,
 } from "./plays.ts";
+import { cellOf, STILL, type Stage } from "./stage.ts";
 import { actionText, cardNames, cardText, unitText } from "./text.ts";
 
 type Side = View["players"][number];
@@ -58,8 +59,19 @@ const WEATHER_LOOKS: Partial<Record<SpecialCard["kind"], string>> = {
  * The lists have role="list": Tailwind takes their bullets off, and with
  * them Safari drops the lists from what VoiceOver reads.
  */
-export function Board({ view, playing }: { view: View; playing?: Playing }) {
+export function Board({
+  view,
+  playing,
+  stage = STILL,
+}: {
+  view: View;
+  playing?: Playing;
+  stage?: Stage;
+}) {
   const { you, ai } = sides(view);
+  // The index of each side in the view, for the places on the board.
+  const mine = view.player;
+  const theirSide = 1 - view.player;
   // Weather hits both sides, so it is shown once, for both.
   const weather = [...ai.weather, ...you.weather];
   const names = cardNames(view);
@@ -123,7 +135,19 @@ export function Board({ view, playing }: { view: View; playing?: Playing }) {
     >
       <div className="grid grid-cols-3 gap-2 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:grid-cols-1 lg:content-center lg:gap-6">
         <PlayerPanel name="The AI" side={ai} ahead={ai.total > you.total} />
-        <Weather cards={weather} />
+        <Weather
+          cards={[
+            ...ai.weather.map((card, index) => ({
+              card,
+              cell: cellOf.weather(theirSide, index),
+            })),
+            ...you.weather.map((card, index) => ({
+              card,
+              cell: cellOf.weather(mine, index),
+            })),
+          ]}
+          hidden={stage.hidden}
+        />
         <PlayerPanel name="You" side={you} ahead={you.total > ai.total} />
       </div>
       <div className="flex flex-col gap-2 lg:col-start-2 lg:row-start-1">
@@ -132,6 +156,8 @@ export function Board({ view, playing }: { view: View; playing?: Playing }) {
             key={row}
             kind={row}
             label={`The AI's ${row} row`}
+            side={theirSide}
+            stage={stage}
             row={ai.rows[row]}
             weather={weather.find((card) => card.weather_row === row)}
             bubble="bg-enemy"
@@ -155,6 +181,8 @@ export function Board({ view, playing }: { view: View; playing?: Playing }) {
             key={row}
             kind={row}
             label={`Your ${row} row`}
+            side={mine}
+            stage={stage}
             row={you.rows[row]}
             weather={weather.find((card) => card.weather_row === row)}
             bubble="bg-ally"
@@ -178,8 +206,16 @@ export function Board({ view, playing }: { view: View; playing?: Playing }) {
         names={names}
       />
       <div className="flex justify-between gap-2 lg:col-start-3 lg:row-span-3 lg:row-start-1 lg:flex-col">
-        <Piles name="The AI's deck and discard pile" side={ai} />
-        <Piles name="Your deck and discard pile" side={you} />
+        <Piles
+          name="The AI's deck and discard pile"
+          side={ai}
+          cell={cellOf.discard(theirSide)}
+        />
+        <Piles
+          name="Your deck and discard pile"
+          side={you}
+          cell={cellOf.discard(mine)}
+        />
       </div>
     </section>
   );
@@ -271,8 +307,19 @@ function PlayerPanel({
   );
 }
 
-/** The weather cards in play, which hit the rows of both sides. */
-function Weather({ cards }: { cards: SpecialCard[] }) {
+/**
+ * The weather cards in play, which hit the rows of both sides, each with its
+ * place on the board.
+ *
+ * @param hidden - The places whose cards are held back while a move plays out.
+ */
+function Weather({
+  cards,
+  hidden,
+}: {
+  cards: { card: SpecialCard; cell: string }[];
+  hidden: ReadonlySet<string>;
+}) {
   const id = useId();
   return (
     <div
@@ -290,9 +337,14 @@ function Weather({ cards }: { cards: SpecialCard[] }) {
         <p className="text-xs italic opacity-70">None</p>
       ) : (
         <ul role="list" className="flex flex-wrap justify-center gap-1">
-          {cards.map((card, index) => (
-            // Two players may play the same weather card, with the same id.
-            <li key={index}>
+          {cards.map(({ card, cell }) => (
+            // Two players may play the same weather card, with the same id:
+            // each has its own place.
+            <li
+              key={cell}
+              data-cell={cell}
+              className={hidden.has(cell) ? HELD : SHOWN}
+            >
               <CardFace card={card} name={cardText(card)} />
             </li>
           ))}
@@ -311,6 +363,9 @@ function Weather({ cards }: { cards: SpecialCard[] }) {
  *
  * @param kind - Which row it is: its icon (a sword, a bow or a tower) is
  *   next to its score, so the rows can be told apart at a glance.
+ * @param side - The index in the view of the player whose row it is.
+ * @param stage - What the board shows while a move plays out: the cards
+ *   held back, and the units destroyed still burning.
  * @param weather - The weather card that hits this row, if one is in play.
  * @param bubble - The colour of the score's bubble: the player's or the AI's.
  * @param targets - Where the card chosen may go in this row: the whole row
@@ -320,6 +375,8 @@ function Weather({ cards }: { cards: SpecialCard[] }) {
 function BoardRow({
   kind,
   label,
+  side,
+  stage,
   row,
   weather,
   bubble,
@@ -327,6 +384,8 @@ function BoardRow({
 }: {
   kind: Row;
   label: string;
+  side: number;
+  stage: Stage;
   row: RowView;
   weather: SpecialCard | undefined;
   bubble: string;
@@ -334,10 +393,12 @@ function BoardRow({
 }) {
   const under = row.weathered ? (weather?.name ?? "weather") : null;
   const name = `${label}: ${String(row.score)}${under === null ? "" : `, under ${under}`}`;
+  const horn = cellOf.horn(side, kind);
   return (
     <div
       role="group"
       aria-label={name}
+      data-cell={cellOf.row(side, kind)}
       className="relative flex min-h-23 items-center gap-2 overflow-hidden rounded-md border border-wood-600/70 bg-black/25 p-1"
     >
       {/* The weather first, so the cards are drawn over it. (The high
@@ -346,18 +407,23 @@ function BoardRow({
       {under !== null && (
         <div
           aria-hidden
-          className={`pointer-events-none absolute inset-0 forced-colors:border-2 forced-colors:border-dashed ${weatherLook(weather)}`}
+          className={`pointer-events-none absolute inset-0 forced-colors:border-2 forced-colors:border-dashed motion-safe:animate-fade-in ${weatherLook(weather)}`}
         />
       )}
       <span
+        // A new score is a new bubble, which bumps.
+        key={row.score}
         aria-hidden
-        className={`relative grid size-9 shrink-0 place-items-center rounded-full border-2 border-wood-950 font-display text-base font-bold text-ink shadow shadow-black/60 ${bubble}`}
+        className={`relative grid size-9 shrink-0 place-items-center rounded-full border-2 border-wood-950 font-display text-base font-bold text-ink shadow shadow-black/60 motion-safe:animate-bump ${bubble}`}
       >
         {row.score}
       </span>
       {/* Only a picture: the row's name says which row it is. */}
       <Icon name={kind} className="relative size-6 shrink-0 text-gold-200" />
-      <div className="relative grid h-20 w-14 shrink-0 place-items-center rounded border border-dashed border-gold-600/40">
+      <div
+        data-cell={horn}
+        className={`relative grid h-20 w-14 shrink-0 place-items-center rounded border border-dashed border-gold-600/40 ${held(stage, horn)}`}
+      >
         {row.horn !== null && (
           <CardFace card={row.horn} name={cardText(row.horn)} />
         )}
@@ -377,9 +443,14 @@ function BoardRow({
             />
           );
           const play = targets?.unit(unit.card.id);
+          const cell = cellOf.unit(side, kind, index);
           return (
             // Copies of a unit share its id, so the place in the row is the key.
-            <li key={`unit-${String(index)}`}>
+            <li
+              key={`unit-${String(index)}`}
+              data-cell={cell}
+              className={held(stage, cell)}
+            >
               {targets === undefined || play === undefined ? (
                 face
               ) : (
@@ -393,6 +464,18 @@ function BoardRow({
         {row.scarecrows.map((card, index) => (
           <li key={`scarecrow-${String(index)}`}>
             <CardFace card={card} name={cardText(card)} />
+          </li>
+        ))}
+        {/* Units destroyed, until they have burned: only a picture, as the
+            log says what happened. */}
+        {stage.ghosts.get(cellOf.row(side, kind))?.map((ghost, index) => (
+          <li
+            key={`ghost-${String(index)}`}
+            aria-hidden
+            data-ghost={ghost.card.id}
+            className={ghost.burning ? "animate-burn" : undefined}
+          >
+            <CardFace card={ghost.card} name={cardText(ghost.card)} />
           </li>
         ))}
       </ul>
@@ -696,8 +779,21 @@ function CardButton({
   );
 }
 
-/** One player's deck, face down, and their discard pile, its top card up. */
-function Piles({ name, side }: { name: string; side: Side }) {
+/**
+ * One player's deck, face down, and their discard pile, its top card up.
+ *
+ * @param cell - The discard pile's place on the board, where Clear Skies and
+ *   Wildfire go once played.
+ */
+function Piles({
+  name,
+  side,
+  cell,
+}: {
+  name: string;
+  side: Side;
+  cell: string;
+}) {
   const id = useId();
   const top = side.discard.at(-1);
   return (
@@ -713,7 +809,7 @@ function Piles({ name, side }: { name: string; side: Side }) {
       <dl className="flex gap-2 text-center text-xs lg:flex-col lg:items-center">
         <div className="flex flex-col items-center gap-1">
           <dt className="opacity-80">Discard pile</dt>
-          <dd className="flex flex-col items-center gap-1">
+          <dd data-cell={cell} className="flex flex-col items-center gap-1">
             {top === undefined ? (
               <span className="h-20 w-14 rounded border border-dashed border-gold-600/40" />
             ) : (
@@ -737,6 +833,20 @@ function Piles({ name, side }: { name: string; side: Side }) {
       </dl>
     </div>
   );
+}
+
+/**
+ * A card held back while a move plays out keeps its place, so nothing moves
+ * when it shows; screen readers still read it, as the log says what happened.
+ */
+const HELD = "opacity-0";
+/** A card shown: it fades in once it is no longer held back. */
+const SHOWN =
+  "opacity-100 motion-safe:transition-opacity motion-safe:duration-300";
+
+/** Return the classes of the card in the place `cell` at `stage`. */
+function held(stage: Stage, cell: string): string {
+  return stage.hidden.has(cell) ? HELD : SHOWN;
 }
 
 /** Return a number of cards in words: `1 card`, `12 cards`. */

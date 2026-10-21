@@ -9,6 +9,15 @@ import {
   type RequestError,
 } from "./api/requests.ts";
 import { Board } from "./Board.tsx";
+import { Showcase } from "./Showcase.tsx";
+import {
+  mayMove,
+  NO_STEPS,
+  stageOf,
+  stepsOf,
+  usePlayOut,
+  type Step,
+} from "./stage.ts";
 import { onFirstClick } from "./clicks.ts";
 import {
   otherActions,
@@ -180,6 +189,13 @@ function PlayMatch({
           },
         ],
   );
+  // The animation of the last move, or of the AI's first one: none with
+  // reduced motion.
+  const [steps, setSteps] = useState<readonly Step[]>(() =>
+    mayMove() ? stepsOf(started.events, undefined, started.view) : NO_STEPS,
+  );
+  const progress = usePlayOut(steps);
+  const showing = steps[progress.step];
   const resultId = useId();
   // The card the player chose, with the version of the view it was chosen
   // in: a new view lets it go.
@@ -212,6 +228,9 @@ function PlayMatch({
         before?.round ?? played.view.round,
       );
       setLog((log) => [{ number: log.length + 1, ...entry }, ...log]);
+      setSteps(
+        mayMove() ? stepsOf(played.events, before, played.view) : NO_STEPS,
+      );
       queryClient.setQueryData(query.queryKey, matchOf(played));
     },
     onError: (error) => {
@@ -340,7 +359,11 @@ function PlayMatch({
             of a wide one. */}
         <div className="flex min-h-11 items-center justify-center lg:min-h-18">
           {round !== null && (
-            <p className="rounded-md border border-gold-400 bg-wood-900/90 px-4 py-1.5 text-center font-display text-lg text-gold-200 shadow-md shadow-black/50">
+            <p
+              // A new round's result fades in.
+              key={log[0]?.number}
+              className="rounded-md border border-gold-400 bg-wood-900/90 px-4 py-1.5 text-center font-display text-lg text-gold-200 shadow-md shadow-black/50 motion-safe:animate-fade-in"
+            >
               {round}
             </p>
           )}
@@ -350,7 +373,19 @@ function PlayMatch({
         ref={boardArea}
         className="lg:col-start-1 lg:row-span-3 lg:row-start-1"
       >
-        <Board view={view} playing={view.match_over ? undefined : playing} />
+        <Board
+          view={view}
+          playing={view.match_over ? undefined : playing}
+          stage={stageOf(steps, progress)}
+        />
+        {showing?.kind === "play" && (
+          // A new element for each card, which comes up from nothing.
+          <Showcase
+            key={progress.step}
+            step={showing}
+            flying={progress.flying}
+          />
+        )}
       </div>
       <div ref={movesArea} className="lg:col-start-2 lg:row-start-2">
         {view.match_over ? (
@@ -379,7 +414,9 @@ function PlayMatch({
           <Controls view={view} playing={playing} />
         )}
       </div>
-      <Log entries={log} />
+      {/* Out of sight while a card is shown on the right, which it would
+          be under. */}
+      <Log entries={log} faded={showing?.kind === "play"} />
     </section>
   );
 }
@@ -459,12 +496,15 @@ function Controls({ view, playing }: { view: View; playing: Playing }) {
  * What happened in the match so far, the latest first: the sentences of
  * each move and of the AI's answer. Screen readers read what is added.
  */
-function Log({ entries }: { entries: Entry[] }) {
+function Log({ entries, faded }: { entries: Entry[]; faded: boolean }) {
   const id = useId();
   return (
     // On a wide screen, it fills the rest of the column beside the board,
     // and scrolls; its size doesn't count, so it never makes the page taller.
-    <section className="mx-auto flex w-full max-w-3xl flex-col rounded-lg border border-wood-600 bg-wood-900/85 p-2 shadow-inner shadow-black/50 lg:col-start-2 lg:row-start-3 lg:contain-size">
+    // Faded, it only can't be seen: screen readers still read what is added.
+    <section
+      className={`mx-auto flex w-full max-w-3xl flex-col rounded-lg border border-wood-600 bg-wood-900/85 p-2 shadow-inner shadow-black/50 transition-opacity duration-300 lg:col-start-2 lg:row-start-3 lg:contain-size ${faded ? "opacity-0" : ""}`}
+    >
       <h3
         id={id}
         className="mb-1 font-display text-xs tracking-widest text-gold-300/80 uppercase"

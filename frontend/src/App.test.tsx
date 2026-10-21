@@ -1,12 +1,13 @@
 import { onlineManager, QueryClientProvider } from "@tanstack/react-query";
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, onTestFinished, test, vi } from "vitest";
 import { App } from "./App.tsx";
 import {
   createApi,
@@ -17,6 +18,7 @@ import {
   type View,
 } from "./api/client.ts";
 import { createQueryClient } from "./api/requests.ts";
+import { TIMES } from "./stage.ts";
 import { DECKS, HOARFROST, SOLDIER, side, view } from "./test-data.ts";
 
 /**
@@ -1126,4 +1128,112 @@ test("the page says what to do, and a card chosen can be let go with Cancel", as
   expect(
     screen.getByText("Choose a card to play, or pass."),
   ).toBeInTheDocument();
+});
+
+/**
+ * Let the page move things, as the system of a player who didn't ask for
+ * reduced motion does, and make the page's clock the test's, until the test
+ * is over. (jsdom has no `matchMedia`: without it the page moves nothing.)
+ */
+function withMotion(reduced = false) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: reduced && query === "(prefers-reduced-motion: reduce)",
+  }));
+  // The rest of the time goes on as well, for the requests.
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  onTestFinished(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+}
+
+// After keeping the hand, the AI plays a Soldier in its melee row.
+const AI_PLAYED = played(
+  view({
+    players: [
+      side(),
+      side({
+        rows: {
+          ...side().rows,
+          melee: {
+            ...side().rows.melee,
+            units: [{ card: SOLDIER, strength: 4 }],
+          },
+        },
+      }),
+    ],
+    legal_actions: [{ type: "pass" }],
+  }),
+  [
+    { type: "redraw_ended", player: 0 },
+    { type: "unit_played", player: 1, card: "soldier", row: "melee", side: 1 },
+  ],
+);
+
+/** Return the card on its way to the board, large on the right, if any. */
+function showcase() {
+  return document.querySelector("[data-showcase]");
+}
+
+test("a card played shows on the right, then goes to its place, which shows it only then", async () => {
+  withMotion();
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: AI_PLAYED });
+  renderApp(api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByText("The AI played Soldier in the melee row.");
+
+  // Only a picture: screen readers read the log, and the card in its place.
+  expect(showcase()).toHaveAttribute("data-showcase", "soldier");
+  // The log is out of sight meanwhile, but still read.
+  const log = screen.getByRole("log", { name: "What happened" });
+  expect(log.closest("section")).toHaveClass("opacity-0");
+  expect(showcase()?.closest("[aria-hidden]")).not.toBeNull();
+  const place = document.querySelector('[data-cell="1:melee:0"]');
+  expect(place).toHaveClass("opacity-0");
+  expect(
+    within(place as HTMLElement).getByRole("img", { name: /^Soldier/ }),
+  ).toBeInTheDocument();
+
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.show));
+  // On its way.
+  expect(showcase()).not.toBeNull();
+  expect(place).toHaveClass("opacity-0");
+
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.fly));
+  expect(showcase()).toBeNull();
+  expect(place).not.toHaveClass("opacity-0");
+  expect(log.closest("section")).not.toHaveClass("opacity-0");
+});
+
+test("a move can be made while the last one plays out: the board shows the new one", async () => {
+  withMotion();
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: AI_PLAYED });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByText("The AI played Soldier in the melee row.");
+
+  expect(screen.getByRole("button", { name: "Pass" })).toBeEnabled();
+});
+
+test.each([
+  ["asked for reduced motion", true],
+  ["can't be asked", undefined],
+])("when the system %s, a move shows at once", async (_, reduced) => {
+  if (reduced !== undefined) {
+    withMotion(reduced);
+  }
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: AI_PLAYED });
+  renderApp(api);
+  await startMatch();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByText("The AI played Soldier in the melee row.");
+
+  expect(showcase()).toBeNull();
+  expect(document.querySelector('[data-cell="1:melee:0"]')).not.toHaveClass(
+    "opacity-0",
+  );
 });

@@ -42,6 +42,43 @@
   --color-wildfire: #a9431a;
   --color-scarecrow: #8f7744;
 
+  /* The animations of a move (src/stage.ts). Only the times of the cards
+     played are in src/stage.ts: the page waits for them. */
+  --animate-fade-in: fade-in 400ms ease-out;
+  --animate-bump: bump 350ms ease-out;
+  --animate-burn: burn 700ms ease-in forwards;
+  --animate-show: show 250ms ease-out;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  /* A score that changed grows for an instant. */
+  @keyframes bump {
+    40% {
+      scale: 1.3;
+    }
+  }
+  /* A unit destroyed glows red, shrinks and goes. */
+  @keyframes burn {
+    30% {
+      filter: sepia(1) saturate(4) hue-rotate(-30deg) brightness(1.2);
+    }
+    to {
+      filter: sepia(1) saturate(4) hue-rotate(-30deg) brightness(0.3);
+      opacity: 0;
+      scale: 0.6;
+    }
+  }
+  /* A card played comes up on the right. */
+  @keyframes show {
+    from {
+      opacity: 0;
+      scale: 0.6;
+    }
+  }
+
   /* Fonts most computers have: Palatino on Windows and macOS, else Georgia. */
   --font-display: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
 }

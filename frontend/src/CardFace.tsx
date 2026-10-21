@@ -146,7 +146,9 @@ function Strength({
   }
   return (
     <span
-      className={`absolute top-0.5 left-0.5 grid size-6 place-items-center rounded-full border-2 font-display text-xs font-bold shadow shadow-black/60 lg:size-7 lg:text-sm ${
+      // A new strength is a new circle, which bumps.
+      key={now}
+      className={`absolute top-0.5 left-0.5 grid size-6 place-items-center rounded-full border-2 font-display text-xs font-bold shadow shadow-black/60 motion-safe:animate-bump lg:size-7 lg:text-sm ${
         legend ? "border-gold-300 bg-ink" : "border-gold-600 bg-parchment"
       } ${colour}`}
     >
