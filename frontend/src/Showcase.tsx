@@ -40,7 +40,7 @@ export function Showcase({ step, flying }: { step: Step; flying: boolean }) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed top-1/2 right-6 z-50 -translate-y-1/2 lg:right-76"
+      className="pointer-events-none fixed top-1/2 right-6 z-50 -translate-y-1/2 lg:right-24"
     >
       <div
         ref={ref}
