@@ -2,13 +2,13 @@
 
 The server keeps each match, as its seed and every action played (``store``),
 and never sends it, nor the state they make: a response holds only the
-player's view, and the events of the moves just played (the AI's
-first moves in a new match, or the player's action and the AI's answer) as the
-player may see them. So the AI's hand, the order of the decks and the
-seed stay on the server (ADR 0002). The human player is player 0 and the AI
-player 1, as in the CLI. When the AI has a move to make, it makes it before
-the server answers, so the player always gets the match on their turn, unless
-the match is over.
+player's view, and the moves just played (the AI's first actions in a new
+match, or the player's action and the AI's answer), each with its events and
+the view after it, as the player may see them. So the AI's hand, the order of
+the decks and the seed stay on the server (ADR 0002). The human player is
+player 0 and the AI player 1, as in the CLI. When the AI has a move to make, it
+makes it before the server answers, so the player always gets the match on
+their turn, unless the match is over.
 
 When the API turns a request down, it always answers with the same shape, an
 ``Error``: a ``code`` for the browser and a ``message`` for a person. It does
@@ -44,6 +44,7 @@ from rowen.api.schemas import (
     ErrorCode,
     Match,
     Move,
+    MovePlayed,
     NewMatch,
     Played,
     from_events,
@@ -177,8 +178,8 @@ def create_match(
 ) -> Played:
     """Start a match against the AI, which plays another deck.
 
-    If the AI starts, it plays until it is the player's turn, and the events
-    of its moves come with the match. The ``Location`` header of the response
+    If the AI starts, it plays until it is the player's turn, and its moves
+    come with the match. The ``Location`` header of the response
     holds the address of the match.
     """
     decks = deck_ids()
@@ -190,7 +191,7 @@ def create_match(
         )
     ai_deck = next(deck for deck in decks if deck != new_match.deck)
     state = start_match((load_deck(new_match.deck), load_deck(ai_deck)), seed=seed)
-    state, actions, events = _ai_plays(state)
+    state, actions, moves = _ai_plays(state)
     match = store.create((new_match.deck, ai_deck), seed, actions)
     # url_path_for leaves out root_path, which behind nginx is /api (uvicorn's
     # --root-path in backend/Dockerfile), so it is added here.
@@ -200,7 +201,7 @@ def create_match(
         id=match.id,
         version=match.version,
         view=from_view(player_view(state, HUMAN)),
-        events=from_events(events, HUMAN),
+        moves=moves,
     )
 
 
@@ -254,7 +255,8 @@ def play(match_id: UUID, move: Move, store: Store) -> Played:
             "the view.",
         )
     state, events = apply(state, played)
-    state, answer, answer_events = _ai_plays(state)
+    first = _move(state, events)
+    state, answer, answer_moves = _ai_plays(state)
     new = store.add_actions(match_id, old.version, (played, *answer))
     if new is None:
         raise _match_changed()
@@ -262,7 +264,7 @@ def play(match_id: UUID, move: Move, store: Store) -> Played:
         id=new.id,
         version=new.version,
         view=from_view(player_view(state, HUMAN)),
-        events=from_events(events + answer_events, HUMAN),
+        moves=(first, *answer_moves),
     )
 
 
@@ -302,22 +304,31 @@ def _replay(match: StoredMatch) -> GameState:
 
 def _ai_plays(
     state: GameState,
-) -> tuple[GameState, tuple[Action, ...], tuple[Event, ...]]:
+) -> tuple[GameState, tuple[Action, ...], tuple[MovePlayed, ...]]:
     """Let the AI play until it is the player's turn or the match is over.
 
-    Return the new state, the AI's actions and the events of its moves, in
-    order. The AI chooses from its own view, as the player does (ADR 0006).
+    Return the new state, the AI's actions and its moves as the player sees
+    them, in order. The AI chooses from its own view, as the player does
+    (ADR 0006).
     """
     actions: tuple[Action, ...] = ()
-    events: tuple[Event, ...] = ()
+    moves: tuple[MovePlayed, ...] = ()
     view = player_view(state, AI)
     while view.current == AI and not view.match_over:
         action = choose_action(view)
-        state, new_events = apply(state, action)
+        state, events = apply(state, action)
         actions += (action,)
-        events += new_events
+        moves += (_move(state, events),)
         view = player_view(state, AI)
-    return state, actions, events
+    return state, actions, moves
+
+
+def _move(state: GameState, events: tuple[Event, ...]) -> MovePlayed:
+    """Return an action's events and the state after it, as the player sees them."""
+    return MovePlayed(
+        events=from_events(events, HUMAN),
+        view=from_view(player_view(state, HUMAN)),
+    )
 
 
 @app.exception_handler(ApiError)

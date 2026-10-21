@@ -6,7 +6,9 @@ import {
   nextOf,
   stageOf,
   stepsOf,
+  stepsOfMoves,
   TIMES,
+  viewAt,
   type CardStep,
   type Step,
 } from "./stage.ts";
@@ -79,6 +81,8 @@ test("a unit played goes to its new place in its row, which is held back", () =>
       card: SOLDIER,
       cell: cellOf.unit(0, "melee", 1),
       hides: true,
+      view: after,
+      waiting: before,
     },
   ]);
 });
@@ -160,12 +164,15 @@ test("a Scarecrow goes to its row, which isn't held back", () => {
     },
   ];
 
-  expect(stepsOf(events, before, view())).toEqual<Step[]>([
+  const after = view();
+  expect(stepsOf(events, before, after)).toEqual<Step[]>([
     {
       kind: "play",
       card: scarecrow,
       cell: cellOf.row(0, "melee"),
       hides: false,
+      view: after,
+      waiting: before,
     },
   ]);
 });
@@ -178,9 +185,31 @@ test("a card no longer on the board, as after the round ended, has no place; the
   ];
 
   expect(stepsOf(events, undefined, after)).toEqual<Step[]>([
-    { kind: "play", card: SOLDIER, cell: undefined, hides: false },
-    { kind: "announce", text: "Round 1: you won, 4 to 0." },
-    { kind: "announce", text: "Round 2" },
+    {
+      kind: "play",
+      card: SOLDIER,
+      cell: undefined,
+      hides: false,
+      view: after,
+      waiting: after,
+    },
+    { kind: "announce", text: "Round 1: you won, 4 to 0.", view: after },
+    { kind: "announce", text: "Round 2", view: after },
+  ]);
+});
+
+test("a pass that ends the round shows on the board as it was; the next round, on the board after", () => {
+  const before = view({ players: [withMelee([SOLDIER]), side()] });
+  const after = view({ round: 2, players: [side(), side()] });
+  const events: Event[] = [
+    { type: "player_passed", player: 1 },
+    { type: "round_ended", scores: [4, 0], winner: 0 },
+  ];
+
+  expect(stepsOf(events, before, after)).toEqual<Step[]>([
+    { kind: "announce", text: "The AI passed.", view: before },
+    { kind: "announce", text: "Round 1: you won, 4 to 0.", view: before },
+    { kind: "announce", text: "Round 2", view: after },
   ]);
 });
 
@@ -192,9 +221,10 @@ test("after the last round, no next round begins", () => {
     { type: "match_ended", winner: 1 },
   ];
 
-  expect(stepsOf(events, view({ round: 2 }), after)).toEqual<Step[]>([
-    { kind: "announce", text: "You passed." },
-    { kind: "announce", text: "Round 2: the AI won, 9 to 3." },
+  const before = view({ round: 2 });
+  expect(stepsOf(events, before, after)).toEqual<Step[]>([
+    { kind: "announce", text: "You passed.", view: before },
+    { kind: "announce", text: "Round 2: the AI won, 9 to 3.", view: before },
   ]);
 });
 
@@ -207,17 +237,49 @@ test("a unit destroyed burns in its row; a player passing is a big message; a ca
     { type: "wildfire_played", player: 1, card: "unknown" },
   ];
 
-  expect(stepsOf(events, before, view())).toEqual<Step[]>([
-    { kind: "burn", card: SOLDIER, cell: cellOf.row(0, "melee"), hides: false },
-    { kind: "announce", text: "The AI passed." },
+  const after = view();
+  expect(stepsOf(events, before, after)).toEqual<Step[]>([
+    {
+      kind: "burn",
+      card: SOLDIER,
+      cell: cellOf.row(0, "melee"),
+      hides: false,
+      view: after,
+      waiting: before,
+    },
+    // Once a card of the move is on its way, the board is the one after it.
+    { kind: "announce", text: "The AI passed.", view: after },
   ]);
 });
 
+const BEFORE = view();
+const AFTER = view({ players: [withMelee([SOLDIER, SOLDIER]), side()] });
 const STEPS: Step[] = [
-  { kind: "play", card: SOLDIER, cell: "0:melee:0", hides: true },
-  { kind: "muster", card: SOLDIER, cell: "0:melee:1", hides: true },
-  { kind: "burn", card: SPY, cell: "1:melee", hides: false },
-  { kind: "announce", text: "The AI passed." },
+  {
+    kind: "play",
+    card: SOLDIER,
+    cell: "0:melee:0",
+    hides: true,
+    view: AFTER,
+    waiting: BEFORE,
+  },
+  {
+    kind: "muster",
+    card: SOLDIER,
+    cell: "0:melee:1",
+    hides: true,
+    view: AFTER,
+    waiting: AFTER,
+  },
+  {
+    kind: "burn",
+    card: SPY,
+    cell: "1:melee",
+    hides: false,
+    view: AFTER,
+    waiting: AFTER,
+  },
+  { kind: "announce", text: "The AI passed.", view: AFTER },
 ];
 
 test("a card played shows, then flies; a muster, a burn and a big message each take one wait", () => {
@@ -244,8 +306,22 @@ test("a card played shows, then flies; a muster, a burn and a big message each t
   expect(nextOf(STEPS, { step: 4, flying: false })).toBeUndefined();
 });
 
+test("while a card played comes up, the board is as it was before; once it goes, as it is after", () => {
+  expect(viewAt(STEPS, { step: 0, flying: false })).toBe(BEFORE);
+  expect(viewAt(STEPS, { step: 0, flying: true })).toBe(AFTER);
+  expect(viewAt(STEPS, { step: 3, flying: false })).toBe(AFTER);
+  // Once the steps are over, the board shows the match as it is.
+  expect(viewAt(STEPS, { step: 4, flying: false })).toBeUndefined();
+  // The board before holds back none of the cards of the board after.
+  expect(stageOf(STEPS, { step: 0, flying: false })).toEqual({
+    hidden: new Set(),
+    ghosts: new Map(),
+    lingering: undefined,
+  });
+});
+
 test("the board holds back the cards of the steps not done, and shows the units still burning", () => {
-  const start = stageOf(STEPS, { step: 0, flying: false });
+  const start = stageOf(STEPS, { step: 0, flying: true });
   expect([...start.hidden]).toEqual(["0:melee:0", "0:melee:1"]);
   expect(start.ghosts.get("1:melee")).toEqual([{ card: SPY, burning: false }]);
 
@@ -272,7 +348,8 @@ test("a Clear Skies keeps the weather it clears on the board until it lands", ()
     { type: "weather_cleared", player: 0, card: "clear-skies" },
   ];
 
-  const steps = stepsOf(events, before, view());
+  const after = view();
+  const steps = stepsOf(events, before, after);
   expect(steps).toEqual<Step[]>([
     {
       kind: "play",
@@ -280,10 +357,52 @@ test("a Clear Skies keeps the weather it clears on the board until it lands", ()
       cell: cellOf.discard(0),
       hides: false,
       cleared: [HOARFROST],
+      view: after,
+      waiting: before,
     },
   ]);
   expect(stageOf(steps, { step: 0, flying: true }).lingering).toEqual([
     HOARFROST,
   ]);
   expect(stageOf(steps, { step: 1, flying: false }).lingering).toBeUndefined();
+});
+
+test("each move plays out on the board it left, and only its own cards are held back there", () => {
+  // The AI plays a Soldier, then another: the second is in a place the first
+  // view doesn't have.
+  const first = view({ players: [side(), withMelee([SOLDIER])] });
+  const second = view({ players: [side(), withMelee([SOLDIER, SOLDIER])] });
+  const played: Event = {
+    type: "unit_played",
+    player: 1,
+    card: "soldier",
+    row: "melee",
+    side: 1,
+  };
+  const before = view();
+
+  const steps = stepsOfMoves(
+    [
+      { events: [played], view: first },
+      { events: [played], view: second },
+    ],
+    before,
+  );
+
+  expect(steps.map((step) => step.view)).toEqual([first, second]);
+  expect(cardSteps(steps).map((step) => step.waiting)).toEqual([before, first]);
+  expect(cardSteps(steps).map((step) => step.cell)).toEqual([
+    cellOf.unit(1, "melee", 0),
+    cellOf.unit(1, "melee", 1),
+  ]);
+  // On the first board, only the first card is held back.
+  expect([...stageOf(steps, { step: 0, flying: true }).hidden]).toEqual([
+    cellOf.unit(1, "melee", 0),
+  ]);
+  // The second card comes up over the first board, with nothing held back.
+  expect(viewAt(steps, { step: 1, flying: false })).toBe(first);
+  expect([...stageOf(steps, { step: 1, flying: false }).hidden]).toEqual([]);
+  expect([...stageOf(steps, { step: 1, flying: true }).hidden]).toEqual([
+    cellOf.unit(1, "melee", 1),
+  ]);
 });

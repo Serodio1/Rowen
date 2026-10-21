@@ -24,8 +24,9 @@ import {
   mayMove,
   NO_STEPS,
   stageOf,
-  stepsOf,
+  stepsOfMoves,
   usePlayOut,
+  viewAt,
   type Step,
 } from "./stage.ts";
 import { onFirstClick } from "./clicks.ts";
@@ -164,6 +165,16 @@ type Entry = Happened & { number: number };
 /** The end of a round, as the API sends it. */
 type RoundEnded = Extract<Event, { type: "round_ended" }>;
 
+/** Return the events of the moves played, in order. */
+function eventsOf(played: Played): Event[] {
+  return played.moves.flatMap((move) => move.events);
+}
+
+/** Return the names of the cards in the views of the moves played, by id. */
+function namesOf(played: Played): [string, string][] {
+  return played.moves.flatMap((move) => [...cardNames(move.view)]);
+}
+
 /** Return whether an event is the end of a round. */
 function isRoundEnded(event: Event): event is RoundEnded {
   return event.type === "round_ended";
@@ -194,28 +205,29 @@ function PlayMatch({
   const match = useQuery({ ...query, initialData: matchOf(started) });
   // What happened, the latest first.
   const [log, setLog] = useState<Entry[]>(() =>
-    started.events.length === 0
+    started.moves.length === 0
       ? []
       : [
           {
             number: 1,
             ...happened(
-              started.events,
+              eventsOf(started),
               started.view.player,
-              cardNames(started.view),
-              started.view.round,
+              new Map(namesOf(started)),
+              // The AI's first moves are in the first round.
+              1,
             ),
           },
         ],
   );
   // How each round that ended went, for the end of the match.
   const [rounds, setRounds] = useState<RoundEnded[]>(() =>
-    started.events.filter(isRoundEnded),
+    eventsOf(started).filter(isRoundEnded),
   );
   // The animation of the last move, or of the AI's first one: none with
   // reduced motion.
   const [steps, setSteps] = useState<readonly Step[]>(() =>
-    mayMove() ? stepsOf(started.events, undefined, started.view) : NO_STEPS,
+    mayMove() ? stepsOfMoves(started.moves, undefined) : NO_STEPS,
   );
   const progress = usePlayOut(steps);
   const showing = steps[progress.step];
@@ -249,19 +261,20 @@ function PlayMatch({
       // before.
       const names = new Map([
         ...(before === undefined ? [] : cardNames(before)),
-        ...cardNames(played.view),
+        ...namesOf(played),
       ]);
       const entry = happened(
-        played.events,
+        eventsOf(played),
         played.view.player,
         names,
         before?.round ?? played.view.round,
       );
       setLog((log) => [{ number: log.length + 1, ...entry }, ...log]);
-      setSteps(
-        mayMove() ? stepsOf(played.events, before, played.view) : NO_STEPS,
-      );
-      setRounds((rounds) => [...rounds, ...played.events.filter(isRoundEnded)]);
+      setSteps(mayMove() ? stepsOfMoves(played.moves, before) : NO_STEPS);
+      setRounds((rounds) => [
+        ...rounds,
+        ...eventsOf(played).filter(isRoundEnded),
+      ]);
       queryClient.setQueryData(query.queryKey, matchOf(played));
     },
     onError: (error) => {
@@ -322,7 +335,16 @@ function PlayMatch({
   }
 
   const view = match.data.view;
-  const shown = pointed === null ? undefined : cardsById([view]).get(pointed);
+  // While moves play out, the board shows the match as it was then: its
+  // round and both sides. The hand and the moves the player can make are
+  // those of the match as it is, as moves never wait for the animation.
+  const then = viewAt(steps, progress);
+  const board =
+    then === undefined
+      ? view
+      : { ...view, round: then.round, players: then.players };
+  const shown =
+    pointed === null ? undefined : cardsById([board, view]).get(pointed);
   const playing: Playing = {
     actions: view.legal_actions,
     chosen: chosen?.version === match.data.version ? chosen.chosen : null,
@@ -346,8 +368,10 @@ function PlayMatch({
       play.mutate({ version: match.data.version, action });
     },
   };
-  // How the last round went, until the next move.
-  const round = log[0]?.round ?? null;
+  // How the last round went, until the next move; while the round that ended
+  // in the last moves is still on the board, the one before.
+  const round =
+    (board.round === view.round ? log[0]?.round : log[1]?.round) ?? null;
   // On a wide screen, the board is on the left, and on its right the round,
   // how the last one went, what to do and what happened, so it all fits on
   // one screen. On a narrow one, they are in that order, with the board
@@ -356,7 +380,7 @@ function PlayMatch({
     <section className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_17rem] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
       <div className="flex flex-col gap-2 lg:col-start-2">
         <h2 className="text-center font-display text-xl text-gold-300 lg:text-2xl">
-          Round {view.round}
+          Round {board.round}
         </h2>
         {match.isError ? (
           // The page couldn't ask for the match after a move that didn't
@@ -428,7 +452,7 @@ function PlayMatch({
         }}
       >
         <Board
-          view={view}
+          view={board}
           playing={view.match_over ? undefined : playing}
           stage={stageOf(steps, progress)}
           onPile={setPile}

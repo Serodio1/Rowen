@@ -39,8 +39,8 @@ export interface paths {
      * Create Match
      * @description Start a match against the AI, which plays another deck.
      *
-     *     If the AI starts, it plays until it is the player's turn, and the events
-     *     of its moves come with the match. The ``Location`` header of the response
+     *     If the AI starts, it plays until it is the player's turn, and its moves
+     *     come with the match. The ``Location`` header of the response
      *     holds the address of the match.
      */
     post: operations["create_match"];
@@ -294,6 +294,19 @@ export interface components {
       action: components["schemas"]["Action"];
     };
     /**
+     * MovePlayed
+     * @description One action played, as the player may see it: its events and the view after.
+     *
+     *     With the view after each action, the page can show the match as it was
+     *     then while it plays the action's events out, and not the match as it is
+     *     once every action is played.
+     */
+    MovePlayed: {
+      /** Events */
+      events: components["schemas"]["EventView"][];
+      view: components["schemas"]["PlayerView"];
+    };
+    /**
      * NewMatch
      * @description What the player sends to start a match: the id of their deck.
      */
@@ -399,12 +412,12 @@ export interface components {
     };
     /**
      * Played
-     * @description A match after moves were played in it, and what happened.
+     * @description A match after actions were played in it, and what happened.
      *
-     *     ``events`` holds the events of those moves, in order, as the player may see
-     *     them: in a new match, those of the AI's first moves, if it starts (none if
-     *     the player does); after the player's action, those of the action and then
-     *     those of the AI's answer.
+     *     ``moves`` holds those actions, in order: in a new match, the AI's first
+     *     ones, if it starts (none if the player does); after the player's action,
+     *     that action and then the AI's answer, one move for each of its actions.
+     *     The ``view`` of the match is that of the last move, if there is one.
      */
     Played: {
       /**
@@ -415,8 +428,8 @@ export interface components {
       /** Version */
       version: number;
       view: components["schemas"]["PlayerView"];
-      /** Events */
-      events: components["schemas"]["EventView"][];
+      /** Moves */
+      moves: components["schemas"]["MovePlayed"][];
     };
     /**
      * PlayerPassed

@@ -96,7 +96,7 @@ const A_MATCH = {
       id: "a-match",
       version: 1,
       view: view(),
-      events: [],
+      moves: [],
     } satisfies Played,
   },
 };
@@ -115,12 +115,17 @@ const ROUND_1 = view({
 
 /**
  * Return the API's answer to a move: the match after it, at `version`, and
- * its events.
+ * its events, as one move.
  */
 function played(after: View, events: Event[] = [], version = 2) {
   return {
     status: 200,
-    body: { id: "a-match", version, view: after, events } satisfies Played,
+    body: {
+      id: "a-match",
+      version,
+      view: after,
+      moves: [{ events, view: after }],
+    } satisfies Played,
   };
 }
 
@@ -751,9 +756,14 @@ test("when the AI starts the match, the page says what it did", async () => {
         id: "a-match",
         version: 1,
         view: view(),
-        events: [
-          { type: "opponent_redrew", player: 1 },
-          { type: "redraw_ended", player: 1 },
+        moves: [
+          {
+            events: [
+              { type: "opponent_redrew", player: 1 },
+              { type: "redraw_ended", player: 1 },
+            ],
+            view: view(),
+          },
         ],
       } satisfies Played,
     },
@@ -858,7 +868,7 @@ test("a card that left the view is still named, as the page saw it before", asyn
         id: "a-match",
         version: 1,
         view: before,
-        events: [],
+        moves: [],
       } satisfies Played,
     },
     [PLAY]: played(after, [
@@ -1193,16 +1203,17 @@ test("a card played shows on the right, then goes to its place, which shows it o
   const log = screen.getByRole("log", { name: "What happened" });
   expect(log.closest("section")).toHaveClass("opacity-0");
   expect(showcase()?.closest("[aria-hidden]")).not.toBeNull();
+  // The board is still as it was before the move: no place for the card.
+  expect(document.querySelector('[data-cell="1:melee:0"]')).toBeNull();
+
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.show));
+  // On its way, to the board after the move, which holds it back.
+  expect(showcase()).not.toBeNull();
   const place = document.querySelector('[data-cell="1:melee:0"]');
   expect(place).toHaveClass("opacity-0");
   expect(
     within(place as HTMLElement).getByRole("img", { name: /^Soldier/ }),
   ).toBeInTheDocument();
-
-  await act(() => vi.advanceTimersByTimeAsync(TIMES.show));
-  // On its way.
-  expect(showcase()).not.toBeNull();
-  expect(place).toHaveClass("opacity-0");
 
   await act(() => vi.advanceTimersByTimeAsync(TIMES.fly));
   expect(showcase()).toBeNull();
@@ -1313,6 +1324,7 @@ test("a card played on its way comes before a card pointed at", async () => {
   await startMatch();
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
   await screen.findByText("The AI played Soldier in the melee row.");
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.show));
 
   fireEvent.mouseOver(
     document.querySelector('[data-cell="1:melee:0"] [data-card]') as Element,
@@ -1484,4 +1496,92 @@ test("clicking a discard pile lists its cards beside the board, the most recent 
   expect(
     screen.queryByRole("region", { name: "The AI's discard pile" }),
   ).not.toBeInTheDocument();
+});
+
+test("while moves play out, the board shows the match as it was then, up to the next round", async () => {
+  withMotion();
+  const soldier = side({
+    rows: {
+      ...side().rows,
+      melee: { ...side().rows.melee, units: [{ card: SOLDIER, strength: 4 }] },
+    },
+    total: 4,
+  });
+  // The AI plays a Soldier, then passes, and wins the round.
+  const first = view({ players: [side({ passed: true }), soldier] });
+  const next = view({
+    round: 2,
+    players: [side({ lives: 1 }), side()],
+    legal_actions: [{ type: "pass" }],
+  });
+  const { api } = fakeApi({
+    ...A_MATCH,
+    [PLAY]: {
+      status: 200,
+      body: {
+        id: "a-match",
+        version: 2,
+        view: next,
+        moves: [
+          {
+            events: [
+              {
+                type: "unit_played",
+                player: 1,
+                card: "soldier",
+                row: "melee",
+                side: 1,
+              },
+            ],
+            view: first,
+          },
+          {
+            events: [
+              { type: "player_passed", player: 1 },
+              { type: "round_ended", scores: [0, 4], winner: 1 },
+            ],
+            view: next,
+          },
+        ],
+      } satisfies Played,
+    },
+  });
+  renderApp(api);
+  await startMatch();
+  const theAis = () =>
+    within(screen.getByRole("group", { name: "The AI" })).getByText("Total")
+      .nextElementSibling?.textContent;
+  const round = () => screen.getByRole("heading", { level: 2 }).textContent;
+  const place = () => document.querySelector('[data-cell="1:melee:0"]');
+  // How round 1 went: in the log at once, and beside the board once it is
+  // over there.
+  const result = () =>
+    screen.queryAllByText("Round 1: the AI won, 4 to 0.").length;
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByText("The AI played Soldier in the melee row.");
+  // The Soldier comes up: the board is as it was, and so is the AI's total.
+  expect(round()).toBe("Round 1");
+  expect(theAis()).toBe("0");
+
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.show));
+  // On its way: the board after the Soldier's move.
+  expect(theAis()).toBe("4 (ahead)");
+
+  // The AI passes and the round ends, on the board of round 1.
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.fly));
+  expect(place()).not.toHaveClass("opacity-0");
+  // Only in the log yet.
+  expect(result()).toBe(1);
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.announce));
+  expect(round()).toBe("Round 1");
+  expect(place()).not.toBeNull();
+  expect(theAis()).toBe("4 (ahead)");
+
+  // Then round 2 begins, on its own board.
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.announce));
+  expect(round()).toBe("Round 2");
+  expect(place()).toBeNull();
+  expect(theAis()).toBe("0");
+  expect(result()).toBe(2);
 });
