@@ -410,6 +410,7 @@ def test_a_view_after_a_medic_says_the_player_is_reviving() -> None:
                 "scarecrow_played",
                 "wildfire_played",
                 "unit_destroyed",
+                "nothing_to_revive",
                 "player_passed",
                 "round_ended",
                 "match_ended",
@@ -560,6 +561,10 @@ def test_every_view_of_a_match_is_sent_as_it_is(seed: int) -> None:
         (
             engine.UnitDestroyed(side=0, row=RANGED, card="sniper"),
             {"type": "unit_destroyed", "side": 0, "row": "ranged", "card": "sniper"},
+        ),
+        (
+            engine.NothingToRevive(player=0),
+            {"type": "nothing_to_revive", "player": 0},
         ),
         (engine.PlayerPassed(player=1), {"type": "player_passed", "player": 1}),
         (

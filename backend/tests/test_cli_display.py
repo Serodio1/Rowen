@@ -24,6 +24,7 @@ from rowen.engine.events import (
     CardsDrawn,
     HornPlayed,
     MatchEnded,
+    NothingToRevive,
     PlayerPassed,
     RedrawEnded,
     RoundEnded,
@@ -375,6 +376,7 @@ def test_an_action_reads_as_a_choice(action: Action, text: str) -> None:
             UnitDestroyed(side=1, row=Row.SIEGE, card="catapult"),
             "Catapult was destroyed in the AI's siege row.",
         ),
+        (NothingToRevive(player=0), "You had nothing to revive."),
         (PlayerPassed(player=1), "The AI passed."),
         (
             RoundEnded(scores=(23, 19), winner=0),

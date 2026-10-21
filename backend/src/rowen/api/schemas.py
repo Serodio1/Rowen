@@ -256,6 +256,13 @@ class UnitDestroyed(Schema):
     card: str
 
 
+class NothingToRevive(Schema):
+    """A Medic found no unit to revive: ``engine.NothingToRevive``."""
+
+    type: Literal["nothing_to_revive"]
+    player: int
+
+
 class PlayerPassed(Schema):
     """A player passed: ``engine.PlayerPassed``."""
 
@@ -317,6 +324,7 @@ class OpponentRedrew(Schema):
 type EventView = Annotated[
     UnitPlayed
     | UnitRevived
+    | NothingToRevive
     | UnitMustered
     | CardsDrawn
     | WeatherPlayed
@@ -698,6 +706,8 @@ def _event(event: engine.EventView) -> EventView:
             return UnitDestroyed(
                 type="unit_destroyed", side=event.side, row=event.row, card=event.card
             )
+        case engine.NothingToRevive():
+            return NothingToRevive(type="nothing_to_revive", player=event.player)
         case engine.PlayerPassed():
             return PlayerPassed(type="player_passed", player=event.player)
         case engine.RoundEnded():

@@ -21,7 +21,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import replace
 
 from rowen.engine.cards import Ability, Card, UnitCard
-from rowen.engine.events import CardsDrawn, Event, UnitMustered
+from rowen.engine.events import CardsDrawn, Event, NothingToRevive, UnitMustered
 from rowen.engine.state import GameState, PlayerState, with_player, with_unit
 
 # Cards the player of a Spy draws (rules, section 7.2).
@@ -91,7 +91,7 @@ def _medic(
 ) -> tuple[GameState, tuple[Event, ...]]:
     """The player must choose a unit to revive, if there is one."""
     if not revivable(state.players[player]):
-        return state, ()
+        return state, (NothingToRevive(player=player),)
     return replace(state, reviving=True), ()
 
 

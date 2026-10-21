@@ -24,6 +24,7 @@ from rowen.engine.public import (
     EventView,
     HornPlayed,
     MatchEnded,
+    NothingToRevive,
     OpponentDrew,
     OpponentRedrew,
     Pass,
@@ -190,6 +191,8 @@ def event_text(event: EventView, viewer: int, names: Mapping[str, str]) -> str:
                 f"{names[event.card]} was destroyed in"
                 f" {_whose(event.side, viewer)} {event.row} row."
             )
+        case NothingToRevive():
+            return f"{_who(event.player, viewer)} had nothing to revive."
         case PlayerPassed():
             return f"{_who(event.player, viewer)} passed."
         case RoundEnded():

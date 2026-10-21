@@ -38,18 +38,21 @@ LEGEND_TEXT = (
 # What each special card does (rules, section 8).
 SPECIAL_TEXTS: Mapping[SpecialKind, str] = {
     SpecialKind.HOARFROST: (
-        "Weather: every unit in the melee rows, on both sides, has strength 1."
+        "Weather: every unit in the melee rows, on both sides, has strength 1, "
+        "but not a Legend. A second copy changes nothing."
     ),
     SpecialKind.THICK_FOG: (
-        "Weather: every unit in the ranged rows, on both sides, has strength 1."
+        "Weather: every unit in the ranged rows, on both sides, has strength 1, "
+        "but not a Legend. A second copy changes nothing."
     ),
     SpecialKind.DOWNPOUR: (
-        "Weather: every unit in the siege rows, on both sides, has strength 1."
+        "Weather: every unit in the siege rows, on both sides, has strength 1, "
+        "but not a Legend. A second copy changes nothing."
     ),
     SpecialKind.CLEAR_SKIES: "Removes every weather card in play.",
     SpecialKind.WAR_HORN: (
         "Goes in the horn slot of one of your rows, and doubles the strength of "
-        "its units."
+        "its units, but not of a Legend."
     ),
     SpecialKind.WILDFIRE: (
         "Destroys the strongest units on the board, on both sides. Legends are "

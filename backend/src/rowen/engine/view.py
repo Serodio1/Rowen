@@ -25,6 +25,7 @@ from rowen.engine.events import (
     Event,
     HornPlayed,
     MatchEnded,
+    NothingToRevive,
     PlayerPassed,
     RedrawEnded,
     RoundEnded,
@@ -220,6 +221,7 @@ def _event_view(event: Event, player: int) -> EventView:
             | CardRedrawn()
             | UnitPlayed()
             | UnitRevived()
+            | NothingToRevive()
             | UnitMustered()
             | WeatherPlayed()
             | WeatherCleared()
