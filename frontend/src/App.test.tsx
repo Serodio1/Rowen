@@ -771,10 +771,11 @@ test("before anything happened, the page says so", async () => {
   const what = screen.getByRole("log", { name: "What happened" });
   expect(log()).toEqual([]);
   expect(within(what).getByText("Nothing yet.")).toBeInTheDocument();
-  // No round is over: nothing between the round and the board.
+  // No round is over: the place kept for how it went, under the round, is
+  // empty.
   expect(
     screen.getByRole("heading", { name: "Round 1" }).nextElementSibling,
-  ).toContainElement(screen.getByRole("region", { name: "Board" }));
+  ).toBeEmptyDOMElement();
 });
 
 test("after each move, the page says what happened, the latest move first", async () => {

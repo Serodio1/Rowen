@@ -61,9 +61,7 @@ export function CardFace({
       role="img"
       aria-label={name}
       className={`relative shrink-0 overflow-hidden rounded-md border-2 bg-wood-900 shadow-md shadow-black/50 ${
-        size === "small"
-          ? "h-20 w-14 lg:h-24 lg:w-16"
-          : "h-24 w-16 lg:h-30 lg:w-20"
+        size === "small" ? "h-20 w-14" : "h-24 w-16"
       } ${frame}`}
     >
       {art === undefined ? (
@@ -127,7 +125,9 @@ function Placeholder({ card }: { card: Card }) {
 
 /**
  * A unit's strength in its circle: dark with gold for a Legend, green when
- * the unit is stronger now than its own strength, red when weaker.
+ * the unit is stronger now than its own strength, red when weaker. An arrow
+ * up or down says it too, for those who can't tell the colours apart (screen
+ * readers read it in the card's name, such as "now 1").
  */
 function Strength({
   own,
@@ -151,6 +151,16 @@ function Strength({
       } ${colour}`}
     >
       {now}
+      {now !== own && (
+        <svg
+          viewBox="0 0 10 10"
+          aria-hidden
+          data-change={now > own ? "up" : "down"}
+          className={`absolute -right-1 -bottom-1 size-3 fill-current drop-shadow lg:size-3.5 ${colour}`}
+        >
+          <path d={now > own ? "M5 1 9.5 9h-9z" : "M5 9 .5 1h9z"} />
+        </svg>
+      )}
     </span>
   );
 }
