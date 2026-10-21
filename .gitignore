@@ -23,3 +23,7 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Playwright's report and what a failed test left (frontend/e2e)
+playwright-report/
+test-results/
