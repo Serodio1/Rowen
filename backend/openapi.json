@@ -1207,6 +1207,13 @@
                 "type": "null"
               }
             ]
+          },
+          "description": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Description"
           }
         },
         "additionalProperties": false,
@@ -1216,10 +1223,11 @@
           "id",
           "name",
           "kind",
-          "weather_row"
+          "weather_row",
+          "description"
         ],
         "title": "SpecialCard",
-        "description": "A special card, as ``engine.SpecialCard`` describes it.\n\n``weather_row`` is the row a weather card hits, on both sides of the board,\nor null for any other special card. It is a rule, so the API says it: the\npage doesn't know the rules (ADR 0002)."
+        "description": "A special card, as ``engine.SpecialCard`` describes it.\n\n``weather_row`` is the row a weather card hits, on both sides of the board,\nor null for any other special card. It is a rule, so the API says it: the\npage doesn't know the rules (ADR 0002). So is ``description``: what the\ncard does."
       },
       "SpecialKind": {
         "type": "string",
@@ -1289,6 +1297,13 @@
           "opponent_side": {
             "type": "boolean",
             "title": "Opponent Side"
+          },
+          "description": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Description"
           }
         },
         "additionalProperties": false,
@@ -1302,10 +1317,11 @@
           "ability",
           "group",
           "legend",
-          "opponent_side"
+          "opponent_side",
+          "description"
         ],
         "title": "UnitCard",
-        "description": "A unit, as ``engine.UnitCard`` describes it.\n\n``opponent_side`` says whether the unit goes on the side of the opponent\nof who plays it or revives it, as a Spy does. It is a rule, so the API\nsays it: the page doesn't know the rules (ADR 0002)."
+        "description": "A unit, as ``engine.UnitCard`` describes it.\n\n``opponent_side`` says whether the unit goes on the side of the opponent\nof who plays it or revives it, as a Spy does. It is a rule, so the API\nsays it: the page doesn't know the rules (ADR 0002). So is\n``description``: what the card does, one sentence per thing."
       },
       "UnitDestroyed": {
         "properties": {

@@ -12,6 +12,7 @@ from rowen.api import schemas
 from rowen.api.app import app
 from rowen.data import deck_ids, load_deck
 from rowen.engine import public as engine
+from rowen.engine.texts import ABILITY_TEXTS, LEGEND_TEXT, SPECIAL_TEXTS
 
 MELEE, RANGED, SIEGE = engine.Row.MELEE, engine.Row.RANGED, engine.Row.SIEGE
 
@@ -40,6 +41,7 @@ SNIPER_JSON = {
     "group": None,
     "legend": False,
     "opponent_side": False,
+    "description": [],
 }
 SOLDIER_JSON = {
     "type": "unit",
@@ -51,6 +53,7 @@ SOLDIER_JSON = {
     "group": None,
     "legend": False,
     "opponent_side": False,
+    "description": [ABILITY_TEXTS[engine.Ability.AGILE]],
 }
 THICK_FOG_JSON = {
     "type": "special",
@@ -58,6 +61,7 @@ THICK_FOG_JSON = {
     "name": "Thick Fog",
     "kind": "thick-fog",
     "weather_row": "ranged",
+    "description": [SPECIAL_TEXTS[engine.SpecialKind.THICK_FOG]],
 }
 WAR_HORN_JSON = {
     "type": "special",
@@ -65,6 +69,7 @@ WAR_HORN_JSON = {
     "name": "War Horn",
     "kind": "war-horn",
     "weather_row": None,
+    "description": [SPECIAL_TEXTS[engine.SpecialKind.WAR_HORN]],
 }
 
 EMPTY_ROW = engine.RowView(units=(), horn=None, scarecrows=(), weathered=False, score=0)
@@ -641,14 +646,23 @@ def with_rules(value: Any) -> Any:
     Only special cards have a "kind", so each dict with one gets the row its
     weather hits, from ``WEATHER_ROWS_JSON``, wherever the card is. Only units
     have a "legend", so each dict with one gets whether it goes on the
-    opponent's side: only a Spy does.
+    opponent's side: only a Spy does. And each card gets what it does.
     """
     if isinstance(value, dict):
         added = {key: with_rules(item) for key, item in value.items()}
         if "kind" in value:
             added["weather_row"] = WEATHER_ROWS_JSON[value["kind"]]
+            added["description"] = [SPECIAL_TEXTS[value["kind"]]]
         if "legend" in value:
             added["opponent_side"] = value["ability"] == "spy"
+            added["description"] = [
+                *([LEGEND_TEXT] if value["legend"] else []),
+                *(
+                    []
+                    if value["ability"] is None
+                    else [ABILITY_TEXTS[value["ability"]]]
+                ),
+            ]
         return added
     if isinstance(value, (list, tuple)):
         return [with_rules(item) for item in value]

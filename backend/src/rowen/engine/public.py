@@ -64,6 +64,7 @@ from rowen.engine.events import (
 )
 from rowen.engine.game import IllegalActionError, apply, start_match
 from rowen.engine.state import GameState
+from rowen.engine.texts import describe
 from rowen.engine.view import (
     EventView,
     OpponentDrew,
@@ -119,6 +120,7 @@ __all__ = [
     "WeatherPlayed",
     "WildfirePlayed",
     "apply",
+    "describe",
     "on_opponent_side",
     "player_events",
     "player_view",
