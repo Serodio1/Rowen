@@ -627,12 +627,22 @@ test("when the match can't be asked for again, no move can be made until it can"
   const { api, requests } = fakeApi(answers);
   renderApp(api);
   await startMatch();
+  // A card chosen when the move is made.
+  fireEvent.click(
+    screen.getByRole("button", { name: "Hoarfrost (weather on melee)" }),
+  );
 
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
 
   expect(
     await screen.findByRole("button", { name: "Try again" }),
   ).toBeEnabled();
+  // The card chosen is let go: it may not be the player's to play any more.
+  expect(
+    screen.getByText("Choose a card to swap, or keep this hand."),
+  ).toBeInTheDocument();
+  // The moves are disabled: the focus is on what the player can do.
+  expect(screen.getByRole("button", { name: "Try again" })).toHaveFocus();
   expect(screen.getByRole("alert")).toHaveTextContent(
     "Could not reach the server.",
   );
@@ -993,7 +1003,7 @@ test("after a move, the focus stays where the player put it, out of the moves", 
   expect(what).toHaveFocus();
 });
 
-test("once the match is over, the focus is on playing again", async () => {
+test("once the match is over, the focus is on playing again, and the rest of the page is out of reach", async () => {
   const over = view({ match_over: true, winner: 0, legal_actions: [] });
   const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(over) });
   renderApp(api);
@@ -1001,9 +1011,90 @@ test("once the match is over, the focus is on playing again", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
 
+  const again = await screen.findByRole("button", { name: "Play again" });
+  expect(again).toHaveFocus();
+  // Behind the end of the match, Tab can't reach the log or the board.
+  for (const behind of [
+    screen.getByRole("button", { name: "Show log" }),
+    screen.getByRole("region", { name: "Board" }),
+    screen.getByRole("heading", { name: "Round 1" }),
+  ]) {
+    expect(behind.closest("[inert]")).not.toBeNull();
+  }
+  expect(again.closest("[inert]")).toBeNull();
+
+  // Back to the decks, where the focus goes on.
+  fireEvent.click(again);
   expect(
-    await screen.findByRole("button", { name: "Play again" }),
+    await screen.findByRole("heading", { name: "Choose your deck" }),
   ).toHaveFocus();
+});
+
+test("the focus the page moves after a move shows no card, even to a player using the keyboard", async () => {
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
+  renderApp(api);
+  await startMatch();
+  // The player uses the keyboard on the board, then keeps the hand.
+  fireEvent.keyDown(firstCardButton() as HTMLElement, { key: "Tab" });
+  const keep = screen.getByRole("button", { name: "Keep this hand" });
+  keep.focus();
+  fireEvent.click(keep);
+
+  await screen.findByRole("button", { name: "Pass" });
+  await waitFor(() => {
+    expect(firstCardButton()).toHaveFocus();
+  });
+  expect(preview()).toBeNull();
+});
+
+test("a unit on the board shows large with its strength now, if it isn't the card's", async () => {
+  const units = [{ card: SOLDIER, strength: 8 }];
+  const base = [{ card: SOLDIER, strength: 4 }];
+  const { api } = fakeApi({
+    ...A_MATCH,
+    [PLAY]: played(
+      view({
+        ...ROUND_1,
+        players: [
+          side({
+            rows: {
+              ...side().rows,
+              melee: { ...side().rows.melee, units },
+              ranged: { ...side().rows.ranged, units: base },
+            },
+          }),
+          side(),
+        ],
+      }),
+    ),
+  });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByRole("button", { name: "Pass" });
+
+  fireEvent.mouseOver(
+    within(screen.getByRole("group", { name: /^Your melee row/ })).getByRole(
+      "img",
+      { name: /^Soldier/ },
+    ),
+  );
+  expect(preview()).toHaveTextContent("Now 8");
+
+  // At the card's own strength, there is nothing more to say.
+  fireEvent.mouseOver(
+    within(screen.getByRole("group", { name: /^Your ranged row/ })).getByRole(
+      "img",
+      { name: /^Soldier/ },
+    ),
+  );
+  expect(preview()).not.toBeNull();
+  expect(document.querySelector("[data-now]")).toBeNull();
+
+  // In the hand, a card is only the card.
+  fireEvent.mouseOver(firstCardButton() as HTMLElement);
+  expect(preview()).not.toBeNull();
+  expect(document.querySelector("[data-now]")).toBeNull();
 });
 
 test("the second click of a double click on playing again doesn't start a match", async () => {
@@ -1111,6 +1202,51 @@ test("for a card with nowhere to choose, the page says choosing it again plays i
 
   expect(
     screen.getByText("Choose Hoarfrost again to play it."),
+  ).toBeInTheDocument();
+});
+
+test("for a Scarecrow, the page asks for a unit to take back", async () => {
+  const scarecrow = {
+    ...HOARFROST,
+    id: "scarecrow",
+    name: "Scarecrow",
+    kind: "scarecrow",
+    weather_row: null,
+  } satisfies Card;
+  const units = [{ card: SOLDIER, strength: 4 }];
+  const { api } = fakeApi({
+    ...A_MATCH,
+    [PLAY]: played(
+      view({
+        hand: [scarecrow],
+        players: [
+          side({
+            rows: { ...side().rows, melee: { ...side().rows.melee, units } },
+          }),
+          side(),
+        ],
+        legal_actions: [
+          {
+            type: "play_scarecrow",
+            card: "scarecrow",
+            row: "melee",
+            unit: "soldier",
+          },
+          { type: "pass" },
+        ],
+      }),
+    ),
+  });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+
+  fireEvent.click(await screen.findByRole("button", { name: /^Scarecrow/ }));
+
+  expect(
+    screen.getByText(
+      "Choose a unit to take back with Scarecrow, or choose Scarecrow again to put it back.",
+    ),
   ).toBeInTheDocument();
 });
 

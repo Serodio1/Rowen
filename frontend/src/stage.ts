@@ -48,6 +48,8 @@ export const TIMES = {
  *   card held back doesn't hit its rows yet either.
  * @property cleared - For Clear Skies, the weather cards it clears: the
  *   board still shows them, and their rows under them, until it lands.
+ * @property burnt - For a unit destroyed, where it was in its row and its
+ *   strength then, as the view before showed them.
  * @property view - The view the board shows during the step: the one after
  *   the card's move.
  * @property waiting - The view the board shows while a card played comes up
@@ -59,8 +61,15 @@ export interface CardStep {
   cell: string | undefined;
   hides: boolean;
   cleared?: readonly WeatherCard[];
+  burnt?: Burnt;
   view: View;
   waiting: View;
+}
+
+/** A unit destroyed: its place in its row, and its strength, before. */
+export interface Burnt {
+  index: number;
+  strength: number;
 }
 
 /** A weather card in play, as a side of the view lists it. */
@@ -166,6 +175,23 @@ export function stepsOf(
     return index === undefined ? undefined : cellOf.weather(side, index);
   }
 
+  // The units destroyed so far in each row of the view before, by index.
+  const destroyed = new Map<string, number[]>();
+  /** Return where a unit destroyed was, and its strength, and take it. */
+  function burntUnit(side: number, row: string, id: string) {
+    const taken = destroyed.get(cellOf.row(side, row)) ?? [];
+    const units = before?.players[side]?.rows[row as "melee"].units ?? [];
+    const index = units.findIndex(
+      (unit, at) => unit.card.id === id && !taken.includes(at),
+    );
+    const unit = units[index];
+    if (unit === undefined) {
+      return undefined;
+    }
+    destroyed.set(cellOf.row(side, row), [...taken, index]);
+    return { index, strength: unit.strength };
+  }
+
   const steps: Step[] = [];
   const names = new Map([...cards].map(([id, card]) => [id, card.name]));
   let round = before?.round ?? after.round;
@@ -232,9 +258,15 @@ export function stepsOf(
       case "wildfire_played":
         add("play", event.card, cellOf.discard(event.player), false);
         break;
-      case "unit_destroyed":
+      case "unit_destroyed": {
         add("burn", event.card, cellOf.row(event.side, event.row), false);
+        const step = steps.at(-1);
+        const burnt = burntUnit(event.side, event.row, event.card);
+        if (step?.kind === "burn" && burnt !== undefined) {
+          step.burnt = burnt;
+        }
         break;
+      }
       case "player_passed":
         steps.push({
           kind: "announce",
@@ -347,10 +379,13 @@ export function nextOf(
  * A unit destroyed, still drawn in its row until it has burned.
  *
  * @property burning - Whether it is burning now.
+ * @property burnt - Where it was in its row and its strength, if the view
+ *   before showed it.
  */
 export interface Ghost {
   card: Card;
   burning: boolean;
+  burnt?: Burnt | undefined;
 }
 
 /**
@@ -396,7 +431,11 @@ export function stageOf(steps: readonly Step[], progress: Progress): Stage {
     }
     if (step.kind === "burn") {
       const row = ghosts.get(step.cell) ?? [];
-      row.push({ card: step.card, burning: index === progress.step });
+      row.push({
+        card: step.card,
+        burning: index === progress.step,
+        burnt: step.burnt,
+      });
       ghosts.set(step.cell, row);
     }
   });

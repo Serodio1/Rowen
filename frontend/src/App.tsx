@@ -250,8 +250,15 @@ function PlayMatch({
   );
   const progress = usePlayOut(steps);
   const showing = steps[progress.step];
-  // The card pointed at or focused, by id, to show it large.
-  const [pointed, setPointed] = useState<string | null>(null);
+  // The card pointed at or focused, by id, to show it large, with its
+  // strength on the board.
+  const [pointed, setPointed] = useState<Pointed | null>(null);
+  /** Point at a card, or at none: the same card is no change. */
+  function point(next: Pointed | null) {
+    setPointed((last) =>
+      last?.id === next?.id && last?.strength === next?.strength ? last : next,
+    );
+  }
   // The player whose discard pile is listed, if one is.
   const [pile, setPile] = useState<number | null>(null);
   // Whether the player is using the keyboard: the page moves the focus by
@@ -379,7 +386,7 @@ function PlayMatch({
       ? view
       : { ...view, round: then.round, players: then.players };
   const shown =
-    pointed === null ? undefined : cardsById([board, view]).get(pointed);
+    pointed === null ? undefined : cardsById([board, view]).get(pointed.id);
   const playing: Playing = {
     actions: view.legal_actions,
     chosen: chosen?.version === match.data.version ? chosen.chosen : null,
@@ -472,7 +479,7 @@ function PlayMatch({
         // Any card on the board or in the hand, pointed at or focused, shows
         // large on the right, with what it does.
         onMouseOver={(event) => {
-          setPointed(cardIn(event.target));
+          point(cardIn(event.target));
         }}
         onMouseLeave={() => {
           setPointed(null);
@@ -485,7 +492,7 @@ function PlayMatch({
         }}
         onFocus={(event) => {
           if (typing.current && !focusing.current) {
-            setPointed(cardIn(event.target));
+            point(cardIn(event.target));
           }
         }}
         onBlur={() => {
@@ -508,7 +515,9 @@ function PlayMatch({
           />
         ) : (
           // A card played comes first.
-          shown !== undefined && <CardPreview card={shown} />
+          shown !== undefined && (
+            <CardPreview card={shown} strength={pointed?.strength} />
+          )
         )}
       </div>
       <div ref={movesArea} className="lg:col-start-2 lg:row-start-2">
@@ -761,7 +770,7 @@ function matchOf(played: Played): Match {
  * Only a button may hold the card: any other element around cards, such as
  * a row or a pile, isn't one of them.
  */
-function cardIn(target: EventTarget): string | null {
+function cardIn(target: EventTarget): Pointed | null {
   if (!(target instanceof Element)) {
     return null;
   }
@@ -770,7 +779,24 @@ function cardIn(target: EventTarget): string | null {
     (target instanceof HTMLButtonElement
       ? target.querySelector("[data-card]")
       : null);
-  return card?.getAttribute("data-card") ?? null;
+  const id = card?.getAttribute("data-card");
+  if (id === undefined || id === null) {
+    return null;
+  }
+  const strength = card?.getAttribute("data-strength");
+  return {
+    id,
+    strength:
+      strength === undefined || strength === null
+        ? undefined
+        : Number(strength),
+  };
+}
+
+/** A card pointed at: its id, and its strength on the board, if it has one. */
+interface Pointed {
+  id: string;
+  strength: number | undefined;
 }
 
 /**

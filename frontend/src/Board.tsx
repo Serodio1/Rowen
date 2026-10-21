@@ -3,6 +3,7 @@ import {
   useId,
   useRef,
   type KeyboardEvent,
+  type ReactElement,
   type ReactNode,
 } from "react";
 import type { Action, Card, View } from "./api/client.ts";
@@ -12,6 +13,7 @@ import { onFirstClick } from "./clicks.ts";
 import {
   choosable,
   playsOf,
+  targetOf,
   ROWS,
   rowPlay,
   selfPlay,
@@ -153,7 +155,13 @@ export function Board({
   const act =
     playing === undefined
       ? undefined
-      : { names, disabled: playing.disabled, onPlay: playing.onPlay };
+      : {
+          names,
+          disabled: playing.disabled,
+          onPlay: playing.onPlay,
+          // A Scarecrow chosen: it goes over a unit, not in a row.
+          taking: plays.some((play) => targetOf(play).kind === "unit"),
+        };
 
   return (
     <section
@@ -469,48 +477,69 @@ function BoardRow({
         role="list"
         className="relative flex min-w-0 flex-1 justify-center-safe gap-1 overflow-x-auto"
       >
-        {row.units.map((unit, index) => {
-          const face = (
-            <CardFace
-              card={unit.card}
-              strength={unit.strength}
-              name={unitText(unit)}
-            />
-          );
-          const play = targets?.unit(unit.card.id);
-          const cell = cellOf.unit(side, kind, index);
-          return (
-            // Copies of a unit share its id, so the place in the row is the key.
-            <li
-              key={`unit-${String(index)}`}
-              data-cell={cell}
-              className={held(stage, cell)}
-            >
-              {targets === undefined || play === undefined ? (
-                face
-              ) : (
-                <TargetButton targets={targets} play={play}>
-                  {face}
-                </TargetButton>
-              )}
-            </li>
-          );
-        })}
+        {placed(
+          row.units.map((unit, index) => {
+            const face = (
+              <CardFace
+                card={unit.card}
+                strength={unit.strength}
+                name={unitText(unit)}
+              />
+            );
+            const play = targets?.unit(unit.card.id);
+            const cell = cellOf.unit(side, kind, index);
+            return (
+              // Copies of a unit share its id, so the place in the row is the key.
+              <li
+                key={`unit-${String(index)}`}
+                data-cell={cell}
+                className={`${held(stage, cell)} ${
+                  targets?.taking === true && play === undefined
+                    ? "opacity-45"
+                    : ""
+                }`}
+              >
+                {targets === undefined || play === undefined ? (
+                  face
+                ) : (
+                  <TargetButton targets={targets} play={play}>
+                    {face}
+                    <span
+                      aria-hidden
+                      className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 bg-black/80 text-center font-display text-[0.65rem] text-gold-200"
+                    >
+                      Take back
+                    </span>
+                  </TargetButton>
+                )}
+              </li>
+            );
+          }),
+          // Units destroyed, until they have burned, where they were: only a
+          // picture, as the log says what happened.
+          (stage.ghosts.get(cellOf.row(side, kind)) ?? []).map(
+            (ghost, index) => ({
+              index: ghost.burnt?.index,
+              element: (
+                <li
+                  key={`ghost-${String(index)}`}
+                  aria-hidden
+                  data-ghost={ghost.card.id}
+                  className={ghost.burning ? "animate-burn" : undefined}
+                >
+                  <CardFace
+                    card={ghost.card}
+                    strength={ghost.burnt?.strength}
+                    name={cardText(ghost.card)}
+                  />
+                </li>
+              ),
+            }),
+          ),
+        )}
         {row.scarecrows.map((card, index) => (
           <li key={`scarecrow-${String(index)}`}>
             <CardFace card={card} name={cardText(card)} />
-          </li>
-        ))}
-        {/* Units destroyed, until they have burned: only a picture, as the
-            log says what happened. */}
-        {stage.ghosts.get(cellOf.row(side, kind))?.map((ghost, index) => (
-          <li
-            key={`ghost-${String(index)}`}
-            aria-hidden
-            data-ghost={ghost.card.id}
-            className={ghost.burning ? "animate-burn" : undefined}
-          >
-            <CardFace card={ghost.card} name={cardText(ghost.card)} />
           </li>
         ))}
       </ul>
@@ -530,17 +559,36 @@ function BoardRow({
           </span>
         </TargetButton>
       )}
-      {/* The weather's name last, so it is drawn over the cards. */}
+      {/* The weather's name last, so it is drawn over the row: under the
+          score, where no card goes, even in a full row. */}
       {under !== null && (
         <span
           aria-hidden
-          className="pointer-events-none absolute top-1 right-1 rounded bg-black/65 px-1.5 font-display text-xs text-white italic"
+          className="pointer-events-none absolute bottom-0.5 left-1 rounded bg-black/65 px-1 font-display text-[0.65rem] text-white italic"
         >
           {under}
         </span>
       )}
     </div>
   );
+}
+
+/**
+ * Return the units of a row with the units destroyed put back where they
+ * were, in the order of the view before; one with no place goes last.
+ */
+function placed(
+  units: readonly ReactElement[],
+  ghosts: readonly { index: number | undefined; element: ReactElement }[],
+): ReactElement[] {
+  const all = [...units];
+  const sorted = [...ghosts].sort(
+    (a, b) => (a.index ?? Infinity) - (b.index ?? Infinity),
+  );
+  for (const ghost of sorted) {
+    all.splice(ghost.index ?? all.length, 0, ghost.element);
+  }
+  return all;
 }
 
 /**
@@ -552,6 +600,8 @@ function BoardRow({
  *   this id, if it may (a Scarecrow).
  * @property shortcut - The key that plays it in this row: 1, 2 or 3.
  * @property theirs - Whether the row is on the AI's side.
+ * @property taking - Whether the card chosen goes over a unit (a Scarecrow):
+ *   the units it can't go over are dimmed.
  * @property names - Each card's name by id, for the buttons' names.
  * @property disabled - Whether nothing can be played now.
  * @property onPlay - Called with the play of the button clicked.
@@ -561,6 +611,7 @@ interface RowTargets {
   unit: (id: string) => CardAction | undefined;
   shortcut: string;
   theirs: boolean;
+  taking: boolean;
   names: ReadonlyMap<string, string>;
   disabled: boolean;
   onPlay: (action: Action) => void;
@@ -576,7 +627,7 @@ function TargetButton({
   targets,
   play,
   shortcut,
-  className = "relative block rounded-md after:absolute after:inset-0 after:rounded-md after:ring-2 after:ring-gold-300 after:ring-inset hover:brightness-125",
+  className = "relative block rounded-md shadow-[0_0_10px_2px] shadow-gold-300/80 after:absolute after:inset-0 after:rounded-md after:ring-3 after:ring-gold-200 after:ring-inset hover:brightness-125",
   children,
 }: {
   targets: RowTargets;
@@ -650,7 +701,9 @@ function Hand({
   const list = { playing, plays, names };
   return (
     <div className="flex flex-col gap-2 rounded-lg border-2 border-gold-600/80 bg-gold-400/10 p-2 shadow-inner shadow-black/40 lg:col-start-2 lg:row-start-3">
-      {revivable.length > 0 && (
+      {/* While reviving, the units to revive take the hand's place, whose
+          cards can't be chosen then: the board never grows. */}
+      {revivable.length > 0 ? (
         <div>
           <h3
             id={reviveId}
@@ -666,27 +719,28 @@ function Hand({
             choosable={ids}
           />
         </div>
+      ) : (
+        <div>
+          <h3
+            id={id}
+            className="mb-1 font-display text-xs tracking-widest text-gold-300/80 uppercase"
+          >
+            Your hand
+          </h3>
+          {view.hand.length === 0 ? (
+            <p className="text-sm italic opacity-70">Your hand is empty.</p>
+          ) : (
+            <CardList
+              {...list}
+              labelledBy={id}
+              cards={view.hand}
+              from="hand"
+              // While reviving, only the discard pile's units can be chosen.
+              choosable={view.reviving ? new Set() : ids}
+            />
+          )}
+        </div>
       )}
-      <div>
-        <h3
-          id={id}
-          className="mb-1 font-display text-xs tracking-widest text-gold-300/80 uppercase"
-        >
-          Your hand
-        </h3>
-        {view.hand.length === 0 ? (
-          <p className="text-sm italic opacity-70">Your hand is empty.</p>
-        ) : (
-          <CardList
-            {...list}
-            labelledBy={id}
-            cards={view.hand}
-            from="hand"
-            // While reviving, only the discard pile's units can be chosen.
-            choosable={view.reviving ? new Set() : ids}
-          />
-        )}
-      </div>
     </div>
   );
 }
@@ -737,11 +791,19 @@ function CardList({
       role="list"
       aria-labelledby={labelledBy}
       onKeyDown={onKeyDown}
-      className="flex justify-center-safe gap-1.5 overflow-x-auto pt-2.5 pl-1.5"
+      // Up to ten cards fit side by side on a laptop's screen; eleven, with
+      // no gap; more overlap a little, and the one pointed at or focused
+      // comes on top.
+      className={`flex justify-center-safe overflow-x-auto pt-2.5 pl-1.5 ${
+        cards.length > 11 ? "-space-x-2" : cards.length > 10 ? "" : "gap-1.5"
+      }`}
     >
       {cards.map((card, index) => (
         // Copies of a card share its id, so the place in the list is the key.
-        <li key={index}>
+        <li
+          key={index}
+          className="relative hover:z-10 has-focus-visible:z-10 has-aria-pressed:z-10"
+        >
           {playing !== undefined && choosable.has(card.id) ? (
             <CardButton
               card={card}

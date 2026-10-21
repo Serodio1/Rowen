@@ -68,10 +68,18 @@ export function Showcase({
  * A card pointed at or focused, large on the right where cards played show,
  * with what it does underneath.
  *
+ * A unit on the board whose strength isn't the card's says what it is now.
+ *
  * It is only a picture: screen readers read what a card does from the card
- * itself (`aria-description`).
+ * itself (`aria-description`), and its strength from its name.
  */
-export function CardPreview({ card }: { card: Card }) {
+export function CardPreview({
+  card,
+  strength,
+}: {
+  card: Card;
+  strength?: number | undefined;
+}) {
   return (
     <div
       aria-hidden
@@ -81,6 +89,16 @@ export function CardPreview({ card }: { card: Card }) {
       <div className="drop-shadow-2xl [zoom:2.5]">
         <CardFace card={card} name={cardText(card)} size="large" />
       </div>
+      {card.type === "unit" &&
+        strength !== undefined &&
+        strength !== card.strength && (
+          <p
+            data-now
+            className="rounded-md border border-gold-400 bg-wood-950/95 px-3 py-1 font-display text-lg text-gold-200 shadow-lg shadow-black/60"
+          >
+            Now {strength}
+          </p>
+        )}
       {card.description.length > 0 && (
         <div className="w-full rounded-lg border border-gold-600 bg-wood-950/95 p-3 text-sm shadow-xl shadow-black/60">
           {card.description.map((text) => (
