@@ -1,16 +1,19 @@
 /**
- * How the page plays out a move: the steps of its animation, worked out from
- * the events the server sent and the views before and after it.
+ * How the page plays out moves: the steps of their animation, worked out from
+ * the events the server sent and the view after each move.
  *
- * The page shows the view after the move at once, but holds back the cards
- * the move put on the board, and plays the move's events one at a time: each
- * card played comes up large on the right of the screen, then goes to its
- * place, which only then shows it. So the player sees the AI's moves one after
- * another, not all at once. Nothing here knows the rules (ADR 0002): where a
- * card goes is where the view after the move has it, or where its event says.
+ * The page plays the moves' events one at a time: each card played comes up
+ * large on the right of the screen, then goes to its place, which only then
+ * shows it. While a card comes up, the board is still as it was before; once
+ * it goes, the board is as the server left it after that card's move, with
+ * the cards that move put there still to come held back. A player passing
+ * and a round ending show on the board as it was; the next round, on the
+ * board after. So the player sees the AI's moves one after another, and each
+ * score as it was then. Nothing here knows the rules (ADR 0002): where a card
+ * goes, and every score, are where and what the server's views say.
  */
 import { useEffect, useState } from "react";
-import type { Card, Event, View } from "./api/client.ts";
+import type { Card, Event, MovePlayed, View } from "./api/client.ts";
 import { eventText } from "./text.ts";
 
 /** How long each part of a step takes, in milliseconds. */
@@ -28,7 +31,8 @@ export const TIMES = {
 } as const;
 
 /**
- * One step of a move's animation.
+ * One step of a move's animation, and the view of the match the board shows
+ * then.
  *
  * - `play`: a card played from a hand (or revived from a discard pile)
  *   shows large on the right, then goes to `cell`.
@@ -44,6 +48,10 @@ export const TIMES = {
  *   card held back doesn't hit its rows yet either.
  * @property cleared - For Clear Skies, the weather cards it clears: the
  *   board still shows them, and their rows under them, until it lands.
+ * @property view - The view the board shows during the step: the one after
+ *   the card's move.
+ * @property waiting - The view the board shows while a card played comes up
+ *   large, before it goes: the one before.
  */
 export interface CardStep {
   kind: "play" | "muster" | "burn";
@@ -51,6 +59,8 @@ export interface CardStep {
   cell: string | undefined;
   hides: boolean;
   cleared?: readonly WeatherCard[];
+  view: View;
+  waiting: View;
 }
 
 /** A weather card in play, as a side of the view lists it. */
@@ -63,6 +73,7 @@ export type WeatherCard = View["players"][number]["weather"][number];
 export interface Announcement {
   kind: "announce";
   text: string;
+  view: View;
 }
 
 /** One step of a move's animation: a card's, or a big message. */
@@ -157,6 +168,10 @@ export function stepsOf(
   const steps: Step[] = [];
   const names = new Map([...cards].map(([id, card]) => [id, card.name]));
   let round = before?.round ?? after.round;
+  // The view the board shows: the one before the move until a card of the
+  // move goes to its place, or the next round begins. (At the start of the
+  // match there is none before: the board shows the view after.)
+  let board = before ?? after;
   function add(
     kind: CardStep["kind"],
     id: string,
@@ -166,7 +181,15 @@ export function stepsOf(
     const card = cards.get(id);
     // A card no view shows can't be drawn: it has no step.
     if (card !== undefined) {
-      steps.push({ kind, card, cell, hides: hides && cell !== undefined });
+      steps.push({
+        kind,
+        card,
+        cell,
+        hides: hides && cell !== undefined,
+        view: after,
+        waiting: board,
+      });
+      board = after;
     }
   }
   for (const event of events) {
@@ -215,17 +238,24 @@ export function stepsOf(
         steps.push({
           kind: "announce",
           text: eventText(event, after.player, names, round),
+          view: board,
         });
         break;
       case "round_ended":
         steps.push({
           kind: "announce",
           text: eventText(event, after.player, names, round),
+          view: board,
         });
         round += 1;
         // The next round begins, unless the match is over.
         if (!events.some((later) => later.type === "match_ended")) {
-          steps.push({ kind: "announce", text: `Round ${String(round)}` });
+          board = after;
+          steps.push({
+            kind: "announce",
+            text: `Round ${String(round)}`,
+            view: board,
+          });
         }
         break;
       default:
@@ -235,6 +265,38 @@ export function stepsOf(
     }
   }
   return steps;
+}
+
+/**
+ * Return the steps of the animation of `moves`, one after the other, from the
+ * view `before` the first one (none at the start of the match).
+ */
+export function stepsOfMoves(
+  moves: readonly MovePlayed[],
+  before: View | undefined,
+): Step[] {
+  return moves.flatMap((move, index) =>
+    stepsOf(
+      move.events,
+      index === 0 ? before : moves[index - 1]?.view,
+      move.view,
+    ),
+  );
+}
+
+/**
+ * Return the view the board shows at `progress` in `steps`, or `undefined`
+ * once they are over: the board then shows the match as it is.
+ */
+export function viewAt(
+  steps: readonly Step[],
+  progress: Progress,
+): View | undefined {
+  const step = steps[progress.step];
+  if (step?.kind === "play" && !progress.flying) {
+    return step.waiting;
+  }
+  return step?.view;
 }
 
 /**
@@ -295,13 +357,22 @@ export interface Stage {
   lingering?: readonly WeatherCard[] | undefined;
 }
 
-/** Return what the board shows at `progress` in `steps`. */
+/**
+ * Return what the board shows at `progress` in `steps`, in the view it shows
+ * then ({@link viewAt}): only the steps still to come in that view hold its
+ * cards back, as the places they name are in it.
+ */
 export function stageOf(steps: readonly Step[], progress: Progress): Stage {
   const hidden = new Set<string>();
   const ghosts = new Map<string, Ghost[]>();
   let lingering: readonly WeatherCard[] | undefined;
+  const view = viewAt(steps, progress);
   steps.forEach((step, index) => {
-    if (index < progress.step || step.kind === "announce") {
+    if (
+      index < progress.step ||
+      step.kind === "announce" ||
+      step.view !== view
+    ) {
       return;
     }
     // The first Clear Skies still to land: the weather it clears stays.
