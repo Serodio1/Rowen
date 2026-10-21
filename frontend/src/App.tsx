@@ -9,6 +9,15 @@ import {
   type RequestError,
 } from "./api/requests.ts";
 import { Board } from "./Board.tsx";
+import { Showcase } from "./Showcase.tsx";
+import {
+  mayMove,
+  NO_STEPS,
+  stageOf,
+  stepsOf,
+  usePlayOut,
+  type Step,
+} from "./stage.ts";
 import { onFirstClick } from "./clicks.ts";
 import {
   otherActions,
@@ -180,6 +189,13 @@ function PlayMatch({
           },
         ],
   );
+  // The animation of the last move, or of the AI's first one: none with
+  // reduced motion.
+  const [steps, setSteps] = useState<readonly Step[]>(() =>
+    mayMove() ? stepsOf(started.events, undefined, started.view) : NO_STEPS,
+  );
+  const progress = usePlayOut(steps);
+  const showing = steps[progress.step];
   const resultId = useId();
   // The card the player chose, with the version of the view it was chosen
   // in: a new view lets it go.
@@ -212,6 +228,9 @@ function PlayMatch({
         before?.round ?? played.view.round,
       );
       setLog((log) => [{ number: log.length + 1, ...entry }, ...log]);
+      setSteps(
+        mayMove() ? stepsOf(played.events, before, played.view) : NO_STEPS,
+      );
       queryClient.setQueryData(query.queryKey, matchOf(played));
     },
     onError: (error) => {
@@ -350,7 +369,19 @@ function PlayMatch({
         ref={boardArea}
         className="lg:col-start-1 lg:row-span-3 lg:row-start-1"
       >
-        <Board view={view} playing={view.match_over ? undefined : playing} />
+        <Board
+          view={view}
+          playing={view.match_over ? undefined : playing}
+          stage={stageOf(steps, progress)}
+        />
+        {showing?.kind === "play" && (
+          // A new element for each card, which comes up from nothing.
+          <Showcase
+            key={progress.step}
+            step={showing}
+            flying={progress.flying}
+          />
+        )}
       </div>
       <div ref={movesArea} className="lg:col-start-2 lg:row-start-2">
         {view.match_over ? (

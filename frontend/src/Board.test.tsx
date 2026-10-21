@@ -416,3 +416,35 @@ test("the same weather, played by both players, is shown twice", () => {
     "Hoarfrost (weather on melee)",
   ]);
 });
+
+test("while a move plays out, its cards are held back and the units destroyed burn in their rows", () => {
+  render(
+    <Board
+      view={view({ players: [side({ weather: [HOARFROST] }), side()] })}
+      stage={{
+        hidden: new Set(["weather:0:0"]),
+        ghosts: new Map([
+          [
+            "1:siege",
+            [
+              { card: SOLDIER, burning: true },
+              { card: SOLDIER, burning: false },
+            ],
+          ],
+        ]),
+      }}
+    />,
+  );
+
+  expect(document.querySelector('[data-cell="weather:0:0"]')).toHaveClass(
+    "opacity-0",
+  );
+  const ghosts = [
+    ...screen
+      .getByRole("group", { name: /^The AI's siege row/ })
+      .querySelectorAll("[data-ghost]"),
+  ];
+  expect(ghosts.map((ghost) => ghost.className)).toEqual(["animate-burn", ""]);
+  // Only pictures: the log says what happened.
+  expect(ghosts.every((ghost) => ghost.getAttribute("aria-hidden"))).toBe(true);
+});
