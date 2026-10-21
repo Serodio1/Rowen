@@ -335,9 +335,11 @@ function BoardRow({
           <CardFace card={row.horn} name={cardText(row.horn)} />
         )}
       </div>
+      {/* As high as the War Horn's place: a row is as high with cards as
+          without, so the board never grows. */}
       <ul
         role="list"
-        className="relative flex min-w-0 flex-1 justify-center-safe gap-1 overflow-x-auto py-1.5 pl-1.5"
+        className="relative flex min-w-0 flex-1 justify-center-safe gap-1 overflow-x-auto"
       >
         {row.units.map((unit, index) => {
           const face = (
@@ -427,7 +429,7 @@ function TargetButton({
   targets,
   play,
   shortcut,
-  className = "block rounded-md ring-2 ring-gold-300 hover:-translate-y-1",
+  className = "relative block rounded-md after:absolute after:inset-0 after:rounded-md after:ring-2 after:ring-gold-300 after:ring-inset hover:brightness-125",
   children,
 }: {
   targets: RowTargets;

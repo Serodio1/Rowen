@@ -19,25 +19,43 @@ test("the match fits a laptop's screen, and nothing sticks out on a phone", asyn
   await page.getByRole("button", { name: "Keep this hand" }).click();
   await expect(page.getByText("Choose a card to play, or pass.")).toBeVisible();
 
+  // The ten cards of the hand at the start, without scrolling it.
+  const hand = page.getByRole("list", { name: "Your hand" });
+  await expect(hand.getByRole("listitem")).toHaveCount(10);
+  expect(
+    await hand.evaluate((list) => list.scrollWidth - list.clientWidth),
+  ).toBe(0);
+
+  // A few moves, so some rows have cards and others don't.
+  const entries = page.getByRole("log").getByRole("listitem");
+  for (let n = 0; n < 4; n++) {
+    const count = await entries.count();
+    await page.locator("[data-choosable]").first().click();
+    await page.locator("[data-target]").first().click();
+    await expect(entries).toHaveCount(count + 1);
+  }
+
+  // A row is as high with cards as without: the board doesn't grow as the
+  // rows fill up, so it still fits once they all have cards.
+  const rows = page
+    .getByRole("region", { name: "Board" })
+    .getByRole("group", { name: /row: / });
+  await expect(rows).toHaveCount(6);
+  const heights = await rows.evaluateAll((all) =>
+    all.map((row) => row.getBoundingClientRect().height),
+  );
+  expect(new Set(heights).size).toBe(1);
+
   // The board, the hand, the moves and what happened: all on one screen.
   expect(await scrolls(page)).toEqual({ across: 0, down: 0 });
   for (const shown of [
     page.getByRole("region", { name: "Board" }),
-    page.getByRole("list", { name: "Your hand" }),
+    hand,
     page.getByRole("button", { name: "Pass" }),
     page.getByRole("log"),
   ]) {
     await expect(shown).toBeInViewport({ ratio: 1 });
   }
-  // The ten cards of the hand at the start, without scrolling it.
-  await expect(
-    page.getByRole("list", { name: "Your hand" }).getByRole("listitem"),
-  ).toHaveCount(10);
-  expect(
-    await page
-      .getByRole("list", { name: "Your hand" })
-      .evaluate((hand) => hand.scrollWidth - hand.clientWidth),
-  ).toBe(0);
 
   for (const [width, height] of [
     [390, 844],
