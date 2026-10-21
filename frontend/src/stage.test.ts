@@ -256,3 +256,34 @@ test("the board holds back the cards of the steps not done, and shows the units 
   const over = stageOf(STEPS, { step: 3, flying: false });
   expect(over.ghosts.size).toBe(0);
 });
+
+test("a Clear Skies keeps the weather it clears on the board until it lands", () => {
+  const clearSkies = {
+    ...WILDFIRE,
+    id: "clear-skies",
+    name: "Clear Skies",
+    kind: "clear-skies",
+  } satisfies Card;
+  const before = view({
+    hand: [clearSkies],
+    players: [side({ weather: [HOARFROST] }), side()],
+  });
+  const events: Event[] = [
+    { type: "weather_cleared", player: 0, card: "clear-skies" },
+  ];
+
+  const steps = stepsOf(events, before, view());
+  expect(steps).toEqual<Step[]>([
+    {
+      kind: "play",
+      card: clearSkies,
+      cell: cellOf.discard(0),
+      hides: false,
+      cleared: [HOARFROST],
+    },
+  ]);
+  expect(stageOf(steps, { step: 0, flying: true }).lingering).toEqual([
+    HOARFROST,
+  ]);
+  expect(stageOf(steps, { step: 1, flying: false }).lingering).toBeUndefined();
+});

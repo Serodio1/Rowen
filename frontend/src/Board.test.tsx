@@ -450,3 +450,51 @@ test("while a move plays out, its cards are held back and the units destroyed bu
   // Only pictures: the log says what happened.
   expect(ghosts.every((ghost) => ghost.getAttribute("aria-hidden"))).toBe(true);
 });
+
+test("a weather card still on its way doesn't hit its rows yet", () => {
+  render(
+    <Board
+      view={view({
+        players: [
+          side({
+            weather: [HOARFROST],
+            rows: {
+              ...side().rows,
+              melee: { ...side().rows.melee, weathered: true },
+            },
+          }),
+          side(),
+        ],
+      })}
+      stage={{ hidden: new Set(["weather:0:0"]), ghosts: new Map() }}
+    />,
+  );
+
+  expect(
+    screen.getByRole("group", { name: "Your melee row: 0" }),
+  ).toBeInTheDocument();
+});
+
+test("while a Clear Skies is on its way, the weather it clears still shows", () => {
+  // The view after it: no weather any more.
+  render(
+    <Board
+      view={view()}
+      stage={{ hidden: new Set(), ghosts: new Map(), lingering: [HOARFROST] }}
+    />,
+  );
+
+  expect(
+    screen.getByRole("group", { name: "Your melee row: 0, under Hoarfrost" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("group", {
+      name: "The AI's melee row: 0, under Hoarfrost",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("group", { name: "Weather" })).getByRole("img", {
+      name: /^Hoarfrost/,
+    }),
+  ).toBeInTheDocument();
+});
