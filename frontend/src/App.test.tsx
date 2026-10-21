@@ -1408,6 +1408,33 @@ test("once the last move has played out, the end of the match shows each round a
   expect(within(end).getByRole("button", { name: "Play again" })).toHaveFocus();
 });
 
+test("pointing at a row or a pile, and not at a card in it, shows no card", async () => {
+  const turn = view({
+    players: [side({ discard: [SOLDIER] }), side()],
+    legal_actions: [{ type: "pass" }],
+  });
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(turn) });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  await screen.findByText("Choose a card to play, or pass.");
+
+  fireEvent.mouseOver(
+    screen.getByRole("group", { name: "Your deck and discard pile" }),
+  );
+  expect(preview()).toBeNull();
+  fireEvent.mouseOver(screen.getByRole("group", { name: /^Your melee row/ }));
+  expect(preview()).toBeNull();
+
+  // The card itself does.
+  fireEvent.mouseOver(
+    within(
+      screen.getByRole("group", { name: "Your deck and discard pile" }),
+    ).getByRole("img", { name: /^Soldier/ }),
+  );
+  expect(preview()).toHaveAttribute("data-preview", "soldier");
+});
+
 test("clicking a discard pile lists its cards beside the board, the most recent first", async () => {
   const sniper = { ...SOLDIER, id: "sniper", name: "Sniper" };
   const turn = view({

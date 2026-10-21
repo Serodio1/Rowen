@@ -75,8 +75,34 @@ export function Board({
   // The index of each side in the view, for the places on the board.
   const mine = view.player;
   const theirSide = 1 - view.player;
-  // Weather hits both sides, so it is shown once, for both.
-  const weather = [...ai.weather, ...you.weather];
+  // Weather hits both sides, so it is shown once, for both: what the view
+  // has, or, while a Clear Skies is on its way, the weather it clears.
+  const weatherCards = stage.lingering
+    ? stage.lingering.map((card, index) => ({
+        card,
+        cell: `lingering:${String(index)}`,
+      }))
+    : [
+        ...ai.weather.map((card, index) => ({
+          card,
+          cell: cellOf.weather(theirSide, index),
+        })),
+        ...you.weather.map((card, index) => ({
+          card,
+          cell: cellOf.weather(mine, index),
+        })),
+      ];
+  // A weather card still on its way doesn't hit its rows yet.
+  const weather = weatherCards
+    .filter(({ cell }) => !stage.hidden.has(cell))
+    .map(({ card }) => card);
+  /** Return whether the row `row` of `side` shows under weather now. */
+  const weathered = (side: Side, row: Row) =>
+    weather.some((card) => card.weather_row === row) ||
+    // Weather the page shows no card for still shows.
+    (stage.lingering === undefined &&
+      side.rows[row].weathered &&
+      !weatherCards.some(({ card }) => card.weather_row === row));
   const names = cardNames(view);
   const chosen = playing?.chosen ?? null;
   const plays =
@@ -138,19 +164,7 @@ export function Board({
     >
       <div className="grid grid-cols-3 gap-2 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:grid-cols-1 lg:content-center lg:gap-6">
         <PlayerPanel name="The AI" side={ai} ahead={ai.total > you.total} />
-        <Weather
-          cards={[
-            ...ai.weather.map((card, index) => ({
-              card,
-              cell: cellOf.weather(theirSide, index),
-            })),
-            ...you.weather.map((card, index) => ({
-              card,
-              cell: cellOf.weather(mine, index),
-            })),
-          ]}
-          hidden={stage.hidden}
-        />
+        <Weather cards={weatherCards} hidden={stage.hidden} />
         <PlayerPanel name="You" side={you} ahead={you.total > ai.total} />
       </div>
       <div className="flex flex-col gap-2 lg:col-start-2 lg:row-start-1">
@@ -163,6 +177,7 @@ export function Board({
             stage={stage}
             row={ai.rows[row]}
             weather={weather.find((card) => card.weather_row === row)}
+            weathered={weathered(ai, row)}
             bubble="bg-enemy"
             targets={
               act && theirs
@@ -188,6 +203,7 @@ export function Board({
             stage={stage}
             row={you.rows[row]}
             weather={weather.find((card) => card.weather_row === row)}
+            weathered={weathered(you, row)}
             bubble="bg-ally"
             targets={
               act && {
@@ -382,6 +398,8 @@ function Weather({
  * @param stage - What the board shows while a move plays out: the cards
  *   held back, and the units destroyed still burning.
  * @param weather - The weather card that hits this row, if one is in play.
+ * @param weathered - Whether the row shows under weather now: not while
+ *   the weather card is still on its way.
  * @param bubble - The colour of the score's bubble: the player's or the AI's.
  * @param targets - Where the card chosen may go in this row: the whole row
  *   lights up as a button, or each unit it may go over. On the AI's side,
@@ -394,6 +412,7 @@ function BoardRow({
   stage,
   row,
   weather,
+  weathered,
   bubble,
   targets,
 }: {
@@ -403,10 +422,11 @@ function BoardRow({
   stage: Stage;
   row: RowView;
   weather: SpecialCard | undefined;
+  weathered: boolean;
   bubble: string;
   targets?: RowTargets | undefined;
 }) {
-  const under = row.weathered ? (weather?.name ?? "weather") : null;
+  const under = weathered ? (weather?.name ?? "weather") : null;
   const name = `${label}: ${String(row.score)}${under === null ? "" : `, under ${under}`}`;
   const horn = cellOf.horn(side, kind);
   return (

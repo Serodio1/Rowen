@@ -682,13 +682,19 @@ function matchOf(played: Played): Match {
 /**
  * Return the id of the card at `target` (its face, or a button around it),
  * or null if it isn't one.
+ *
+ * Only a button may hold the card: any other element around cards, such as
+ * a row or a pile, isn't one of them.
  */
 function cardIn(target: EventTarget): string | null {
   if (!(target instanceof Element)) {
     return null;
   }
   const card =
-    target.closest("[data-card]") ?? target.querySelector("[data-card]");
+    target.closest("[data-card]") ??
+    (target instanceof HTMLButtonElement
+      ? target.querySelector("[data-card]")
+      : null);
   return card?.getAttribute("data-card") ?? null;
 }
 
