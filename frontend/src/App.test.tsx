@@ -1553,6 +1553,10 @@ test("while moves play out, the board shows the match as it was then, up to the 
       .nextElementSibling?.textContent;
   const round = () => screen.getByRole("heading", { level: 2 }).textContent;
   const place = () => document.querySelector('[data-cell="1:melee:0"]');
+  // How round 1 went: in the log at once, and beside the board once it is
+  // over there.
+  const result = () =>
+    screen.queryAllByText("Round 1: the AI won, 4 to 0.").length;
 
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
   await screen.findByText("The AI played Soldier in the melee row.");
@@ -1567,6 +1571,8 @@ test("while moves play out, the board shows the match as it was then, up to the 
   // The AI passes and the round ends, on the board of round 1.
   await act(() => vi.advanceTimersByTimeAsync(TIMES.fly));
   expect(place()).not.toHaveClass("opacity-0");
+  // Only in the log yet.
+  expect(result()).toBe(1);
   await act(() => vi.advanceTimersByTimeAsync(TIMES.announce));
   expect(round()).toBe("Round 1");
   expect(place()).not.toBeNull();
@@ -1577,4 +1583,5 @@ test("while moves play out, the board shows the match as it was then, up to the 
   expect(round()).toBe("Round 2");
   expect(place()).toBeNull();
   expect(theAis()).toBe("0");
+  expect(result()).toBe(2);
 });
