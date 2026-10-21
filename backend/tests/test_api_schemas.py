@@ -39,6 +39,7 @@ SNIPER_JSON = {
     "ability": None,
     "group": None,
     "legend": False,
+    "opponent_side": False,
 }
 SOLDIER_JSON = {
     "type": "unit",
@@ -49,6 +50,7 @@ SOLDIER_JSON = {
     "ability": "agile",
     "group": None,
     "legend": False,
+    "opponent_side": False,
 }
 THICK_FOG_JSON = {
     "type": "special",
@@ -295,6 +297,29 @@ def test_a_special_card_says_which_row_its_weather_hits(
     assert sent["hand"][0]["weather_row"] == weather_row
 
 
+@pytest.mark.parametrize("ability", [None, *engine.Ability])
+def test_a_unit_says_whether_it_goes_on_the_opponents_side(
+    ability: engine.Ability | None,
+) -> None:
+    card = engine.UnitCard(
+        id="unit",
+        name="Unit",
+        # An Agile unit has two rows, and Bond and Muster units a group.
+        rows=(MELEE, RANGED) if ability is engine.Ability.AGILE else (MELEE,),
+        strength=1,
+        ability=ability,
+        group="group"
+        if ability in (engine.Ability.BOND, engine.Ability.MUSTER)
+        else None,
+    )
+    view = replace(EMPTY_VIEW, hand=(card,))
+
+    sent = json.loads(schemas.from_view(view).model_dump_json())
+
+    # Written out, not taken from the engine: only a Spy does.
+    assert sent["hand"][0]["opponent_side"] is (ability is engine.Ability.SPY)
+
+
 def test_every_kind_of_special_card_is_tested_for_its_weather_row() -> None:
     assert set(WEATHER_ROWS_JSON) == set(engine.SpecialKind)
 
@@ -437,9 +462,10 @@ def test_every_view_of_a_match_is_sent_as_it_is(seed: int) -> None:
         sent = schemas.from_view(view)
         text = sent.model_dump_json()
         # Field by field, the JSON is the view, with a "type" on each card and
-        # action, and the right "weather_row" on each special card.
+        # action, the right "weather_row" on each special card and the right
+        # "opponent_side" on each unit.
         assert as_text(without_types(json.loads(text))) == as_text(
-            with_weather_rows(asdict(view))
+            with_rules(asdict(view))
         )
         # And what the JSON reads back as is what was sent.
         assert schemas.PlayerView.model_validate_json(text) == sent
@@ -584,9 +610,7 @@ def test_every_event_of_a_match_is_sent_as_the_player_sees_it(seed: int) -> None
             # player see it, with a "type" (and the right "weather_row" on each
             # special card).
             seen = [asdict(event) for event in engine.player_events(events, player)]
-            assert as_text(without_types(json.loads(text))) == as_text(
-                with_weather_rows(seen)
-            )
+            assert as_text(without_types(json.loads(text))) == as_text(with_rules(seen))
             # And what the JSON reads back as is what was sent.
             assert EVENTS.validate_json(text) == sent
 
@@ -611,17 +635,21 @@ def without_types(value: Any) -> Any:
     return value
 
 
-def with_weather_rows(value: Any) -> Any:
-    """Return a value from ``asdict`` with the "weather_row" the API adds.
+def with_rules(value: Any) -> Any:
+    """Return a value from ``asdict`` with the rules the API adds to the cards.
 
     Only special cards have a "kind", so each dict with one gets the row its
-    weather hits, from ``WEATHER_ROWS_JSON``, wherever the card is.
+    weather hits, from ``WEATHER_ROWS_JSON``, wherever the card is. Only units
+    have a "legend", so each dict with one gets whether it goes on the
+    opponent's side: only a Spy does.
     """
     if isinstance(value, dict):
-        added = {key: with_weather_rows(item) for key, item in value.items()}
+        added = {key: with_rules(item) for key, item in value.items()}
         if "kind" in value:
             added["weather_row"] = WEATHER_ROWS_JSON[value["kind"]]
+        if "legend" in value:
+            added["opponent_side"] = value["ability"] == "spy"
         return added
     if isinstance(value, (list, tuple)):
-        return [with_weather_rows(item) for item in value]
+        return [with_rules(item) for item in value]
     return value

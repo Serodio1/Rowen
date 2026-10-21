@@ -625,6 +625,10 @@ export interface components {
     /**
      * UnitCard
      * @description A unit, as ``engine.UnitCard`` describes it.
+     *
+     *     ``opponent_side`` says whether the unit goes on the side of the opponent
+     *     of who plays it or revives it, as a Spy does. It is a rule, so the API
+     *     says it: the page doesn't know the rules (ADR 0002).
      */
     UnitCard: {
       /**
@@ -645,6 +649,8 @@ export interface components {
       group: string | null;
       /** Legend */
       legend: boolean;
+      /** Opponent Side */
+      opponent_side: boolean;
     };
     /**
      * UnitDestroyed

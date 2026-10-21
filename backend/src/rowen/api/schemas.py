@@ -47,7 +47,12 @@ class Schema(BaseModel):
 
 
 class UnitCard(Schema):
-    """A unit, as ``engine.UnitCard`` describes it."""
+    """A unit, as ``engine.UnitCard`` describes it.
+
+    ``opponent_side`` says whether the unit goes on the side of the opponent
+    of who plays it or revives it, as a Spy does. It is a rule, so the API
+    says it: the page doesn't know the rules (ADR 0002).
+    """
 
     type: Literal["unit"]
     id: str
@@ -57,6 +62,7 @@ class UnitCard(Schema):
     ability: Ability | None
     group: str | None
     legend: bool
+    opponent_side: bool
 
 
 class SpecialCard(Schema):
@@ -545,6 +551,7 @@ def _unit(card: engine.UnitCard) -> UnitCard:
         ability=card.ability,
         group=card.group,
         legend=card.legend,
+        opponent_side=engine.on_opponent_side(card),
     )
 
 

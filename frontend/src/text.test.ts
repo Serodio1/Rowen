@@ -65,6 +65,19 @@ test.each<[Action, string]>([
   expect(actionText(action, NAMES)).toBe(text);
 });
 
+test.each<[Action, string]>([
+  [
+    { type: "play_unit", card: "medic", row: "melee" },
+    "Play Medic in the AI's melee row",
+  ],
+  [
+    { type: "revive", card: "medic", row: "siege" },
+    "Revive Medic in the AI's siege row",
+  ],
+])("a unit that goes on the AI's side says so: %j", (action, text) => {
+  expect(actionText(action, NAMES, true)).toBe(text);
+});
+
 test("a card the view doesn't show is named by its id", () => {
   expect(actionText({ type: "redraw", card: "drone" }, NAMES)).toBe(
     "Swap drone",

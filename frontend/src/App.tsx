@@ -10,7 +10,13 @@ import {
 } from "./api/requests.ts";
 import { Board } from "./Board.tsx";
 import { onFirstClick } from "./clicks.ts";
-import { otherActions, type Chosen, type Playing } from "./plays.ts";
+import {
+  otherActions,
+  playsOf,
+  selfPlay,
+  type Chosen,
+  type Playing,
+} from "./plays.ts";
 import {
   actionText,
   cardNames,
@@ -400,6 +406,13 @@ function Controls({ view, playing }: { view: View; playing: Playing }) {
       chosen === null
         ? "Choose a card to swap, or keep this hand."
         : `Click ${name} again to swap it.`;
+  } else if (
+    chosen !== null &&
+    selfPlay(playsOf(view.legal_actions, chosen.card)) !== undefined
+  ) {
+    // Weather, Clear Skies and Wildfire have nowhere to choose: clicking
+    // the card again plays it.
+    hint = `Click ${name} again to play it.`;
   } else if (chosen !== null) {
     hint = `Choose where to play ${name}, or click it again to put it back.`;
   }

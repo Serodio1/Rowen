@@ -23,6 +23,7 @@ together. ``__all__`` is the list of what it offers, and mypy rejects
 importing from here a name that isn't in it.
 """
 
+from rowen.engine.abilities import on_opponent_side
 from rowen.engine.actions import (
     Action,
     EndRedraw,
@@ -118,6 +119,7 @@ __all__ = [
     "WeatherPlayed",
     "WildfirePlayed",
     "apply",
+    "on_opponent_side",
     "player_events",
     "player_view",
     "start_match",

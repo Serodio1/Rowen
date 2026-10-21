@@ -67,6 +67,12 @@ export function Board({ view, playing }: { view: View; playing?: Playing }) {
     playing === undefined || chosen === null
       ? []
       : playsOf(playing.actions, chosen.card);
+  const card =
+    chosen === null
+      ? undefined
+      : (chosen.from === "hand" ? view.hand : you.discard)[chosen.index];
+  // A Spy goes on the AI's side: the API says which units do (ADR 0002).
+  const theirs = card?.type === "unit" && card.opponent_side;
   const board = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -127,6 +133,17 @@ export function Board({ view, playing }: { view: View; playing?: Playing }) {
             row={ai.rows[row]}
             weather={weather.find((card) => card.weather_row === row)}
             bubble="bg-enemy"
+            targets={
+              act && theirs
+                ? {
+                    ...act,
+                    row: rowPlay(plays, row),
+                    unit: () => undefined,
+                    shortcut: String(ROWS.indexOf(row) + 1),
+                    theirs,
+                  }
+                : undefined
+            }
           />
         ))}
       </div>
@@ -141,9 +158,10 @@ export function Board({ view, playing }: { view: View; playing?: Playing }) {
             targets={
               act && {
                 ...act,
-                row: rowPlay(plays, row),
+                row: theirs ? undefined : rowPlay(plays, row),
                 unit: (id) => unitPlay(plays, row, id),
                 shortcut: String(ROWS.indexOf(row) + 1),
+                theirs: false,
               }
             }
           />
@@ -290,9 +308,9 @@ function Weather({ cards }: { cards: SpecialCard[] }) {
  *
  * @param weather - The weather card that hits this row, if one is in play.
  * @param bubble - The colour of the score's bubble: the player's or the AI's.
- * @param targets - On the player's side, where the card chosen may go in
- *   this row: the whole row lights up as a button, or each unit it may go
- *   over.
+ * @param targets - Where the card chosen may go in this row: the whole row
+ *   lights up as a button, or each unit it may go over. On the AI's side,
+ *   only a unit that goes there, such as a Spy, has targets.
  */
 function BoardRow({
   label,
@@ -399,13 +417,14 @@ function BoardRow({
 }
 
 /**
- * Where the card chosen may go in one of the player's rows, and what the
- * buttons need to make the move.
+ * Where the card chosen may go in one row, and what the buttons need to make
+ * the move.
  *
  * @property row - The play that puts the card in the row, if it may go there.
  * @property unit - Return the play that puts the card over the unit with
  *   this id, if it may (a Scarecrow).
  * @property shortcut - The key that plays it in this row: 1, 2 or 3.
+ * @property theirs - Whether the row is on the AI's side.
  * @property names - Each card's name by id, for the buttons' names.
  * @property disabled - Whether nothing can be played now.
  * @property onPlay - Called with the play of the button clicked.
@@ -414,6 +433,7 @@ interface RowTargets {
   row: CardAction | undefined;
   unit: (id: string) => CardAction | undefined;
   shortcut: string;
+  theirs: boolean;
   names: ReadonlyMap<string, string>;
   disabled: boolean;
   onPlay: (action: Action) => void;
@@ -443,7 +463,7 @@ function TargetButton({
       type="button"
       data-target
       // Named as the move: the card under it or "Play here" only show where.
-      aria-label={actionText(play, targets.names)}
+      aria-label={actionText(play, targets.names, targets.theirs)}
       aria-keyshortcuts={shortcut}
       disabled={targets.disabled}
       className={`${className} transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-200 disabled:cursor-not-allowed`}

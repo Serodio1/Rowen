@@ -18,6 +18,7 @@ export const SOLDIER = {
   ability: "agile",
   group: null,
   legend: false,
+  opponent_side: false,
 } satisfies Card;
 
 export const CAPTAIN = {

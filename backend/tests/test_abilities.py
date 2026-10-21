@@ -6,6 +6,7 @@ test_turns.py.
 
 import pytest
 
+from rowen.engine.abilities import on_opponent_side
 from rowen.engine.actions import Action, Pass, PlayUnit, Revive
 from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.events import (
@@ -134,6 +135,21 @@ def test_spy_goes_on_the_opponents_side() -> None:
     assert state.players[1].rows[Row.MELEE].units == (INFORMANT,)
     assert state.players[0].rows[Row.MELEE].units == ()
     assert events[0] == INFORMANT_PLAYED
+
+
+@pytest.mark.parametrize("ability", [None, *Ability])
+def test_only_a_spy_goes_on_the_opponents_side(ability: Ability | None) -> None:
+    unit = UnitCard(
+        id="unit",
+        name="Unit",
+        # An Agile unit has two rows, and Bond and Muster units a group.
+        rows=(Row.MELEE, Row.RANGED) if ability is Ability.AGILE else (Row.MELEE,),
+        strength=1,
+        ability=ability,
+        group="group" if ability in (Ability.BOND, Ability.MUSTER) else None,
+    )
+
+    assert on_opponent_side(unit) is (ability is Ability.SPY)
 
 
 def test_spys_strength_counts_for_the_opponent() -> None:

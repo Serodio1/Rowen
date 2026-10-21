@@ -5,7 +5,7 @@ implemented once, in the part of the engine that matches its kind:
 
 - **Placement**, where the unit goes. Agile needs no code: an Agile unit has
   two rows, so ``legal_actions`` offers both. A Spy goes on the opponent's
-  side, as ``side`` says.
+  side, as ``on_opponent_side`` and ``side`` say.
 - **On play**, once, when the unit is played: Spy, Medic and Muster. Each one
   is a function in the ``ON_PLAY`` table, which ``on_play`` looks up. The
   Medic only starts a choice: the unit to revive is the player's next action,
@@ -33,13 +33,20 @@ SPY_DRAWS = 2
 type OnPlay = Callable[[GameState, int, UnitCard], tuple[GameState, tuple[Event, ...]]]
 
 
-def side(unit: UnitCard, player: int) -> int:
-    """Return the index of the side of the board the unit goes on.
+def on_opponent_side(unit: UnitCard) -> bool:
+    """Return whether the unit goes on the side of the opponent of who plays it.
 
-    A Spy goes on the opponent's side; any other unit goes on the side of
-    ``player``, who plays it (rules, section 5).
+    A Spy does; any other unit goes on the side of the player who plays it
+    (rules, section 5).
     """
-    if unit.ability is Ability.SPY:
+    return unit.ability is Ability.SPY
+
+
+def side(unit: UnitCard, player: int) -> int:
+    """Return the index of the side of the board the unit goes on, when
+    ``player`` plays it or revives it.
+    """
+    if on_opponent_side(unit):
         return 1 - player
     return player
 
