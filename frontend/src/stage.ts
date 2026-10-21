@@ -11,6 +11,7 @@
  */
 import { useEffect, useState } from "react";
 import type { Card, Event, View } from "./api/client.ts";
+import { eventText } from "./text.ts";
 
 /** How long each part of a step takes, in milliseconds. */
 export const TIMES = {
@@ -22,6 +23,8 @@ export const TIMES = {
   muster: 350,
   /** A unit destroyed, burning away. */
   burn: 700,
+  /** A big message over the whole screen, such as "The AI passed." */
+  announce: 1500,
 } as const;
 
 /**
@@ -39,12 +42,24 @@ export const TIMES = {
  *   the step is done: a unit, a War Horn or a weather card. (A Scarecrow, Clear
  *   Skies or Wildfire go to a place that shows more than them.)
  */
-export interface Step {
+export interface CardStep {
   kind: "play" | "muster" | "burn";
   card: Card;
   cell: string | undefined;
   hides: boolean;
 }
+
+/**
+ * A step with no card: a big message over the whole screen, for what has no
+ * card to show (a player passing, a round ending, the next one beginning).
+ */
+export interface Announcement {
+  kind: "announce";
+  text: string;
+}
+
+/** One step of a move's animation: a card's, or a big message. */
+export type Step = CardStep | Announcement;
 
 /**
  * The names of the places on the board a card can go to, as the board marks
@@ -70,8 +85,10 @@ export const cellOf = {
  * the view `before` to the view `after`. Without a view before (the start of
  * the match), the board was empty.
  *
- * Events that change no card on the board, such as a player passing, have no
- * step.
+ * A player passing and a round ending are big messages, in the words of the
+ * log, and so is the next round beginning. Other events that change no card
+ * on the board, such as drawing, have no step; nor has the end of the match,
+ * which the page shows once the steps are over.
  */
 export function stepsOf(
   events: readonly Event[],
@@ -131,8 +148,10 @@ export function stepsOf(
   }
 
   const steps: Step[] = [];
+  const names = new Map([...cards].map(([id, card]) => [id, card.name]));
+  let round = before?.round ?? after.round;
   function add(
-    kind: Step["kind"],
+    kind: CardStep["kind"],
     id: string,
     cell: string | undefined,
     hides: boolean,
@@ -178,9 +197,26 @@ export function stepsOf(
       case "unit_destroyed":
         add("burn", event.card, cellOf.row(event.side, event.row), false);
         break;
+      case "player_passed":
+        steps.push({
+          kind: "announce",
+          text: eventText(event, after.player, names, round),
+        });
+        break;
+      case "round_ended":
+        steps.push({
+          kind: "announce",
+          text: eventText(event, after.player, names, round),
+        });
+        round += 1;
+        // The next round begins, unless the match is over.
+        if (!events.some((later) => later.type === "match_ended")) {
+          steps.push({ kind: "announce", text: `Round ${String(round)}` });
+        }
+        break;
       default:
-        // Drawing, swapping, passing and the ends of rounds and of the match
-        // change no card on the board.
+        // Drawing, swapping and the end of the match change no card on the
+        // board.
         break;
     }
   }
@@ -211,12 +247,12 @@ export function nextOf(
       after: TIMES.show,
     };
   }
-  const after =
-    step.kind === "play"
-      ? TIMES.fly
-      : step.kind === "muster"
-        ? TIMES.muster
-        : TIMES.burn;
+  const after = {
+    play: TIMES.fly,
+    muster: TIMES.muster,
+    burn: TIMES.burn,
+    announce: TIMES.announce,
+  }[step.kind];
   return { progress: { step: progress.step + 1, flying: false }, after };
 }
 
@@ -247,7 +283,11 @@ export function stageOf(steps: readonly Step[], progress: Progress): Stage {
   const hidden = new Set<string>();
   const ghosts = new Map<string, Ghost[]>();
   steps.forEach((step, index) => {
-    if (index < progress.step || step.cell === undefined) {
+    if (
+      index < progress.step ||
+      step.kind === "announce" ||
+      step.cell === undefined
+    ) {
       return;
     }
     if (step.hides) {

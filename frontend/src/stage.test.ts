@@ -7,6 +7,7 @@ import {
   stageOf,
   stepsOf,
   TIMES,
+  type CardStep,
   type Step,
 } from "./stage.ts";
 import { HOARFROST, SOLDIER, WAR_HORN, side, view } from "./test-data.ts";
@@ -30,6 +31,11 @@ const WILDFIRE = {
 } satisfies Card;
 
 type Side = View["players"][number];
+
+/** Return the steps of cards among `steps`, leaving the big messages out. */
+function cardSteps(steps: readonly Step[]): CardStep[] {
+  return steps.filter((step) => step.kind !== "announce");
+}
 
 /** Return a side with `units` in its melee row. */
 function withMelee(units: Card[], changes: Partial<Side> = {}): Side {
@@ -83,7 +89,7 @@ test("a Spy goes to the side its event names, which may be the other player's", 
     { type: "unit_played", player: 0, card: "spy", row: "melee", side: 1 },
   ];
 
-  expect(stepsOf(events, undefined, after)[0]?.cell).toBe(
+  expect(cardSteps(stepsOf(events, undefined, after))[0]?.cell).toBe(
     cellOf.unit(1, "melee", 0),
   );
 });
@@ -102,7 +108,10 @@ test("two copies played in one move go to two places, in order", () => {
   ];
 
   expect(
-    stepsOf(events, undefined, after).map((step) => [step.kind, step.cell]),
+    cardSteps(stepsOf(events, undefined, after)).map((step) => [
+      step.kind,
+      step.cell,
+    ]),
   ).toEqual([
     ["play", cellOf.unit(1, "melee", 0)],
     ["muster", cellOf.unit(1, "melee", 1)],
@@ -122,7 +131,10 @@ test("special cards go to the War Horn's place, the weather, a row or the discar
   ];
 
   expect(
-    stepsOf(events, before, after).map((step) => [step.cell, step.hides]),
+    cardSteps(stepsOf(events, before, after)).map((step) => [
+      step.cell,
+      step.hides,
+    ]),
   ).toEqual([
     [cellOf.horn(0, "siege"), true],
     [cellOf.weather(0, 0), true],
@@ -158,7 +170,7 @@ test("a Scarecrow goes to its row, which isn't held back", () => {
   ]);
 });
 
-test("a card no longer on the board, as after the round ended, has no place", () => {
+test("a card no longer on the board, as after the round ended, has no place; the round's end and the next one are big messages", () => {
   const after = view({ players: [side({ discard: [SOLDIER] }), side()] });
   const events: Event[] = [
     { type: "unit_played", player: 0, card: "soldier", row: "melee", side: 0 },
@@ -167,10 +179,26 @@ test("a card no longer on the board, as after the round ended, has no place", ()
 
   expect(stepsOf(events, undefined, after)).toEqual<Step[]>([
     { kind: "play", card: SOLDIER, cell: undefined, hides: false },
+    { kind: "announce", text: "Round 1: you won, 4 to 0." },
+    { kind: "announce", text: "Round 2" },
   ]);
 });
 
-test("a unit destroyed burns in its row; events with no card on the board have no step", () => {
+test("after the last round, no next round begins", () => {
+  const after = view({ round: 2, match_over: true, winner: 1 });
+  const events: Event[] = [
+    { type: "player_passed", player: 0 },
+    { type: "round_ended", scores: [3, 9], winner: 1 },
+    { type: "match_ended", winner: 1 },
+  ];
+
+  expect(stepsOf(events, view({ round: 2 }), after)).toEqual<Step[]>([
+    { kind: "announce", text: "You passed." },
+    { kind: "announce", text: "Round 2: the AI won, 9 to 3." },
+  ]);
+});
+
+test("a unit destroyed burns in its row; a player passing is a big message; a card no view shows has no step", () => {
   const before = view({ players: [withMelee([SOLDIER]), side()] });
   const events: Event[] = [
     { type: "unit_destroyed", side: 0, row: "melee", card: "soldier" },
@@ -181,6 +209,7 @@ test("a unit destroyed burns in its row; events with no card on the board have n
 
   expect(stepsOf(events, before, view())).toEqual<Step[]>([
     { kind: "burn", card: SOLDIER, cell: cellOf.row(0, "melee"), hides: false },
+    { kind: "announce", text: "The AI passed." },
   ]);
 });
 
@@ -188,9 +217,10 @@ const STEPS: Step[] = [
   { kind: "play", card: SOLDIER, cell: "0:melee:0", hides: true },
   { kind: "muster", card: SOLDIER, cell: "0:melee:1", hides: true },
   { kind: "burn", card: SPY, cell: "1:melee", hides: false },
+  { kind: "announce", text: "The AI passed." },
 ];
 
-test("a card played shows, then flies; a muster and a burn each take one wait", () => {
+test("a card played shows, then flies; a muster, a burn and a big message each take one wait", () => {
   expect(nextOf(STEPS, { step: 0, flying: false })).toEqual({
     progress: { step: 0, flying: true },
     after: TIMES.show,
@@ -207,7 +237,11 @@ test("a card played shows, then flies; a muster and a burn each take one wait", 
     progress: { step: 3, flying: false },
     after: TIMES.burn,
   });
-  expect(nextOf(STEPS, { step: 3, flying: false })).toBeUndefined();
+  expect(nextOf(STEPS, { step: 3, flying: false })).toEqual({
+    progress: { step: 4, flying: false },
+    after: TIMES.announce,
+  });
+  expect(nextOf(STEPS, { step: 4, flying: false })).toBeUndefined();
 });
 
 test("the board holds back the cards of the steps not done, and shows the units still burning", () => {

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import type { Card } from "./api/client.ts";
 import { CardFace } from "./CardFace.tsx";
-import { TIMES, type Step } from "./stage.ts";
+import { TIMES, type CardStep } from "./stage.ts";
 import { cardText } from "./text.ts";
 
 /**
@@ -12,7 +12,13 @@ import { cardText } from "./text.ts";
  *
  * It is only a picture: the log says what was played, for screen readers too.
  */
-export function Showcase({ step, flying }: { step: Step; flying: boolean }) {
+export function Showcase({
+  step,
+  flying,
+}: {
+  step: CardStep;
+  flying: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -84,6 +90,25 @@ export function CardPreview({ card }: { card: Card }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * A big message over the whole screen, for what has no card to show, such as
+ * "The AI passed." It never takes a click, and it is only a picture: the log
+ * says the same to screen readers.
+ */
+export function Banner({ text }: { text: string }) {
+  return (
+    <div
+      aria-hidden
+      data-banner
+      className="pointer-events-none fixed inset-0 z-40 grid place-items-center bg-black/55"
+    >
+      <p className="animate-show border-y-2 border-gold-400 bg-wood-950/90 px-12 py-6 text-center font-display text-4xl text-gold-200 shadow-2xl shadow-black lg:text-5xl">
+        {text}
+      </p>
     </div>
   );
 }
