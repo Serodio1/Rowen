@@ -93,17 +93,21 @@ export function cardNames(view: View): Map<string, string> {
  * yet.
  *
  * @param names - The name of every card, by id, from {@link cardNames}.
+ * @param theirs - Whether the unit the action plays or revives goes on the
+ *   AI's side, as a Spy does: `Play Informant in the AI's melee row`.
  */
 export function actionText(
   action: Action,
   names: ReadonlyMap<string, string>,
+  theirs = false,
 ): string {
   // The id itself if the view didn't show the card, which shouldn't happen.
   const name = (id: string) => names.get(id) ?? id;
+  const row = (name: string) => `in ${theirs ? "the AI's" : "the"} ${name} row`;
 
   switch (action.type) {
     case "play_unit":
-      return `Play ${name(action.card)} in the ${action.row} row`;
+      return `Play ${name(action.card)} ${row(action.row)}`;
     case "play_special":
       return `Play ${name(action.card)}`;
     case "play_horn":
@@ -113,7 +117,7 @@ export function actionText(
     case "pass":
       return "Pass";
     case "revive":
-      return `Revive ${name(action.card)} in the ${action.row} row`;
+      return `Revive ${name(action.card)} ${row(action.row)}`;
     case "redraw":
       return `Swap ${name(action.card)}`;
     case "end_redraw":

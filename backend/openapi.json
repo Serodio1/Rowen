@@ -1285,6 +1285,10 @@
           "legend": {
             "type": "boolean",
             "title": "Legend"
+          },
+          "opponent_side": {
+            "type": "boolean",
+            "title": "Opponent Side"
           }
         },
         "additionalProperties": false,
@@ -1297,10 +1301,11 @@
           "strength",
           "ability",
           "group",
-          "legend"
+          "legend",
+          "opponent_side"
         ],
         "title": "UnitCard",
-        "description": "A unit, as ``engine.UnitCard`` describes it."
+        "description": "A unit, as ``engine.UnitCard`` describes it.\n\n``opponent_side`` says whether the unit goes on the side of the opponent\nof who plays it or revives it, as a Spy does. It is a rule, so the API\nsays it: the page doesn't know the rules (ADR 0002)."
       },
       "UnitDestroyed": {
         "properties": {

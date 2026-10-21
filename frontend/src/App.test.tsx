@@ -1078,6 +1078,27 @@ test("the second click of a double click on the last move doesn't leave the end 
   expect(screen.getByText("You won the match!")).toBeInTheDocument();
 });
 
+test("for a card with nowhere to choose, the page says clicking it again plays it", async () => {
+  const turn = view({
+    legal_actions: [
+      { type: "play_special", card: "hoarfrost" },
+      { type: "pass" },
+    ],
+  });
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(turn) });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Hoarfrost (weather on melee)" }),
+  );
+
+  expect(
+    screen.getByText("Click Hoarfrost again to play it."),
+  ).toBeInTheDocument();
+});
+
 test("the page says what to do, and a card chosen can be let go with Cancel", async () => {
   const { api } = fakeApi({ ...A_MATCH, [PLAY]: played(ROUND_1) });
   renderApp(api);

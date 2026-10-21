@@ -15,6 +15,17 @@ const SNIPER = {
   ability: null,
 } satisfies Card;
 
+// A Spy: the API says it goes on the AI's side.
+const INFORMANT = {
+  ...SOLDIER,
+  id: "informant",
+  name: "Informant",
+  rows: ["melee"],
+  strength: 3,
+  ability: "spy",
+  opponent_side: true,
+} satisfies Card;
+
 const SCARECROW = {
   type: "special",
   id: "scarecrow",
@@ -107,6 +118,36 @@ test("choosing a card lights up the rows it may go in, and the focus goes to the
 
   expect(played).toEqual([
     { type: "play_unit", card: "soldier", row: "ranged" },
+  ]);
+});
+
+test("a Spy lights up the AI's row, where it goes, and not the player's", () => {
+  const played = renderPlaying(
+    view({
+      hand: [INFORMANT],
+      legal_actions: [
+        { type: "play_unit", card: "informant", row: "melee" },
+        { type: "pass" },
+      ],
+    }),
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: /^Informant/ }));
+
+  const theirs = within(
+    screen.getByRole("group", { name: /^The AI's melee row/ }),
+  ).getByRole("button", { name: "Play Informant in the AI's melee row" });
+  expect(theirs).toHaveFocus();
+  expect(
+    within(screen.getByRole("group", { name: /^Your melee row/ })).queryByRole(
+      "button",
+    ),
+  ).not.toBeInTheDocument();
+
+  fireEvent.keyDown(theirs, { key: "1" });
+
+  expect(played).toEqual([
+    { type: "play_unit", card: "informant", row: "melee" },
   ]);
 });
 
@@ -264,6 +305,25 @@ test("after a Medic, the units to revive are chosen from the discard pile, not t
   );
 
   expect(played).toEqual([{ type: "revive", card: "sniper", row: "ranged" }]);
+});
+
+test("a Spy revived after a Medic goes on the AI's side too", () => {
+  const played = renderPlaying(
+    view({
+      reviving: true,
+      players: [side({ discard: [INFORMANT] }), side()],
+      legal_actions: [{ type: "revive", card: "informant", row: "melee" }],
+    }),
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: /^Informant/ }));
+  fireEvent.click(
+    within(
+      screen.getByRole("group", { name: /^The AI's melee row/ }),
+    ).getByRole("button", { name: "Revive Informant in the AI's melee row" }),
+  );
+
+  expect(played).toEqual([{ type: "revive", card: "informant", row: "melee" }]);
 });
 
 test("while nothing can be played, no card can be chosen", () => {
