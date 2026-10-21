@@ -414,7 +414,9 @@ function PlayMatch({
           <Controls view={view} playing={playing} />
         )}
       </div>
-      <Log entries={log} />
+      {/* Out of sight while a card is shown on the right, which it would
+          be under. */}
+      <Log entries={log} faded={showing?.kind === "play"} />
     </section>
   );
 }
@@ -494,12 +496,15 @@ function Controls({ view, playing }: { view: View; playing: Playing }) {
  * What happened in the match so far, the latest first: the sentences of
  * each move and of the AI's answer. Screen readers read what is added.
  */
-function Log({ entries }: { entries: Entry[] }) {
+function Log({ entries, faded }: { entries: Entry[]; faded: boolean }) {
   const id = useId();
   return (
     // On a wide screen, it fills the rest of the column beside the board,
     // and scrolls; its size doesn't count, so it never makes the page taller.
-    <section className="mx-auto flex w-full max-w-3xl flex-col rounded-lg border border-wood-600 bg-wood-900/85 p-2 shadow-inner shadow-black/50 lg:col-start-2 lg:row-start-3 lg:contain-size">
+    // Faded, it only can't be seen: screen readers still read what is added.
+    <section
+      className={`mx-auto flex w-full max-w-3xl flex-col rounded-lg border border-wood-600 bg-wood-900/85 p-2 shadow-inner shadow-black/50 transition-opacity duration-300 lg:col-start-2 lg:row-start-3 lg:contain-size ${faded ? "opacity-0" : ""}`}
+    >
       <h3
         id={id}
         className="mb-1 font-display text-xs tracking-widest text-gold-300/80 uppercase"

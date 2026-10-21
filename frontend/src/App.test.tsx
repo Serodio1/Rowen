@@ -1186,6 +1186,9 @@ test("a card played shows on the right, then goes to its place, which shows it o
 
   // Only a picture: screen readers read the log, and the card in its place.
   expect(showcase()).toHaveAttribute("data-showcase", "soldier");
+  // The log is out of sight meanwhile, but still read.
+  const log = screen.getByRole("log", { name: "What happened" });
+  expect(log.closest("section")).toHaveClass("opacity-0");
   expect(showcase()?.closest("[aria-hidden]")).not.toBeNull();
   const place = document.querySelector('[data-cell="1:melee:0"]');
   expect(place).toHaveClass("opacity-0");
@@ -1201,6 +1204,7 @@ test("a card played shows on the right, then goes to its place, which shows it o
   await act(() => vi.advanceTimersByTimeAsync(TIMES.fly));
   expect(showcase()).toBeNull();
   expect(place).not.toHaveClass("opacity-0");
+  expect(log.closest("section")).not.toHaveClass("opacity-0");
 });
 
 test("a move can be made while the last one plays out: the board shows the new one", async () => {
