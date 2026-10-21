@@ -9,8 +9,9 @@ import {
   type RequestError,
 } from "./api/requests.ts";
 import { Board } from "./Board.tsx";
-import { Showcase } from "./Showcase.tsx";
+import { CardPreview, Showcase } from "./Showcase.tsx";
 import {
+  cardsById,
   mayMove,
   NO_STEPS,
   stageOf,
@@ -196,6 +197,11 @@ function PlayMatch({
   );
   const progress = usePlayOut(steps);
   const showing = steps[progress.step];
+  // The card pointed at or focused, by id, to show it large.
+  const [pointed, setPointed] = useState<string | null>(null);
+  // Whether the player is using the keyboard: the page moves the focus by
+  // itself after each move, which must not show a card then.
+  const typing = useRef(false);
   const resultId = useId();
   // The card the player chose, with the version of the view it was chosen
   // in: a new view lets it go.
@@ -291,6 +297,7 @@ function PlayMatch({
   }
 
   const view = match.data.view;
+  const shown = pointed === null ? undefined : cardsById([view]).get(pointed);
   const playing: Playing = {
     actions: view.legal_actions,
     chosen: chosen?.version === match.data.version ? chosen.chosen : null,
@@ -372,19 +379,44 @@ function PlayMatch({
       <div
         ref={boardArea}
         className="lg:col-start-1 lg:row-span-3 lg:row-start-1"
+        // Any card on the board or in the hand, pointed at or focused, shows
+        // large on the right, with what it does.
+        onMouseOver={(event) => {
+          setPointed(cardIn(event.target));
+        }}
+        onMouseLeave={() => {
+          setPointed(null);
+        }}
+        onKeyDown={() => {
+          typing.current = true;
+        }}
+        onMouseDown={() => {
+          typing.current = false;
+        }}
+        onFocus={(event) => {
+          if (typing.current) {
+            setPointed(cardIn(event.target));
+          }
+        }}
+        onBlur={() => {
+          setPointed(null);
+        }}
       >
         <Board
           view={view}
           playing={view.match_over ? undefined : playing}
           stage={stageOf(steps, progress)}
         />
-        {showing?.kind === "play" && (
+        {showing?.kind === "play" ? (
           // A new element for each card, which comes up from nothing.
           <Showcase
             key={progress.step}
             step={showing}
             flying={progress.flying}
           />
+        ) : (
+          // A card played comes first.
+          shown !== undefined && <CardPreview card={shown} />
         )}
       </div>
       <div ref={movesArea} className="lg:col-start-2 lg:row-start-2">
@@ -416,7 +448,10 @@ function PlayMatch({
       </div>
       {/* Out of sight while a card is shown on the right, which it would
           be under. */}
-      <Log entries={log} faded={showing?.kind === "play"} />
+      <Log
+        entries={log}
+        faded={showing?.kind === "play" || shown !== undefined}
+      />
     </section>
   );
 }
@@ -561,4 +596,17 @@ function outOfDate(error: RequestError): boolean {
 /** The match of an answer, without what happened, as the cache keeps it. */
 function matchOf(played: Played): Match {
   return { id: played.id, version: played.version, view: played.view };
+}
+
+/**
+ * Return the id of the card at `target` (its face, or a button around it),
+ * or null if it isn't one.
+ */
+function cardIn(target: EventTarget): string | null {
+  if (!(target instanceof Element)) {
+    return null;
+  }
+  const card =
+    target.closest("[data-card]") ?? target.querySelector("[data-card]");
+  return card?.getAttribute("data-card") ?? null;
 }

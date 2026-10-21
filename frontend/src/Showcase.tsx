@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from "react";
+import type { Card } from "./api/client.ts";
 import { CardFace } from "./CardFace.tsx";
 import { TIMES, type Step } from "./stage.ts";
 import { cardText } from "./text.ts";
@@ -53,6 +54,36 @@ export function Showcase({ step, flying }: { step: Step; flying: boolean }) {
           <CardFace card={step.card} name={cardText(step.card)} size="large" />
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A card pointed at or focused, large on the right where cards played show,
+ * with what it does underneath.
+ *
+ * It is only a picture: screen readers read what a card does from the card
+ * itself (`aria-description`).
+ */
+export function CardPreview({ card }: { card: Card }) {
+  return (
+    <div
+      aria-hidden
+      data-preview={card.id}
+      className="pointer-events-none fixed top-1/2 right-6 z-50 flex w-60 -translate-y-1/2 flex-col items-center gap-3 lg:right-16"
+    >
+      <div className="drop-shadow-2xl [zoom:2.5]">
+        <CardFace card={card} name={cardText(card)} size="large" />
+      </div>
+      {card.description.length > 0 && (
+        <div className="w-full rounded-lg border border-gold-600 bg-wood-950/95 p-3 text-sm shadow-xl shadow-black/60">
+          {card.description.map((text) => (
+            <p key={text} className="leading-snug text-parchment">
+              {text}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

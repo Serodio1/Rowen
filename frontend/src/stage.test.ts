@@ -26,6 +26,7 @@ const WILDFIRE = {
   name: "Wildfire",
   kind: "wildfire",
   weather_row: null,
+  description: [],
 } satisfies Card;
 
 type Side = View["players"][number];

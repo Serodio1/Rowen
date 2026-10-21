@@ -334,7 +334,7 @@ export function newIndexes(
 }
 
 /** Return every card the views show, by id. */
-function cardsById(views: readonly View[]): Map<string, Card> {
+export function cardsById(views: readonly View[]): Map<string, Card> {
   const cards = new Map<string, Card>();
   for (const view of views) {
     const all: Card[] = [...view.hand];
