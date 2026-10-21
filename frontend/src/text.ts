@@ -49,36 +49,6 @@ export function unitText(unit: Unit): string {
 }
 
 /**
- * Return the short words a card shows under its name: where it goes and what
- * it does.
- *
- * For example `["Siege", "Muster"]`, `["Weather", "Melee"]` for Hoarfrost, or
- * `["Special"]`. A unit that may go in more than one row shows only what it
- * does, such as `["Agile"]`: the words must fit on the card, and `cardText`
- * says it all.
- */
-export function cardLabels(card: Card): string[] {
-  if (card.type === "special") {
-    return card.weather_row === null
-      ? ["Special"]
-      : ["Weather", capitalized(card.weather_row)];
-  }
-
-  const [row, ...others] = card.rows;
-  const labels =
-    row !== undefined && others.length === 0 ? [capitalized(row)] : [];
-  if (card.ability !== null) {
-    labels.push(capitalized(card.ability));
-  }
-  return labels;
-}
-
-/** Return a word with its first letter in capitals: `melee` is `Melee`. */
-function capitalized(word: string): string {
-  return word.charAt(0).toUpperCase() + word.slice(1);
-}
-
-/**
  * Return who won the match, for the player of the view, once it is over.
  */
 export function resultText(view: View): string {

@@ -1,11 +1,31 @@
-import { Fragment } from "react";
 import type { Card } from "./api/client.ts";
-import { cardLabels } from "./text.ts";
+import { artOf, cardIcons, placeholderLook, type Look } from "./cards.ts";
+import { Icon } from "./icons.tsx";
 
 /**
- * A card as the page draws it: its strength in a circle, its name and a few
- * words on what it does, on a parchment face in a gold frame. (The art comes
- * in Phase 3.)
+ * The colours of a card with no art yet, by what its big icon is: a unit's
+ * row, or a special card's kind. (A unit that may go in two rows fades from
+ * the first to the second.)
+ */
+const PLACEHOLDER_LOOKS = {
+  melee: { from: "from-melee", to: "to-melee" },
+  ranged: { from: "from-ranged", to: "to-ranged" },
+  siege: { from: "from-siege", to: "to-siege" },
+  hoarfrost: { from: "from-hoarfrost", to: "to-wood-900" },
+  "thick-fog": { from: "from-thick-fog", to: "to-wood-900" },
+  downpour: { from: "from-downpour", to: "to-wood-900" },
+  "clear-skies": { from: "from-clear-skies", to: "to-wood-900" },
+  "war-horn": { from: "from-war-horn", to: "to-wood-900" },
+  wildfire: { from: "from-wildfire", to: "to-wood-900" },
+  scarecrow: { from: "from-scarecrow", to: "to-wood-900" },
+} satisfies Record<Look, { from: string; to: string }>;
+
+/**
+ * A card as the page draws it, upright: its art over the whole face, its
+ * strength in a circle at the top left, icons at the top right for where it
+ * goes and what it does, and its name in a strip at the bottom. A Legend has
+ * a gold frame, a special card a dark one. Until a card has its art
+ * (`src/art`), a placeholder shows: its colours, and its big icon.
  *
  * Screen readers read the card as one picture, with `name` as its text: the
  * face only repeats it in short.
@@ -29,22 +49,37 @@ export function CardFace({
   size?: "small" | "large";
 }) {
   const legend = card.type === "unit" && card.legend;
+  const art = artOf(card);
+  let frame = "border-gold-600";
+  if (legend) {
+    frame = "border-gold-300 ring-2 ring-gold-400/70";
+  } else if (card.type === "special") {
+    frame = "border-wood-950 ring-1 ring-gold-600";
+  }
   return (
     <div
       role="img"
       aria-label={name}
-      className={`relative flex shrink-0 flex-col justify-end gap-0.5 rounded-md border bg-linear-to-b from-parchment to-parchment-dark p-1 text-ink shadow-md shadow-black/50 ${
+      className={`relative shrink-0 overflow-hidden rounded-md border-2 bg-wood-900 shadow-md shadow-black/50 ${
         size === "small"
           ? "h-20 w-14 lg:h-24 lg:w-16"
           : "h-24 w-16 lg:h-30 lg:w-20"
-      } ${legend ? "border-gold-300 ring-2 ring-gold-400/70" : "border-gold-600"}`}
+      } ${frame}`}
     >
-      {/* Where the art goes in Phase 3: for now, the first letter of the name,
-          faint (and gone in the high contrast mode of Windows, which would
-          draw it over the name). */}
-      <span className="absolute inset-x-1 top-1 bottom-7 grid place-items-center rounded-sm border border-gold-600/25 font-display text-3xl font-bold text-ink/15 lg:bottom-8 lg:text-4xl forced-colors:hidden">
-        {card.name.charAt(0)}
-      </span>
+      {art === undefined ? (
+        <Placeholder card={card} />
+      ) : (
+        <img
+          src={art}
+          alt=""
+          // The hand and the board show many cards: each picture is
+          // fetched once it is about to show, and drawn without holding up
+          // the page.
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 size-full object-cover"
+        />
+      )}
       {card.type === "unit" && (
         <Strength
           own={card.strength}
@@ -52,21 +87,40 @@ export function CardFace({
           legend={card.legend}
         />
       )}
-      <p className="relative line-clamp-2 text-center font-display text-[0.65rem] leading-tight font-bold lg:text-xs">
+      <div className="absolute top-0.5 right-0.5 flex flex-col items-center gap-0.5">
+        {cardIcons(card).map((icon) => (
+          <span
+            key={icon}
+            className="grid size-4 place-items-center rounded-full border border-gold-600 bg-wood-950/85 text-gold-200 lg:size-5"
+          >
+            <Icon name={icon} className="size-2.5 lg:size-3" />
+          </span>
+        ))}
+      </div>
+      <p className="absolute inset-x-0 bottom-0 line-clamp-2 bg-wood-950/85 px-0.5 py-px text-center font-display text-[0.6rem] leading-tight font-bold text-parchment lg:text-[0.65rem]">
         {card.name}
       </p>
-      <p className="relative text-center text-[0.625rem] leading-tight uppercase lg:text-[0.65rem]">
-        {/* A line may break between two words, never inside one. */}
-        {cardLabels(card).map((label, index) => (
-          <Fragment key={label}>
-            {index > 0 && " "}
-            <span className="whitespace-nowrap">
-              {index > 0 && "· "}
-              {label}
-            </span>
-          </Fragment>
-        ))}
-      </p>
+    </div>
+  );
+}
+
+/**
+ * What a card with no art yet shows over its face: its colours, and its big
+ * icon (gone in the high contrast mode of Windows, as the colours are).
+ */
+function Placeholder({ card }: { card: Card }) {
+  const icon = placeholderLook(card);
+  const look = PLACEHOLDER_LOOKS[icon];
+  // A unit's last row: the same as its first, unless it may go in two.
+  const last =
+    card.type === "unit" ? (card.rows.at(-1) ?? card.rows[0]) : undefined;
+  const to = last === undefined ? look.to : PLACEHOLDER_LOOKS[last].to;
+  return (
+    <div
+      data-placeholder
+      className={`absolute inset-0 grid place-items-center bg-linear-to-br ${look.from} ${to} pt-3 pb-5 forced-colors:hidden`}
+    >
+      <Icon name={icon} className="size-1/2 text-white/30" />
     </div>
   );
 }
@@ -92,7 +146,7 @@ function Strength({
   }
   return (
     <span
-      className={`absolute -top-1.5 -left-1.5 grid size-6 place-items-center rounded-full border-2 font-display text-xs font-bold shadow lg:size-7 lg:text-sm ${
+      className={`absolute top-0.5 left-0.5 grid size-6 place-items-center rounded-full border-2 font-display text-xs font-bold shadow shadow-black/60 lg:size-7 lg:text-sm ${
         legend ? "border-gold-300 bg-ink" : "border-gold-600 bg-parchment"
       } ${colour}`}
     >

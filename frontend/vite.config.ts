@@ -12,6 +12,12 @@ export default defineConfig({
   // the /api. So the API needs no CORS. The API is where uvicorn listens by
   // default. frontend/nginx.conf does the same in the Docker image (ADR 0009):
   // change both together.
+  build: {
+    // Every image a file of its own, however small: nginx's
+    // Content-Security-Policy (default-src 'self') would block one written
+    // into the JavaScript as a data: URL.
+    assetsInlineLimit: 0,
+  },
   server: {
     proxy: {
       "/api/": {

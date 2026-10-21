@@ -48,7 +48,7 @@ export default defineConfig(
           },
           {
             kind: "variable",
-            name: "^WEATHER_LOOKS$",
+            name: "^(WEATHER|PLACEHOLDER)_LOOKS$",
             match: [{ type: "objectValues" }],
           },
           { kind: "attribute", name: "^bubble$", match: [{ type: "strings" }] },
