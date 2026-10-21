@@ -16,7 +16,7 @@ import { eventText } from "./text.ts";
 /** How long each part of a step takes, in milliseconds. */
 export const TIMES = {
   /** A card played, large on the right, before it goes. */
-  show: 1000,
+  show: 1500,
   /** A card played, on its way to its place. */
   fly: 500,
   /** A unit that a Muster brings: it pops up in its place, with no showing. */
@@ -24,7 +24,7 @@ export const TIMES = {
   /** A unit destroyed, burning away. */
   burn: 700,
   /** A big message over the whole screen, such as "The AI passed." */
-  announce: 1500,
+  announce: 2000,
 } as const;
 
 /**
@@ -40,14 +40,21 @@ export const TIMES = {
  *   such as a card played just before the round ended.
  * @property hides - Whether the board holds the card back in `cell` until
  *   the step is done: a unit, a War Horn or a weather card. (A Scarecrow, Clear
- *   Skies or Wildfire go to a place that shows more than them.)
+ *   Skies or Wildfire go to a place that shows more than them.) A weather
+ *   card held back doesn't hit its rows yet either.
+ * @property cleared - For Clear Skies, the weather cards it clears: the
+ *   board still shows them, and their rows under them, until it lands.
  */
 export interface CardStep {
   kind: "play" | "muster" | "burn";
   card: Card;
   cell: string | undefined;
   hides: boolean;
+  cleared?: readonly WeatherCard[];
 }
+
+/** A weather card in play, as a side of the view lists it. */
+export type WeatherCard = View["players"][number]["weather"][number];
 
 /**
  * A step with no card: a big message over the whole screen, for what has no
@@ -190,7 +197,14 @@ export function stepsOf(
       case "weather_played":
         add("play", event.card, weatherCell(event.player, event.card), true);
         break;
-      case "weather_cleared":
+      case "weather_cleared": {
+        add("play", event.card, cellOf.discard(event.player), false);
+        const step = steps.at(-1);
+        if (step?.kind === "play") {
+          step.cleared = before?.players.flatMap((side) => side.weather) ?? [];
+        }
+        break;
+      }
       case "wildfire_played":
         add("play", event.card, cellOf.discard(event.player), false);
         break;
@@ -272,22 +286,27 @@ export interface Ghost {
  * @property hidden - The places whose cards are held back.
  * @property ghosts - By row (as {@link cellOf.row}), the units destroyed
  *   that are still drawn there.
+ * @property lingering - The weather cards a Clear Skies still on its way
+ *   will clear, which the board shows instead of the weather in the view.
  */
 export interface Stage {
   hidden: ReadonlySet<string>;
   ghosts: ReadonlyMap<string, readonly Ghost[]>;
+  lingering?: readonly WeatherCard[] | undefined;
 }
 
 /** Return what the board shows at `progress` in `steps`. */
 export function stageOf(steps: readonly Step[], progress: Progress): Stage {
   const hidden = new Set<string>();
   const ghosts = new Map<string, Ghost[]>();
+  let lingering: readonly WeatherCard[] | undefined;
   steps.forEach((step, index) => {
-    if (
-      index < progress.step ||
-      step.kind === "announce" ||
-      step.cell === undefined
-    ) {
+    if (index < progress.step || step.kind === "announce") {
+      return;
+    }
+    // The first Clear Skies still to land: the weather it clears stays.
+    lingering ??= step.cleared;
+    if (step.cell === undefined) {
       return;
     }
     if (step.hides) {
@@ -299,7 +318,7 @@ export function stageOf(steps: readonly Step[], progress: Progress): Stage {
       ghosts.set(step.cell, row);
     }
   });
-  return { hidden, ghosts };
+  return { hidden, ghosts, lingering };
 }
 
 /** No step: nothing plays out. */
