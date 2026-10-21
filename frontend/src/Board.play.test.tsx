@@ -244,7 +244,8 @@ test("after a Medic, the units to revive are chosen from the discard pile, not t
   const played = renderPlaying(
     view({
       reviving: true,
-      hand: [SOLDIER],
+      // A Sniper in the hand too: only the discard pile's may be revived.
+      hand: [SNIPER, SOLDIER],
       // Two copies, and a Legend that can't be revived.
       players: [side({ discard: [SNIPER, SNIPER, CAPTAIN] }), side()],
       legal_actions: [{ type: "revive", card: "sniper", row: "ranged" }],
