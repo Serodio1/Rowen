@@ -153,6 +153,18 @@ test("the AI's rows are on top and the player's below, so the melee rows meet in
   ]);
 });
 
+test("each row shows its icon next to its score: a sword, a bow or a tower", () => {
+  render(<Board view={MID} />);
+
+  expect(
+    screen
+      .getAllByRole("group", { name: /row/ })
+      .map((group) =>
+        group.querySelector("[data-icon]")?.getAttribute("data-icon"),
+      ),
+  ).toEqual(["siege", "ranged", "melee", "melee", "ranged", "siege"]);
+});
+
 test("a row shows its units with their strength now, its War Horn and its Scarecrows", () => {
   render(<Board view={MID} />);
 

@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { Action, Card, View } from "./api/client.ts";
 import { CardFace } from "./CardFace.tsx";
+import { Icon } from "./icons.tsx";
 import { onFirstClick } from "./clicks.ts";
 import {
   choosable,
@@ -129,6 +130,7 @@ export function Board({ view, playing }: { view: View; playing?: Playing }) {
         {(["siege", "ranged", "melee"] as const).map((row) => (
           <BoardRow
             key={row}
+            kind={row}
             label={`The AI's ${row} row`}
             row={ai.rows[row]}
             weather={weather.find((card) => card.weather_row === row)}
@@ -151,6 +153,7 @@ export function Board({ view, playing }: { view: View; playing?: Playing }) {
         {(["melee", "ranged", "siege"] as const).map((row) => (
           <BoardRow
             key={row}
+            kind={row}
             label={`Your ${row} row`}
             row={you.rows[row]}
             weather={weather.find((card) => card.weather_row === row)}
@@ -306,6 +309,8 @@ function Weather({ cards }: { cards: SpecialCard[] }) {
  * Screen readers read the row's name with its score and its weather, such as
  * "Your melee row: 3, under Hoarfrost".
  *
+ * @param kind - Which row it is: its icon (a sword, a bow or a tower) is
+ *   next to its score, so the rows can be told apart at a glance.
  * @param weather - The weather card that hits this row, if one is in play.
  * @param bubble - The colour of the score's bubble: the player's or the AI's.
  * @param targets - Where the card chosen may go in this row: the whole row
@@ -313,12 +318,14 @@ function Weather({ cards }: { cards: SpecialCard[] }) {
  *   only a unit that goes there, such as a Spy, has targets.
  */
 function BoardRow({
+  kind,
   label,
   row,
   weather,
   bubble,
   targets,
 }: {
+  kind: Row;
   label: string;
   row: RowView;
   weather: SpecialCard | undefined;
@@ -348,6 +355,8 @@ function BoardRow({
       >
         {row.score}
       </span>
+      {/* Only a picture: the row's name says which row it is. */}
+      <Icon name={kind} className="relative size-6 shrink-0 text-gold-200" />
       <div className="relative grid h-20 w-14 shrink-0 place-items-center rounded border border-dashed border-gold-600/40">
         {row.horn !== null && (
           <CardFace card={row.horn} name={cardText(row.horn)} />
