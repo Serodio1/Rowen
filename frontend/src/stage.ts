@@ -104,7 +104,8 @@ export const cellOf = {
  * the match), the board was empty.
  *
  * A player passing and a round ending are big messages, in the words of the
- * log, and so is the next round beginning. Other events that change no card
+ * log, and so is the next round beginning. Round 1 begins once both players
+ * are done swapping cards: its message says who goes first. Other events that change no card
  * on the board, such as drawing, have no step; nor has the end of the match,
  * which the page shows once the steps are over.
  */
@@ -254,6 +255,16 @@ export function stepsOf(
           steps.push({
             kind: "announce",
             text: `Round ${String(round)}`,
+            view: board,
+          });
+        }
+        break;
+      case "redraw_ended":
+        if (after.players.every((side) => side.redraws_left === 0)) {
+          board = after;
+          steps.push({
+            kind: "announce",
+            text: `Round 1 · ${after.current === after.player ? "You go" : "The AI goes"} first.`,
             view: board,
           });
         }

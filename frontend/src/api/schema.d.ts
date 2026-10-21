@@ -218,6 +218,7 @@ export interface components {
     EventView:
       | components["schemas"]["UnitPlayed"]
       | components["schemas"]["UnitRevived"]
+      | components["schemas"]["NothingToRevive"]
       | components["schemas"]["UnitMustered"]
       | components["schemas"]["CardsDrawn"]
       | components["schemas"]["WeatherPlayed"]
@@ -313,6 +314,19 @@ export interface components {
     NewMatch: {
       /** Deck */
       deck: string;
+    };
+    /**
+     * NothingToRevive
+     * @description A Medic found no unit to revive: ``engine.NothingToRevive``.
+     */
+    NothingToRevive: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "nothing_to_revive";
+      /** Player */
+      player: number;
     };
     /**
      * OpponentDrew

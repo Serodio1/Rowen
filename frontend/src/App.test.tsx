@@ -1093,7 +1093,7 @@ test("the second click of a double click on the last move doesn't leave the end 
   expect(screen.getByText("You won the match!")).toBeInTheDocument();
 });
 
-test("for a card with nowhere to choose, the page says clicking it again plays it", async () => {
+test("for a card with nowhere to choose, the page says choosing it again plays it", async () => {
   const turn = view({
     legal_actions: [
       { type: "play_special", card: "hoarfrost" },
@@ -1110,7 +1110,7 @@ test("for a card with nowhere to choose, the page says clicking it again plays i
   );
 
   expect(
-    screen.getByText("Click Hoarfrost again to play it."),
+    screen.getByText("Choose Hoarfrost again to play it."),
   ).toBeInTheDocument();
 });
 
@@ -1129,7 +1129,7 @@ test("the page says what to do, and a card chosen can be let go with Cancel", as
 
   expect(
     screen.getByText(
-      "Choose where to play Soldier, or click it again to put it back.",
+      "Choose where to play Soldier, or choose it again to put it back.",
     ),
   ).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
