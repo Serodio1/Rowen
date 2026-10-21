@@ -26,6 +26,7 @@ after the server sleeps, and when a new version goes online.
 - [Architecture decision records](docs/adr/README.md): why the main
   technical decisions were made.
 - [Deploying to Google Cloud Run](docs/deploy.md)
+- [The cards' art](docs/art.md): where it comes from, and how to add more.
 - [Phase 1 retrospective](docs/retrospectives/phase-1.md): what the game
   engine release built, and what it taught.
 - [Phase 2 retrospective](docs/retrospectives/phase-2.md): what the first
@@ -122,8 +123,9 @@ shows the board: the AI's rows on top and yours below, with their scores, the
 weather, each player's lives, cards in hand, deck and discard pile, and your hand
 under your rows. Over the board, it says how the last round went, and under the
 moves what happened in the match so far, the latest move first. The look follows
-the card game in The Witcher 3, but it is all drawn with CSS: no art, icon or
-font comes from the game. The CSS is made with Tailwind CSS 4, so the page needs a
+the card game in The Witcher 3, but it is drawn with CSS, and the cards' art
+was made for Rowen with AI tools ([where it comes from](docs/art.md)): no
+art, icon or font comes from the game. The CSS is made with Tailwind CSS 4, so the page needs a
 recent browser: Chrome or Edge 111, Safari 16.4 or Firefox 128, or later. The
 development server passes the page's requests for
 `/api` on to the web API at 127.0.0.1:8000, where uvicorn listens by default
@@ -228,4 +230,6 @@ nginx, that the game answers.
 
 ## License
 
-The code is released under the [MIT License](LICENSE).
+The code is released under the [MIT License](LICENSE). The cards' art was
+generated with Grok and Gemini: see [docs/art.md](docs/art.md) for where it
+comes from and the tools' terms.
