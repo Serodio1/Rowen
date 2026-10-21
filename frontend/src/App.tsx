@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
-import type { Action, Api, Match, Move, Played, View } from "./api/client.ts";
+import { useEffect, useId, useRef, useState } from "react";
+import type { Api, Match, Move, Played, View } from "./api/client.ts";
 import {
   decksQuery,
   matchQuery,
@@ -9,6 +9,8 @@ import {
   type RequestError,
 } from "./api/requests.ts";
 import { Board } from "./Board.tsx";
+import { onFirstClick } from "./clicks.ts";
+import { otherActions, type Chosen, type Playing } from "./plays.ts";
 import {
   actionText,
   cardNames,
@@ -23,24 +25,6 @@ const BUTTON =
   "rounded-md border border-gold-600 bg-wood-700 px-3 py-1.5 font-display text-gold-200 shadow shadow-black/50 hover:bg-wood-600 hover:text-gold-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300 disabled:cursor-not-allowed disabled:opacity-50";
 const ALERT =
   "rounded-md border border-red-400/60 bg-red-950/70 px-3 py-2 text-red-100";
-
-/**
- * Return a click handler that ignores the second click of a double click.
- *
- * The answer to the first click can come before the second, and change what
- * is under the mouse: the second click would land on a move of the next
- * view, or on a deck once the player chose to play again. (`detail` counts
- * the clicks in a row, and a key press gives 0. Some systems count a fourth
- * quick click as 1 again: this stops double and triple clicks.)
- */
-function onFirstClick(onClick: () => void) {
-  return (event: MouseEvent) => {
-    if (event.detail > 1) {
-      return;
-    }
-    onClick();
-  };
-}
 
 /**
  * The game's page: choose a deck to start a match against the AI, then play
@@ -191,6 +175,13 @@ function PlayMatch({
         ],
   );
   const resultId = useId();
+  // The card the player chose, with the version of the view it was chosen
+  // in: a new view lets it go.
+  const [chosen, setChosen] = useState<{
+    version: number;
+    chosen: Chosen;
+  } | null>(null);
+  const area = useRef<HTMLDivElement>(null);
   const play = useMutation({
     mutationKey: ["play"],
     mutationFn: (move: Move) => playMove(api, started.id, move),
@@ -226,6 +217,30 @@ function PlayMatch({
     },
   });
 
+  const ready = !(play.isPending || match.isFetching || match.isError);
+  const version = match.data.version;
+  useEffect(() => {
+    // After a move, the focus was on the button played, or on nothing once
+    // the button was disabled or gone: the next Tab would go on from a card
+    // or a place that may now be another one. And once a match starts, the
+    // deck chosen is gone. So once moves can be made, the focus goes to the
+    // first card the player may choose, or else to the first button (Pass),
+    // unless the player put it somewhere else. (After a move that didn't
+    // work, the view may be the same: the cards become usable again. While
+    // they are disabled, none can take the focus.)
+    const focused = document.activeElement;
+    if (
+      ready &&
+      (focused === document.body || area.current?.contains(focused))
+    ) {
+      (
+        area.current?.querySelector<HTMLElement>(
+          "[data-choosable]:not(:disabled)",
+        ) ?? area.current?.querySelector<HTMLElement>("button:not(:disabled)")
+      )?.focus();
+    }
+  }, [version, ready]);
+
   if (
     play.error?.code === "match_not_found" ||
     match.error?.code === "match_not_found"
@@ -246,6 +261,29 @@ function PlayMatch({
   }
 
   const view = match.data.view;
+  const playing: Playing = {
+    actions: view.legal_actions,
+    chosen: chosen?.version === match.data.version ? chosen.chosen : null,
+    // No move while one is on its way, or while the moves on the page may be
+    // out of date: the page is asking for the match, or couldn't.
+    disabled: play.isPending || match.isFetching || match.isError,
+    onChoose: (card) => {
+      setChosen(
+        card === null ? null : { version: match.data.version, chosen: card },
+      );
+    },
+    onPlay: (action) => {
+      // Two clicks in the same instant both come before the page shows the
+      // buttons disabled; the cache already knows about the first.
+      if (queryClient.isMutating({ mutationKey: ["play"] }) > 0) {
+        return;
+      }
+      // With the version of the view these moves come from: if the match is
+      // at another one when the move reaches the server, the move isn't
+      // played, however late it gets there.
+      play.mutate({ version: match.data.version, action });
+    },
+  };
   // How the last round went, until the next move.
   const round = log[0]?.round ?? null;
   return (
@@ -285,111 +323,96 @@ function PlayMatch({
           {round}
         </p>
       )}
-      <Board view={view} />
-      {view.match_over ? (
-        <div className="flex flex-col items-center gap-3">
-          <p id={resultId} className="font-display text-2xl text-gold-200">
-            {resultText(view)}
-          </p>
-          <button
-            type="button"
-            className={BUTTON}
-            // The moves are gone: the focus goes on from here, and screen
-            // readers read who won with it.
-            autoFocus
-            aria-describedby={resultId}
-            // The second click of a double click on the last move could
-            // land here, and skip who won.
-            onClick={onFirstClick(onLeave)}
-          >
-            Play again
-          </button>
-        </div>
-      ) : (
-        <Moves
-          view={view}
-          // No move while one is on its way, or while the moves on the page
-          // may be out of date: the page is asking for the match, or couldn't.
-          disabled={play.isPending || match.isFetching || match.isError}
-          onPlay={(action) => {
-            // Two clicks in the same instant both come before the page shows
-            // the buttons disabled; the cache already knows about the first.
-            if (queryClient.isMutating({ mutationKey: ["play"] }) > 0) {
-              return;
-            }
-            // With the version of the view these moves come from: if the
-            // match is at another one when the move reaches the server, the
-            // move isn't played, however late it gets there.
-            play.mutate({ version: match.data.version, action });
-          }}
-        />
-      )}
+      <div ref={area} className="flex flex-col gap-3">
+        <Board view={view} playing={view.match_over ? undefined : playing} />
+        {view.match_over ? (
+          <div className="flex flex-col items-center gap-3">
+            <p id={resultId} className="font-display text-2xl text-gold-200">
+              {resultText(view)}
+            </p>
+            <button
+              type="button"
+              className={BUTTON}
+              // The moves are gone: the focus goes on from here, and screen
+              // readers read who won with it.
+              autoFocus
+              aria-describedby={resultId}
+              // The second click of a double click on the last move could
+              // land here, and skip who won.
+              onClick={onFirstClick(onLeave)}
+            >
+              Play again
+            </button>
+          </div>
+        ) : (
+          <Controls view={view} playing={playing} />
+        )}
+      </div>
       <Log entries={log} />
     </section>
   );
 }
 
 /**
- * The legal actions of the view, as buttons.
- *
- * @param onPlay - Called with the action of the button the player clicked.
+ * What the player is to do now, in words, and the moves that are no card:
+ * passing, or keeping the hand before round 1. While a card is chosen, a
+ * button lets it go (as Escape does on the board).
  */
-function Moves({
-  view,
-  disabled,
-  onPlay,
-}: {
-  view: View;
-  disabled: boolean;
-  onPlay: (action: Action) => void;
-}) {
+function Controls({ view, playing }: { view: View; playing: Playing }) {
   const names = cardNames(view);
-  const id = useId();
-  const list = useRef<HTMLUListElement>(null);
-  useEffect(() => {
-    // After a move, the focus was on the button played, or on nothing once
-    // the button was disabled: the next Tab would go on from a move that
-    // may now be another one. And once a match starts, the deck chosen is
-    // gone. So once the moves can be made, the focus goes to the first one,
-    // unless the player put it somewhere else. (After a move that didn't
-    // work, the view may be the same: the moves become usable again. While
-    // they are disabled, the first one can't take the focus.)
-    const focused = document.activeElement;
-    if (focused === document.body || list.current?.contains(focused)) {
-      list.current?.querySelector("button")?.focus();
-    }
-  }, [view, disabled]);
+  const chosen = playing.chosen;
+  const name = chosen === null ? "" : (names.get(chosen.card) ?? chosen.card);
+  let hint = "Choose a card to play, or pass.";
+  if (view.reviving) {
+    hint =
+      chosen === null
+        ? "Choose a unit to revive."
+        : `Choose the row to revive ${name} in.`;
+  } else if (
+    view.legal_actions.some((action) => action.type === "end_redraw")
+  ) {
+    hint =
+      chosen === null
+        ? "Choose a card to swap, or keep this hand."
+        : `Click ${name} again to swap it.`;
+  } else if (chosen !== null) {
+    hint = `Choose where to play ${name}, or click it again to put it back.`;
+  }
   return (
     <div className="flex flex-col items-center gap-2">
-      <h3
-        id={id}
-        className="font-display text-xs tracking-widest text-gold-300/80 uppercase"
-      >
-        What you can do
-      </h3>
-      {/* Tailwind takes the bullets off lists, and with them Safari drops the
-          list from what VoiceOver reads: role="list" puts it back. */}
-      <ul
-        ref={list}
-        role="list"
-        aria-labelledby={id}
+      <p className="text-center text-sm text-gold-200">{hint}</p>
+      <div
+        role="group"
+        aria-label="Moves"
         className="flex flex-wrap justify-center gap-2"
       >
-        {view.legal_actions.map((action, index) => (
-          <li key={index}>
-            <button
-              type="button"
-              className={BUTTON}
-              disabled={disabled}
-              onClick={onFirstClick(() => {
-                onPlay(action);
-              })}
-            >
-              {actionText(action, names)}
-            </button>
-          </li>
+        {chosen !== null && (
+          <button
+            type="button"
+            className={BUTTON}
+            aria-keyshortcuts="Escape"
+            disabled={playing.disabled}
+            onClick={() => {
+              playing.onChoose(null);
+            }}
+          >
+            Cancel
+          </button>
+        )}
+        {otherActions(view.legal_actions).map((action) => (
+          <button
+            key={action.type}
+            type="button"
+            className={BUTTON}
+            disabled={playing.disabled}
+            onClick={onFirstClick(() => {
+              playing.onPlay(action);
+            })}
+          >
+            {actionText(action, names)}
+          </button>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

@@ -118,7 +118,12 @@ npm run dev     # start the development server
 
 With the web API running too (above, in another terminal), open
 <http://localhost:5173> and choose a deck: a match against the AI starts. Click
-a move to make it, and the AI answers at once, until the match is over. The page
+a card in your hand to choose it: the places it may go light up, and clicking
+one plays it (a card with nowhere to choose, such as weather, is played by
+clicking it again). The AI answers at once, until the match is over. With the
+keyboard: Tab and the arrow keys go from card to card, Enter chooses, 1, 2 and
+3 play the card chosen in the melee, ranged or siege row, and Escape lets it
+go. The page
 shows the board: the AI's rows on top and yours below, with their scores, the
 weather, each player's lives, cards in hand, deck and discard pile, and your hand
 under your rows. Over the board, it says how the last round went, and under the
