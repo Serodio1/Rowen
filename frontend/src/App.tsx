@@ -359,7 +359,11 @@ function PlayMatch({
             of a wide one. */}
         <div className="flex min-h-11 items-center justify-center lg:min-h-18">
           {round !== null && (
-            <p className="rounded-md border border-gold-400 bg-wood-900/90 px-4 py-1.5 text-center font-display text-lg text-gold-200 shadow-md shadow-black/50">
+            <p
+              // A new round's result fades in.
+              key={log[0]?.number}
+              className="rounded-md border border-gold-400 bg-wood-900/90 px-4 py-1.5 text-center font-display text-lg text-gold-200 shadow-md shadow-black/50 motion-safe:animate-fade-in"
+            >
               {round}
             </p>
           )}
