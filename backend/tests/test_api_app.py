@@ -105,17 +105,27 @@ def first_action(response: httpx2.Response) -> Any:
     return response.json()["view"]["legal_actions"][0]
 
 
-def ai_answers(state: GameState) -> tuple[GameState, tuple[Event, ...]]:
+def move_of(state: GameState, events: tuple[Event, ...]) -> schemas.MovePlayed:
+    """Return an action's events and the state after it, as the player sees them."""
+    return schemas.MovePlayed(
+        events=schemas.from_events(events, HUMAN),
+        view=schemas.from_view(player_view(state, HUMAN)),
+    )
+
+
+def ai_answers(
+    state: GameState,
+) -> tuple[GameState, tuple[schemas.MovePlayed, ...]]:
     """Let the baseline AI play from its own view, as the server does.
 
-    Return the match once it is the player's turn or it is over, and the events
-    of the AI's moves.
+    Return the match once it is the player's turn or it is over, and the AI's
+    moves, each with the view after it.
     """
-    events: tuple[Event, ...] = ()
+    moves: tuple[schemas.MovePlayed, ...] = ()
     while (view := player_view(state, AI)).current == AI and not view.match_over:
-        state, new_events = apply(state, choose_action(view))
-        events += new_events
-    return state, events
+        state, events = apply(state, choose_action(view))
+        moves += (move_of(state, events),)
+    return state, moves
 
 
 def stored(store: MatchStore, response: httpx2.Response) -> StoredMatch:
@@ -191,13 +201,13 @@ def test_behind_nginx_the_addresses_the_api_gives_out_start_with_api(
     assert "'/api/openapi.json'" in docs.text
 
 
-def test_the_player_gets_their_view_and_the_events_of_the_ais_first_moves(
+def test_the_player_gets_their_view_and_the_ais_first_moves(
     client: TestClient,
 ) -> None:
     # The same start, played with the engine and the AI directly.
     state = start_match((DECKS["humans"], DECKS["robots"]), seed=AI_STARTS)
-    state, events = ai_answers(state)
-    assert events
+    state, moves = ai_answers(state)
+    assert moves
 
     response = start(client, seed=AI_STARTS)
 
@@ -205,7 +215,7 @@ def test_the_player_gets_their_view_and_the_events_of_the_ais_first_moves(
         id=UUID(response.json()["id"]),
         version=FIRST_VERSION,
         view=schemas.from_view(player_view(state, HUMAN)),
-        events=schemas.from_events(events, HUMAN),
+        moves=moves,
     )
     # The same JSON, as text: in Python, False == 0. Nothing more.
     assert response.text == sent.model_dump_json()
@@ -307,7 +317,7 @@ def test_the_ai_waits_when_the_player_wins_the_coin_flip(
 
     assert state_of(store, response) == start_match(decks, seed=PLAYER_STARTS)
     # No move was played, so nothing happened yet.
-    assert response.json()["events"] == []
+    assert response.json()["moves"] == []
 
 
 @pytest.mark.parametrize("seed", range(10))
@@ -328,7 +338,7 @@ def test_a_match_can_be_seen_again(client: TestClient) -> None:
     response = client.get(started.headers["Location"])
 
     assert response.status_code == 200
-    # The same match, without the events of the AI's first moves: they come
+    # The same match, without the AI's first moves: they come
     # only with the new match.
     assert response.text == match_text(started)
 
@@ -544,7 +554,8 @@ def test_a_full_match_can_be_played_through_the_api(
         view = response.json()["view"]
         # The AI has played its moves: it is the player's turn, or it's over.
         assert view["current"] == HUMAN or view["match_over"]
-        assert response.json()["events"]
+        # Its last move leaves the match as it is now.
+        assert response.json()["moves"][-1]["view"] == view
         # And the match is kept as it was sent.
         match = client.get(f"/matches/{response.json()['id']}").json()
         assert match["view"] == view
@@ -555,7 +566,7 @@ def test_a_full_match_can_be_played_through_the_api(
     assert response.json()["code"] == "illegal_action"
 
 
-def test_the_events_are_the_players_action_and_then_the_ais_answer(
+def test_the_moves_are_the_players_action_and_then_the_ais_answer(
     client: TestClient,
 ) -> None:
     # The same match, played with the engine and the AI directly.
@@ -567,6 +578,7 @@ def test_the_events_are_the_players_action_and_then_the_ais_answer(
     while not response.json()["view"]["match_over"]:
         action = first_action(response)
         state, events = apply(state, player_view(state, HUMAN).legal_actions[0])
+        move = move_of(state, events)
         state, answer = ai_answers(state)
 
         response = play(client, response, action)
@@ -576,7 +588,7 @@ def test_the_events_are_the_players_action_and_then_the_ais_answer(
             id=UUID(response.json()["id"]),
             version=version,
             view=schemas.from_view(player_view(state, HUMAN)),
-            events=schemas.from_events(events + answer, HUMAN),
+            moves=(move, *answer),
         )
         assert response.text == sent.model_dump_json()
 
@@ -588,7 +600,7 @@ def test_the_player_never_gets_the_cards_the_ai_drew_or_swapped(
     response = start(client, seed=AI_DRAWS_AND_REDRAWS)
     while not response.json()["view"]["match_over"]:
         response = play(client, response, first_action(response))
-        events += response.json()["events"]
+        events += [e for move in response.json()["moves"] for e in move["events"]]
 
     the_ais = {event["type"] for event in events if event.get("player") == AI}
     assert {"opponent_drew", "opponent_redrew"} <= the_ais
@@ -617,7 +629,8 @@ def test_any_legal_action_can_be_played_through_the_api(
             assert response.status_code == 200
             view = response.json()["view"]
             assert view["current"] == HUMAN or view["match_over"]
-            for event in response.json()["events"]:
+            events = [e for move in response.json()["moves"] for e in move["events"]]
+            for event in events:
                 assert event["type"] not in {"cards_drawn", "card_redrawn"} or (
                     event["player"] == HUMAN
                 )

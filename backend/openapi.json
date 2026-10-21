@@ -27,7 +27,7 @@
     "/matches": {
       "post": {
         "summary": "Create Match",
-        "description": "Start a match against the AI, which plays another deck.\n\nIf the AI starts, it plays until it is the player's turn, and the events\nof its moves come with the match. The ``Location`` header of the response\nholds the address of the match.",
+        "description": "Start a match against the AI, which plays another deck.\n\nIf the AI starts, it plays until it is the player's turn, and its moves\ncome with the match. The ``Location`` header of the response\nholds the address of the match.",
         "operationId": "create_match",
         "requestBody": {
           "content": {
@@ -585,6 +585,28 @@
         "title": "Move",
         "description": "What the player sends to play: an action, and the version it was chosen at.\n\n``action`` is one of the legal actions of the view, sent back as it is,\nand ``version`` is the version of the match that came with that view. If\nthe match is at another version by then, the move isn't played."
       },
+      "MovePlayed": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "view": {
+            "$ref": "#/components/schemas/PlayerView"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "events",
+          "view"
+        ],
+        "title": "MovePlayed",
+        "description": "One action played, as the player may see it: its events and the view after.\n\nWith the view after each action, the page can show the match as it was\nthen while it plays the action's events out, and not the match as it is\nonce every action is played."
+      },
       "NewMatch": {
         "properties": {
           "deck": {
@@ -778,12 +800,12 @@
           "view": {
             "$ref": "#/components/schemas/PlayerView"
           },
-          "events": {
+          "moves": {
             "items": {
-              "$ref": "#/components/schemas/EventView"
+              "$ref": "#/components/schemas/MovePlayed"
             },
             "type": "array",
-            "title": "Events"
+            "title": "Moves"
           }
         },
         "additionalProperties": false,
@@ -792,10 +814,10 @@
           "id",
           "version",
           "view",
-          "events"
+          "moves"
         ],
         "title": "Played",
-        "description": "A match after moves were played in it, and what happened.\n\n``events`` holds the events of those moves, in order, as the player may see\nthem: in a new match, those of the AI's first moves, if it starts (none if\nthe player does); after the player's action, those of the action and then\nthose of the AI's answer."
+        "description": "A match after actions were played in it, and what happened.\n\n``moves`` holds those actions, in order: in a new match, the AI's first\nones, if it starts (none if the player does); after the player's action,\nthat action and then the AI's answer, one move for each of its actions.\nThe ``view`` of the match is that of the last move, if there is one."
       },
       "PlayerPassed": {
         "properties": {

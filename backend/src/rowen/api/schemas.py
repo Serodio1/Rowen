@@ -430,16 +430,28 @@ class Match(Schema):
     view: PlayerView
 
 
-class Played(Match):
-    """A match after moves were played in it, and what happened.
+class MovePlayed(Schema):
+    """One action played, as the player may see it: its events and the view after.
 
-    ``events`` holds the events of those moves, in order, as the player may see
-    them: in a new match, those of the AI's first moves, if it starts (none if
-    the player does); after the player's action, those of the action and then
-    those of the AI's answer.
+    With the view after each action, the page can show the match as it was
+    then while it plays the action's events out, and not the match as it is
+    once every action is played.
     """
 
     events: tuple[EventView, ...]
+    view: PlayerView
+
+
+class Played(Match):
+    """A match after actions were played in it, and what happened.
+
+    ``moves`` holds those actions, in order: in a new match, the AI's first
+    ones, if it starts (none if the player does); after the player's action,
+    that action and then the AI's answer, one move for each of its actions.
+    The ``view`` of the match is that of the last move, if there is one.
+    """
+
+    moves: tuple[MovePlayed, ...]
 
 
 class Move(Schema):
