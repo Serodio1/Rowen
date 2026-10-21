@@ -182,6 +182,22 @@ npm test                # run the tests with Vitest
 npm run build           # build the production files into dist/
 ```
 
+The end-to-end test (`frontend/e2e`) plays a whole match in a real browser
+with [Playwright](https://playwright.dev/), against the game in Docker, as CI
+does. In PowerShell, from the repository's folder:
+
+```powershell
+docker compose up --build --detach --wait   # start the game, as in "Play with Docker"
+cd frontend
+npx playwright install chromium             # once, and again after Playwright is updated
+npm run test:e2e                            # play the match in Chromium
+docker compose down                         # stop the game
+```
+
+`npm run test:e2e -- --headed` shows the browser while it plays. To test
+another copy of the game, set `BASE_URL` (`$env:BASE_URL = "http://localhost:5173"`
+for the development server, with the API running).
+
 To install a new package, use `npm install <package>`, which also updates
 `package-lock.json`. In `frontend/`, npm only picks versions published at least
 14 days earlier, and never runs the install scripts of packages (see

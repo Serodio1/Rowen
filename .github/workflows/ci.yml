@@ -132,6 +132,34 @@ jobs:
       - name: Start the game
         run: docker compose up --detach --wait
 
+      # A whole match in a real browser (frontend/e2e), against the game just
+      # started. Before the Smoke test, which ends by using up nginx's limits.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Playwright's own Chromium, with the system libraries it needs.
+      - name: Install Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Test in the browser
+        working-directory: frontend
+        run: npm run test:e2e
+
+      # What the browser showed at each step of a test that failed: open the
+      # report with `npx playwright show-report <folder>`.
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 7
+
       # Through nginx, as the browser does: the page with its security headers,
       # its JavaScript with nosniff, a redirect that names only the path (as
       # behind Cloud Run), the API's docs under /api, the decks, then a whole
