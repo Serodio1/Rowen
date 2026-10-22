@@ -168,11 +168,15 @@ jobs:
       # which comes too late: 409. The API then restarts (nginx with it), and
       # the match is still there, kept in PostgreSQL. A move every quarter of a
       # second stays under nginx's limit of 5 requests a second. Then, that the
-      # API ignores an address a visitor writes in X-Forwarded-For. Last,
-      # nginx's limits (they use up the buckets, so they come last): a request
-      # over 16 KB, for a new match and for a move, new matches in a row, each
-      # with another address in X-Forwarded-For, until nginx answers 429 with
-      # its error, and then requests for the decks in a row, until the same 429.
+      # API ignores an address a visitor writes in X-Forwarded-For. Then an
+      # account, as the page makes it (with its Origin): logged in, a log out
+      # from another site turned down (403), a log out, and the old cookie
+      # worth nothing. Last, nginx's limits (they use up the buckets, so they
+      # come last): a request over 16 KB, for a new match and for a move, new
+      # matches in a row, each with another address in X-Forwarded-For, until
+      # nginx answers 429 with its error, logins with a wrong password in a
+      # row, the same way, and then requests for the decks in a row, until the
+      # same 429.
       # The first request tries again for a few seconds, in case nginx is not
       # listening yet.
       - name: Smoke test
@@ -212,6 +216,19 @@ jobs:
           if docker compose logs api | grep --quiet 203.0.113.9; then
             echo "The API took the address in X-Forwarded-For"; exit 1
           fi
+          jar=$(mktemp)
+          account="{\"username\": \"smoke$(date +%s)\", \"password\": \"smoke test password\"}"
+          curl --fail --silent --show-error --cookie-jar "$jar" --header 'Content-Type: application/json' \
+            --header "Origin: $url" --data "$account" "$url/api/accounts" | jq --exit-status '.username | startswith("smoke")'
+          curl --fail --silent --show-error --cookie "$jar" "$url/api/session" | jq --exit-status '.username | startswith("smoke")'
+          answer=$(curl --silent --show-error --write-out '\n%{http_code}' --cookie "$jar" \
+            --header 'Origin: https://evil.example' --request DELETE "$url/api/session")
+          [ "$(tail --lines 1 <<< "$answer")" = 403 ]
+          head --lines 1 <<< "$answer" | jq --exit-status '.code == "forbidden_origin"'
+          cp "$jar" "$jar.old"
+          curl --fail --silent --show-error --cookie "$jar" --cookie-jar "$jar" --header "Origin: $url" \
+            --request DELETE "$url/api/session"
+          [ "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --cookie "$jar.old" "$url/api/session")" = 401 ]
           for path in matches "matches/$id/actions"; do
             head --bytes 20000 /dev/zero | curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
               --header 'Content-Type: application/json' --data-binary @- "$url/api/$path" | grep --quiet '^413$'
@@ -220,6 +237,15 @@ jobs:
             answer=$(curl --silent --show-error --write-out '\n%{http_code}' --header 'Content-Type: application/json' \
               --header "X-Forwarded-For: 203.0.113.$n" --data '{"deck": "humans"}' "$url/api/matches")
             [ "$(tail --lines 1 <<< "$answer")" = 429 ] && break
+          done
+          [ "$(tail --lines 1 <<< "$answer")" = 429 ]
+          head --lines 1 <<< "$answer" | jq --exit-status '.code == "too_many_requests" and (.message | type) == "string"'
+          for n in $(seq 10); do
+            answer=$(curl --silent --show-error --write-out '\n%{http_code}' --header 'Content-Type: application/json' \
+              --header "X-Forwarded-For: 203.0.113.$n" --data '{"username": "nobody", "password": "wrong password"}' \
+              "$url/api/session")
+            [ "$(tail --lines 1 <<< "$answer")" = 429 ] && break
+            [ "$(tail --lines 1 <<< "$answer")" = 401 ]
           done
           [ "$(tail --lines 1 <<< "$answer")" = 429 ]
           head --lines 1 <<< "$answer" | jq --exit-status '.code == "too_many_requests" and (.message | type) == "string"'
