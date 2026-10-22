@@ -7,16 +7,21 @@ each. The others are about the store in memory only.
 
 import sys
 import threading
-from datetime import UTC, datetime
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from functools import partial
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
+from rowen.api.accounts import AccountStore
 from rowen.api.store import (
     FIRST_VERSION,
     MAX_MATCHES,
+    DeckStats,
+    MatchResult,
     MatchStore,
+    MatchSummary,
     MemoryMatchStore,
     StoredMatch,
 )
@@ -202,14 +207,14 @@ def test_a_thread_waits_while_another_one_uses_the_store(method: str) -> None:
     store = MemoryMatchStore()
     match = create(store)
     owner = uuid4()
-    call = {
+    calls: dict[str, Callable[[], object]] = {
         "create": partial(store.create, DECKS, 0, SOME_ACTIONS, owner=None, now=NOW),
         "get": partial(store.get, match.id),
         "add_actions": partial(store.add_actions, match.id, match.version, (Pass(),)),
         "list_matches": partial(store.list_matches, owner, 20),
         "stats": partial(store.stats, owner),
-    }[method]
-    thread = threading.Thread(target=call)
+    }
+    thread = threading.Thread(target=calls[method])
 
     # While the test holds the lock, the other thread can't get in.
     with store._lock:
@@ -248,3 +253,179 @@ def test_many_threads_can_use_the_store_at_once() -> None:
         sys.setswitchinterval(interval)
 
     assert errors == []
+
+
+# Matches with an owner. In PostgreSQL the owner must be an account, so these
+# tests make one in the store of accounts that goes with the store of matches.
+
+WON = MatchResult(outcome="won", rounds=((30, 12), (25, 40), (18, 9)), ended_at=NOW)
+
+
+def owner_of(stores: tuple[MatchStore, AccountStore], username: str = "rui") -> UUID:
+    """Make an account and return its id."""
+    _, accounts = stores
+    account = accounts.create_account(username, "a hash")
+    assert account is not None
+    return account.id
+
+
+def start(
+    store: MatchStore, owner: UUID | None, now: datetime = NOW, deck: str = "humans"
+) -> StoredMatch:
+    """Keep a new match of an owner's, at a time, and return it."""
+    return store.create((deck, "robots"), 0, SOME_ACTIONS, owner=owner, now=now)
+
+
+def end(store: MatchStore, match: StoredMatch, result: MatchResult = WON) -> None:
+    """Add the actions that end a match, with its result."""
+    assert store.add_actions(match.id, match.version, (Pass(),), result) is not None
+
+
+def ids(matches: tuple[MatchSummary, ...]) -> list[UUID]:
+    return [match.id for match in matches]
+
+
+def test_a_match_keeps_its_owner(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    store, _ = any_stores
+    owner = owner_of(any_stores)
+
+    match = start(store, owner)
+
+    assert match.owner == owner
+    assert store.get(match.id) == match
+
+
+def test_the_actions_that_end_a_match_keep_its_result(
+    any_store: MatchStore,
+) -> None:
+    store = any_store
+    old = create(store)
+
+    new = store.add_actions(old.id, old.version, (Pass(),), WON)
+
+    assert new is not None
+    assert new.result == WON
+    assert store.get(old.id) == new
+
+
+def test_an_owners_matches_are_listed_newest_first_with_their_results(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    store, _ = any_stores
+    owner = owner_of(any_stores)
+    old = start(store, owner, NOW)
+    new = start(store, owner, NOW + timedelta(minutes=1), deck="robots")
+    end(store, old)
+
+    listed = store.list_matches(owner, 10)
+
+    assert listed == (
+        MatchSummary(
+            id=new.id,
+            decks=("robots", "robots"),
+            created_at=new.created_at,
+            result=None,
+        ),
+        MatchSummary(id=old.id, decks=DECKS, created_at=old.created_at, result=WON),
+    )
+
+
+def test_only_the_owners_matches_are_listed(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    store, _ = any_stores
+    rui = owner_of(any_stores, "rui")
+    ana = owner_of(any_stores, "ana")
+    ruis = start(store, rui)
+    start(store, ana)
+    create(store)
+
+    assert ids(store.list_matches(rui, 10)) == [ruis.id]
+    assert store.list_matches(uuid4(), 10) == ()
+
+
+def test_matches_are_listed_a_page_at_a_time(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    store, _ = any_stores
+    owner = owner_of(any_stores)
+    matches = [start(store, owner, NOW + timedelta(minutes=n)) for n in range(5)]
+    newest_first = [match.id for match in reversed(matches)]
+
+    first = store.list_matches(owner, 2)
+    second = store.list_matches(owner, 2, before=first[-1].id)
+    third = store.list_matches(owner, 2, before=second[-1].id)
+
+    assert ids(first) + ids(second) + ids(third) == newest_first
+    assert len(third) == 1
+
+
+def test_matches_that_started_at_the_same_time_are_each_on_one_page(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    # Then their ids put them in order, the same in both stores.
+    store, _ = any_stores
+    owner = owner_of(any_stores)
+    matches = [start(store, owner) for _ in range(6)]
+
+    pages = [store.list_matches(owner, 4)]
+    pages.append(store.list_matches(owner, 4, before=pages[0][-1].id))
+
+    listed = [match_id for page in pages for match_id in ids(page)]
+    assert listed == sorted((match.id for match in matches), reverse=True)
+
+
+def test_a_match_started_meanwhile_doesnt_move_the_next_page(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    store, _ = any_stores
+    owner = owner_of(any_stores)
+    matches = [start(store, owner, NOW + timedelta(minutes=n)) for n in range(4)]
+    first = store.list_matches(owner, 2)
+
+    start(store, owner, NOW + timedelta(hours=1))
+    second = store.list_matches(owner, 2, before=first[-1].id)
+
+    assert ids(second) == [matches[1].id, matches[0].id]
+
+
+def test_no_page_comes_after_a_match_that_isnt_the_owners(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    store, _ = any_stores
+    rui = owner_of(any_stores, "rui")
+    ana = owner_of(any_stores, "ana")
+    start(store, rui, NOW - timedelta(minutes=1))
+    anas = start(store, ana)
+
+    assert store.list_matches(rui, 10, before=anas.id) == ()
+    assert store.list_matches(rui, 10, before=uuid4()) == ()
+
+
+def test_stats_count_how_the_owners_matches_ended_with_each_deck(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    store, _ = any_stores
+    rui = owner_of(any_stores, "rui")
+    ana = owner_of(any_stores, "ana")
+    lost = MatchResult(outcome="lost", rounds=((1, 2), (3, 4)), ended_at=NOW)
+    drawn = MatchResult(outcome="drawn", rounds=((5, 5), (6, 6)), ended_at=NOW)
+    for deck, result in [
+        ("robots", WON),
+        ("humans", WON),
+        ("humans", WON),
+        ("humans", lost),
+        ("humans", drawn),
+    ]:
+        end(store, start(store, rui, deck=deck), result)
+    # Neither a match that goes on nor another owner's counts.
+    start(store, rui, deck="humans")
+    end(store, start(store, ana, deck="humans"))
+
+    assert store.stats(rui) == (
+        DeckStats(deck="humans", won=2, lost=1, drawn=1),
+        DeckStats(deck="robots", won=1, lost=0, drawn=0),
+    )
+    assert store.stats(uuid4()) == ()

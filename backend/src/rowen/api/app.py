@@ -423,7 +423,12 @@ def list_matches(
     )
 
 
-@app.get("/stats", responses=_errors(status.HTTP_401_UNAUTHORIZED))
+@app.get(
+    "/stats",
+    responses=_errors(
+        status.HTTP_401_UNAUTHORIZED, status.HTTP_422_UNPROCESSABLE_CONTENT
+    ),
+)
 def get_stats(accounts: Accounts, store: Store, now: Now, token: Token = None) -> Stats:
     """Return how the player's matches ended with each deck they played.
 

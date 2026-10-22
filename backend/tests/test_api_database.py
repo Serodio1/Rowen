@@ -80,6 +80,61 @@ def test_the_database_turns_down_a_negative_seed(
         postgres_store.create(("humans", "robots"), -1, (), owner=None, now=NOW)
 
 
+@pytest.mark.parametrize(
+    ("change", "constraint"),
+    [
+        # An outcome the API never gives.
+        (
+            "outcome = 'lost badly', rounds = '[]', ended_at = now()",
+            "outcome_is_known",
+        ),
+        # Only part of a result.
+        ("outcome = 'won'", "result_is_whole"),
+        ("rounds = '[]'", "result_is_whole"),
+        ("ended_at = now()", "result_is_whole"),
+        ("outcome = 'won', rounds = '[]'", "result_is_whole"),
+    ],
+)
+def test_the_database_turns_down_a_result_that_cant_be(
+    postgres_store: PostgresMatchStore, database_url: str, change: str, constraint: str
+) -> None:
+    match = postgres_store.create(("humans", "robots"), 1, (), owner=None, now=NOW)
+
+    engine = create_engine(database_url)
+    try:
+        with pytest.raises(IntegrityError, match=constraint), engine.begin() as c:
+            c.execute(
+                text(f"UPDATE matches SET {change} WHERE id = :id"), {"id": match.id}
+            )
+    finally:
+        engine.dispose()
+
+
+def test_deleting_an_account_leaves_its_matches_with_no_owner(
+    postgres_store: PostgresMatchStore,
+    postgres_accounts: PostgresAccountStore,
+    database_url: str,
+) -> None:
+    account = postgres_accounts.create_account("rui", "a hash")
+    assert account is not None
+    match = postgres_store.create(
+        ("humans", "robots"), 1, (), owner=account.id, now=NOW
+    )
+
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM accounts WHERE id = :id"), {"id": account.id}
+            )
+    finally:
+        engine.dispose()
+
+    stored = postgres_store.get(match.id)
+    assert stored is not None
+    assert stored.owner is None
+
+
 def test_a_match_outlives_the_store_that_kept_it(
     postgres_store: PostgresMatchStore, database_url: str
 ) -> None:

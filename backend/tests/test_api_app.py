@@ -543,7 +543,7 @@ def test_the_openapi_schema_lists_the_endpoints(client: TestClient) -> None:
         ("/matches/{match_id}", "get", {"404", "422"}),
         ("/matches/{match_id}/actions", "post", {"404", "409", "422"}),
         ("/matches", "get", {"401", "422"}),
-        ("/stats", "get", {"401"}),
+        ("/stats", "get", {"401", "422"}),
     ],
 )
 def test_the_openapi_schema_says_how_each_endpoint_turns_requests_down(
