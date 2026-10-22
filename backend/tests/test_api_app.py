@@ -20,6 +20,7 @@ from hypothesis import strategies as st
 from rowen import data
 from rowen.ai.baseline import choose_action
 from rowen.api import schemas
+from rowen.api.accounts import MemoryAccountStore
 from rowen.api.app import (
     AI,
     HUMAN,
@@ -27,10 +28,10 @@ from rowen.api.app import (
     _replay,
     app,
     get_store,
-    make_store,
+    make_stores,
     new_seed,
 )
-from rowen.api.database import PostgresMatchStore
+from rowen.api.database import PostgresAccountStore, PostgresMatchStore
 from rowen.api.store import FIRST_VERSION, MatchStore, MemoryMatchStore, StoredMatch
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
@@ -437,16 +438,22 @@ def test_seeds_are_big_and_random() -> None:
 def test_without_a_database_the_matches_are_kept_in_memory(
     environ: dict[str, str],
 ) -> None:
-    assert isinstance(make_store(environ), MemoryMatchStore)
+    store, accounts = make_stores(environ)
+
+    assert isinstance(store, MemoryMatchStore)
+    assert isinstance(accounts, MemoryAccountStore)
 
 
 def test_with_a_database_the_matches_are_kept_there() -> None:
     # No connection is made until a match is asked for, so none here.
     url = "postgresql+psycopg://rowen:secret@db.example/rowen"
 
-    store = make_store({"DATABASE_URL": url})
+    store, accounts = make_stores({"DATABASE_URL": url})
 
     assert isinstance(store, PostgresMatchStore)
+    assert isinstance(accounts, PostgresAccountStore)
+    # On the same connections.
+    assert store._engine is accounts._engine
 
 
 def test_the_app_keeps_its_matches_in_a_store_of_its_own() -> None:
@@ -502,6 +509,10 @@ def test_every_endpoint_sends_only_the_apis_own_models() -> None:
     assert routes
     for route in routes:
         assert isinstance(route, APIRoute), route
+        # Or nothing at all: a 204 has no body.
+        if route.status_code == 204:
+            assert route.response_model is None, route.path
+            continue
         assert isinstance(route.response_model, type), route.path
         assert issubclass(route.response_model, schemas.Schema), route.path
 
@@ -516,6 +527,8 @@ def test_the_openapi_schema_lists_the_endpoints(client: TestClient) -> None:
     assert set(paths["/matches"]) == {"post"}
     assert set(paths["/matches/{match_id}"]) == {"get"}
     assert set(paths["/matches/{match_id}/actions"]) == {"post"}
+    assert set(paths["/accounts"]) == {"post"}
+    assert set(paths["/session"]) == {"get", "post", "delete"}
 
 
 @pytest.mark.parametrize(

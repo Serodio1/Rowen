@@ -10,34 +10,49 @@ player 0 and the AI player 1, as in the CLI. When the AI has a move to make, it
 makes it before the server answers, so the player always gets the match on
 their turn, unless the match is over.
 
+A player may also make an account and log in (ADR 0014), but needn't: a
+guest plays the same way. Logging in sets a cookie with the session's token,
+which the browser sends back with each request. A request that would change
+something and comes from a page of another site is turned down (``Origin``,
+below), against cross-site request forgery.
+
 When the API turns a request down, it always answers with the same shape, an
 ``Error``: a ``code`` for the browser and a ``message`` for a person. It does
 the same when a bug on the server makes a request fail.
 
-Endpoints get the match store and the seed of a new match from ``get_store``
-and ``new_seed``, through FastAPI's ``Depends``. The tests replace both with
-``app.dependency_overrides``: a new store for each test, and seeds they know.
+Endpoints get the match store, the account store, the seed of a new match and
+the time from ``get_store``, ``get_accounts``, ``new_seed`` and ``get_now``,
+through FastAPI's ``Depends``. The tests replace them with
+``app.dependency_overrides``: new stores for each test, seeds they know, and
+a time they choose.
 
 To run the server on your computer, in ``backend``:
 ``uv run uvicorn rowen.api.app:app --reload --reload-dir src``.
 """
 
+import hashlib
 import os
 import secrets
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
+from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
 from typing import Annotated, Any
+from urllib.parse import urlsplit
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Request, Response, status
+from fastapi import Cookie, Depends, FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException
 
 from rowen.ai.baseline import choose_action
-from rowen.api.database import PostgresMatchStore, create_engine
+from rowen.api.accounts import AccountStore, MemoryAccountStore, StoredAccount
+from rowen.api.database import PostgresAccountStore, PostgresMatchStore, create_engine
+from rowen.api.passwords import check_password, hash_password
 from rowen.api.schemas import (
+    Account,
+    Credentials,
     Decks,
     DeckSummary,
     Error,
@@ -73,6 +88,17 @@ AI = 1
 # 64, so that a seed fits PostgreSQL's BIGINT, whose largest value is 2**63 - 1.
 SEED_BITS = 63
 
+# The cookie with the session's token. The __Host- prefix makes the browser
+# take it only if it is Secure, for the whole site (Path=/) and for this
+# address alone, not for others under the same domain (no Domain).
+SESSION_COOKIE = "__Host-session"
+
+# How long a session lasts after the player was last seen, and how often it is
+# renewed: at most once a day, so that not every request writes to the
+# database.
+SESSION_LENGTH = timedelta(days=30)
+RENEW_AFTER = timedelta(days=1)
+
 
 def _operation_id(route: APIRoute) -> str:
     """Name each endpoint in the OpenAPI document after its function.
@@ -94,25 +120,27 @@ app = FastAPI(
 )
 
 
-def make_store(environ: Mapping[str, str]) -> MatchStore:
-    """Return the store the server keeps its matches in.
+def make_stores(environ: Mapping[str, str]) -> tuple[MatchStore, AccountStore]:
+    """Return the stores the server keeps its matches and its accounts in.
 
     In PostgreSQL if ``DATABASE_URL`` gives its address, so they survive a
-    restart, as in Docker Compose and online. Otherwise in the memory of the
-    server's process, as when it runs on a computer for development. Then the
-    server must run as a single process, as uvicorn does unless told
-    otherwise: with several workers, each would have a store of its own, and a
-    match started in one would be unknown to the others.
+    restart, as in Docker Compose and online. Both share the same
+    connections. Otherwise in the memory of the server's process, as when it
+    runs on a computer for development. Then the server must run as a single
+    process, as uvicorn does unless told otherwise: with several workers,
+    each would have stores of its own, and a match started in one would be
+    unknown to the others.
     """
     url = environ.get("DATABASE_URL")
     if url:
-        return PostgresMatchStore(create_engine(url))
-    return MemoryMatchStore()
+        engine = create_engine(url)
+        return PostgresMatchStore(engine), PostgresAccountStore(engine)
+    return MemoryMatchStore(), MemoryAccountStore()
 
 
-# All the server's matches. No connection to the database is made until a
-# request needs one.
-_store = make_store(os.environ)
+# All the server's matches and accounts. No connection to the database is made
+# until a request needs one.
+_store, _accounts = make_stores(os.environ)
 
 
 def get_store() -> MatchStore:
@@ -120,15 +148,30 @@ def get_store() -> MatchStore:
     return _store
 
 
+def get_accounts() -> AccountStore:
+    """Return where the server keeps its accounts and their sessions."""
+    return _accounts
+
+
 def new_seed() -> int:
     """Return the seed of a new match: random, and never sent to a player."""
     return secrets.randbits(SEED_BITS)
 
 
-# What an endpoint asks for to get the store or a seed: FastAPI calls the
-# function in Depends and passes the endpoint what it returns.
+def get_now() -> datetime:
+    """Return the time now, to know when a session expires."""
+    return datetime.now(UTC)
+
+
+# What an endpoint asks for to get a store, a seed or the time: FastAPI calls
+# the function in Depends and passes the endpoint what it returns.
 type Store = Annotated[MatchStore, Depends(get_store)]
+type Accounts = Annotated[AccountStore, Depends(get_accounts)]
 type Seed = Annotated[int, Depends(new_seed)]
+type Now = Annotated[datetime, Depends(get_now)]
+# The session's token, from its cookie. An endpoint gives it None as its
+# default, for when the browser sends none.
+type Token = Annotated[str | None, Cookie(alias=SESSION_COOKIE)]
 
 
 class ApiError(Exception):
@@ -152,6 +195,44 @@ class ApiError(Exception):
 # endpoint answers with them on purpose.
 def _errors(*status_codes: int) -> dict[int | str, dict[str, Any]]:
     return {status_code: {"model": Error} for status_code in status_codes}
+
+
+# Methods that only read, which a page of another site may send.
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+@app.middleware("http")
+async def _same_origin(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Turn down a request that changes something and comes from another site.
+
+    A browser says which site's page sends a request in ``Origin``, and a page
+    can't change it. The page and the API have the same address (behind
+    nginx, as in development behind Vite), which the browser sends in
+    ``Host``, so a request from the game's own page has an ``Origin`` with
+    that address. Without the check, a page of another site could, say, log
+    the player out with the cookie their browser keeps for the game. The
+    cookie's ``SameSite=Lax`` already keeps the browser from sending it then;
+    this is a second guard, in case a browser doesn't.
+
+    A request with no ``Origin`` doesn't come from a page, but from a program
+    such as curl, which has no cookie of the player's to send: it goes on.
+    """
+    origin = request.headers.get("origin")
+    if (
+        request.method not in _SAFE_METHODS
+        and origin is not None
+        and urlsplit(origin).netloc != request.headers.get("host")
+    ):
+        return _error(
+            status.HTTP_403_FORBIDDEN,
+            Error(
+                code="forbidden_origin",
+                message="This request comes from a page of another site.",
+            ),
+        )
+    return await call_next(request)
 
 
 @app.get("/decks")
@@ -265,6 +346,137 @@ def play(match_id: UUID, move: Move, store: Store) -> Played:
         version=new.version,
         view=from_view(player_view(state, HUMAN)),
         moves=(first, *answer_moves),
+    )
+
+
+@app.post(
+    "/accounts",
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(status.HTTP_409_CONFLICT, status.HTTP_422_UNPROCESSABLE_CONTENT),
+)
+def register(
+    credentials: Credentials, response: Response, accounts: Accounts, now: Now
+) -> Account:
+    """Make an account, and log in with it.
+
+    If another account has the username, the answer is a 409.
+    """
+    account = accounts.create_account(
+        credentials.username, hash_password(credentials.password)
+    )
+    if account is None:
+        raise ApiError(
+            status.HTTP_409_CONFLICT,
+            "username_taken",
+            "There is already an account with this username. Choose another.",
+        )
+    _start_session(account, response, accounts, now)
+    return Account(username=account.username)
+
+
+@app.post(
+    "/session",
+    responses=_errors(
+        status.HTTP_401_UNAUTHORIZED, status.HTTP_422_UNPROCESSABLE_CONTENT
+    ),
+)
+def log_in(
+    credentials: Credentials, response: Response, accounts: Accounts, now: Now
+) -> Account:
+    """Log in with an account's username and password.
+
+    A username with no account and a wrong password get the same answer, a
+    401, so it doesn't tell which usernames have an account.
+    """
+    account = accounts.find_account(credentials.username)
+    password_hash = None if account is None else account.password_hash
+    # check_password is always False without an account: "account is None" is
+    # here for mypy, which can't know it.
+    if not check_password(password_hash, credentials.password) or account is None:
+        raise ApiError(
+            status.HTTP_401_UNAUTHORIZED,
+            "wrong_credentials",
+            "The username or the password is wrong.",
+        )
+    _start_session(account, response, accounts, now)
+    return Account(username=account.username)
+
+
+@app.get("/session", responses=_errors(status.HTTP_401_UNAUTHORIZED))
+def get_session(
+    response: Response, accounts: Accounts, now: Now, token: Token = None
+) -> Account:
+    """Return the account the player is logged in with.
+
+    If the player isn't logged in, or their session expired, the answer is a
+    401. Once a day at most, the session is renewed: it then lasts 30 days
+    from now, and so does its cookie.
+    """
+    session = None if token is None else accounts.find_session(_hash_token(token), now)
+    if token is None or session is None:
+        raise ApiError(
+            status.HTTP_401_UNAUTHORIZED,
+            "not_logged_in",
+            "The player isn't logged in.",
+        )
+    if session.expires_at - now < SESSION_LENGTH - RENEW_AFTER:
+        accounts.renew_session(session.token_hash, now + SESSION_LENGTH)
+        _set_cookie(response, token)
+    return Account(username=session.account.username)
+
+
+@app.delete("/session", status_code=status.HTTP_204_NO_CONTENT)
+def log_out(response: Response, accounts: Accounts, token: Token = None) -> None:
+    """Log out: the session ends, and the browser forgets its cookie.
+
+    The answer is the same if the player wasn't logged in.
+    """
+    if token is not None:
+        accounts.delete_session(_hash_token(token))
+    response.delete_cookie(
+        SESSION_COOKIE, path="/", secure=True, httponly=True, samesite="lax"
+    )
+
+
+def _start_session(
+    account: StoredAccount, response: Response, accounts: AccountStore, now: datetime
+) -> None:
+    """Start a session of an account, and set its cookie in the response.
+
+    The token is 32 random bytes from the operating system (256 bits), so
+    nobody can guess one. The store keeps only its hash.
+    """
+    token = secrets.token_urlsafe(32)
+    accounts.create_session(account, _hash_token(token), now + SESSION_LENGTH, now)
+    _set_cookie(response, token)
+
+
+def _hash_token(token: str) -> bytes:
+    """Return a session token's SHA-256 hash, which the store keeps.
+
+    The token is random and long, so a fast hash is enough: unlike a
+    password, it can't be found by trying likely ones.
+    """
+    return hashlib.sha256(token.encode()).digest()
+
+
+def _set_cookie(response: Response, token: str) -> None:
+    """Set the cookie with the session's token, for the next 30 days.
+
+    - ``HttpOnly``: the page's JavaScript can't read it, so a script that
+      got into the page can't send it elsewhere.
+    - ``Secure``: only over HTTPS (or to localhost, in development).
+    - ``SameSite=Lax``: the browser doesn't send it with a request that a
+      page of another site makes, only when the player follows a link here.
+    """
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=int(SESSION_LENGTH.total_seconds()),
+        path="/",
+        secure=True,
+        httponly=True,
+        samesite="lax",
     )
 
 

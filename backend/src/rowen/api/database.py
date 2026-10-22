@@ -1,13 +1,18 @@
-"""Where the web API keeps its matches in PostgreSQL, so they survive a restart.
+"""Where the web API keeps its matches and accounts in PostgreSQL.
+
+There they survive a restart.
 
 Each match is a row of the ``matches`` table, as ``rowen.api.store`` describes
 it: the ids of the two decks, the seed, every action played so far and the
 version. The actions are a JSON list, each one in the shape the API sends it
-(``schemas.Action``), so the database holds no Python objects.
+(``schemas.Action``), so the database holds no Python objects. Each account is
+a row of the ``accounts`` table and each session one of ``sessions``, as
+``rowen.api.accounts`` describes them.
 
-The table is made by the migrations in ``backend/migrations`` (Alembic), never
-by this module: ``MatchRow`` only says what the table looks like, and a test
-checks that the migrations make the same table, as ``alembic check`` does.
+The tables are made by the migrations in ``backend/migrations`` (Alembic), never
+by this module: the rows' classes only say what the tables look like, and a
+test checks that the migrations make the same tables, as ``alembic check``
+does.
 That check sees columns and their types, but not everything: not a CHECK
 constraint, for one, which its own test covers.
 
@@ -27,14 +32,26 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Engine,
+    ForeignKey,
+    LargeBinary,
     String,
+    delete,
     func,
+    select,
     update,
 )
 from sqlalchemy import create_engine as _create_engine
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB, insert
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    Session,
+    joinedload,
+    mapped_column,
+    relationship,
+)
 
+from rowen.api.accounts import StoredAccount, StoredSession
 from rowen.api.schemas import Action as ActionJson
 from rowen.api.schemas import from_action, to_action
 from rowen.api.store import FIRST_VERSION, StoredMatch
@@ -70,6 +87,38 @@ class MatchRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class AccountRow(Base):
+    """An account, as a row of the ``accounts`` table."""
+
+    __tablename__ = "accounts"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String, unique=True)
+    password_hash: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class SessionRow(Base):
+    """A session, as a row of the ``sessions`` table.
+
+    Deleting an account deletes its sessions (``ondelete``).
+    """
+
+    __tablename__ = "sessions"
+
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    account: Mapped[AccountRow] = relationship()
 
 
 # How long a request waits to connect to the database, and then for a free
@@ -177,4 +226,106 @@ def _stored(row: MatchRow) -> StoredMatch:
             to_action(action) for action in _ACTIONS.validate_python(row.actions)
         ),
         version=row.version,
+    )
+
+
+class PostgresAccountStore:
+    """The accounts and their sessions, in PostgreSQL."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Make a store that keeps its accounts in a database.
+
+        Args:
+            engine: The connections to the database, from ``create_engine``.
+        """
+        self._engine = engine
+
+    def create_account(self, username: str, password_hash: str) -> StoredAccount | None:
+        """Keep a new account and return it, or None if the username is taken.
+
+        If another account has the username, the database adds no row
+        (``ON CONFLICT DO NOTHING``) and returns none, even when two requests
+        ask for it at the same time.
+        """
+        statement = (
+            insert(AccountRow)
+            .values(id=uuid4(), username=username, password_hash=password_hash)
+            .on_conflict_do_nothing(index_elements=[AccountRow.username])
+            .returning(AccountRow)
+        )
+        with Session(self._engine) as session, session.begin():
+            row = session.scalars(statement).one_or_none()
+            return None if row is None else _account(row)
+
+    def find_account(self, username: str) -> StoredAccount | None:
+        """Return the account with this username, or None if there is none."""
+        statement = select(AccountRow).where(AccountRow.username == username)
+        with Session(self._engine) as session:
+            row = session.scalars(statement).one_or_none()
+            return None if row is None else _account(row)
+
+    def create_session(
+        self,
+        account: StoredAccount,
+        token_hash: bytes,
+        expires_at: datetime,
+        now: datetime,
+    ) -> None:
+        """Keep a new session of an account, until ``expires_at``.
+
+        The account's sessions that expired before ``now`` are deleted.
+        """
+        expired = delete(SessionRow).where(
+            SessionRow.account_id == account.id, SessionRow.expires_at <= now
+        )
+        with Session(self._engine) as session, session.begin():
+            session.execute(expired)
+            session.add(
+                SessionRow(
+                    token_hash=token_hash, account_id=account.id, expires_at=expires_at
+                )
+            )
+
+    def find_session(self, token_hash: bytes, now: datetime) -> StoredSession | None:
+        """Return the session with this token's hash, or None.
+
+        None also if the session expired before ``now``. One query reads the
+        session and its account (``joinedload``).
+        """
+        statement = (
+            select(SessionRow)
+            .where(SessionRow.token_hash == token_hash, SessionRow.expires_at > now)
+            .options(joinedload(SessionRow.account))
+        )
+        with Session(self._engine) as session:
+            row = session.scalars(statement).one_or_none()
+            if row is None:
+                return None
+            return StoredSession(
+                token_hash=row.token_hash,
+                account=_account(row.account),
+                expires_at=row.expires_at,
+            )
+
+    def renew_session(self, token_hash: bytes, expires_at: datetime) -> None:
+        """Make a session last until ``expires_at``; nothing if there is none."""
+        statement = (
+            update(SessionRow)
+            .where(SessionRow.token_hash == token_hash)
+            .values(expires_at=expires_at)
+        )
+        with Session(self._engine) as session, session.begin():
+            session.execute(statement)
+
+    def delete_session(self, token_hash: bytes) -> None:
+        """Delete a session, as logging out does; nothing if there is none."""
+        statement = delete(SessionRow).where(SessionRow.token_hash == token_hash)
+        with Session(self._engine) as session, session.begin():
+            session.execute(statement)
+
+
+def _account(row: AccountRow) -> StoredAccount:
+    """Return a row as the store gives an account."""
+    return StoredAccount(
+        id=row.id, username=row.username, password_hash=row.password_hash
     )

@@ -184,6 +184,197 @@
           }
         }
       }
+    },
+    "/accounts": {
+      "post": {
+        "summary": "Register",
+        "description": "Make an account, and log in with it.\n\nIf another account has the username, the answer is a 409.",
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/session": {
+      "post": {
+        "summary": "Log In",
+        "description": "Log in with an account's username and password.\n\nA username with no account and a wrong password get the same answer, a\n401, so it doesn't tell which usernames have an account.",
+        "operationId": "log_in",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credentials"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get Session",
+        "description": "Return the account the player is logged in with.\n\nIf the player isn't logged in, or their session expired, the answer is a\n401. Once a day at most, the session is renewed: it then lasts 30 days\nfrom now, and so does its cookie.",
+        "operationId": "get_session",
+        "parameters": [
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Log Out",
+        "description": "Log out: the session ends, and the browser forgets its cookie.\n\nThe answer is the same if the player wasn't logged in.",
+        "operationId": "log_out",
+        "parameters": [
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -200,6 +391,21 @@
         ],
         "title": "Ability",
         "description": "A unit ability (rules, section 7). A unit has at most one."
+      },
+      "Account": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username"
+        ],
+        "title": "Account",
+        "description": "The account of the player who is logged in: never its password's hash."
       },
       "Action": {
         "oneOf": [
@@ -319,6 +525,29 @@
         "title": "CardsDrawn",
         "description": "The player drew cards: ``engine.CardsDrawn``.\n\nThe player only gets this for their own cards. For the opponent's, they get\n``OpponentDrew``."
       },
+      "Credentials": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]{3,20}$",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "Credentials",
+        "description": "What a player sends to make an account or to log in.\n\nA username is 3 to 20 lower-case letters, digits, ``_`` or ``-``, so two\nusernames that look the same are the same. A password is 8 to 128\ncharacters, any of them: at least 8, as NIST asks (SP 800-63B), and at\nmost 128, so a hash never has to be worked out from a huge one."
+      },
       "DeckSummary": {
         "properties": {
           "id": {
@@ -403,7 +632,11 @@
           "not_found",
           "method_not_allowed",
           "server_error",
-          "too_many_requests"
+          "too_many_requests",
+          "username_taken",
+          "wrong_credentials",
+          "not_logged_in",
+          "forbidden_origin"
         ]
       },
       "EventView": {
@@ -486,6 +719,19 @@
             "wildfire_played": "#/components/schemas/WildfirePlayed"
           }
         }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
       },
       "HornPlayed": {
         "properties": {
@@ -1523,6 +1769,46 @@
         ],
         "title": "UnitView",
         "description": "A unit on the board, as ``engine.UnitView`` describes it."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       },
       "WeatherCleared": {
         "properties": {
