@@ -310,6 +310,19 @@ def test_the_actions_that_end_a_match_keep_its_result(
     assert store.get(old.id) == new
 
 
+def test_actions_added_after_the_result_keep_it(any_store: MatchStore) -> None:
+    # The API adds none once a match is over, but the store doesn't know that.
+    store = any_store
+    old = create(store)
+    ended = store.add_actions(old.id, old.version, (Pass(),), WON)
+    assert ended is not None
+
+    later = store.add_actions(old.id, ended.version, (Pass(),))
+
+    assert later is not None
+    assert later.result == WON
+
+
 def test_an_owners_matches_are_listed_newest_first_with_their_results(
     any_stores: tuple[MatchStore, AccountStore],
 ) -> None:
@@ -416,16 +429,20 @@ def test_stats_count_how_the_owners_matches_ended_with_each_deck(
         ("robots", WON),
         ("humans", WON),
         ("humans", WON),
+        ("humans", WON),
+        ("humans", lost),
         ("humans", lost),
         ("humans", drawn),
     ]:
         end(store, start(store, rui, deck=deck), result)
-    # Neither a match that goes on nor another owner's counts.
+    # Neither a match that goes on nor another owner's counts, so a deck with
+    # only those isn't listed.
     start(store, rui, deck="humans")
+    start(store, rui, deck="elves")
     end(store, start(store, ana, deck="humans"))
 
     assert store.stats(rui) == (
-        DeckStats(deck="humans", won=2, lost=1, drawn=1),
+        DeckStats(deck="humans", won=3, lost=2, drawn=1),
         DeckStats(deck="robots", won=1, lost=0, drawn=0),
     )
     assert store.stats(uuid4()) == ()
