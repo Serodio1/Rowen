@@ -32,7 +32,16 @@ def test_endpoints_are_named_after_their_functions() -> None:
         for operation in path.values()
     }
 
-    assert operations == {"list_decks", "create_match", "get_match", "play"}
+    assert operations == {
+        "list_decks",
+        "create_match",
+        "get_match",
+        "play",
+        "register",
+        "log_in",
+        "get_session",
+        "log_out",
+    }
 
 
 def test_main_writes_the_document(

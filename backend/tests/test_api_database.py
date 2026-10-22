@@ -6,6 +6,7 @@ They run only when TEST_DATABASE_URL is set (tests/conftest.py).
 import threading
 import time
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -15,8 +16,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
-from rowen.api.app import app, get_store, new_seed
-from rowen.api.database import PostgresMatchStore, create_engine
+from rowen.api.app import app, get_accounts, get_store, new_seed
+from rowen.api.database import PostgresAccountStore, PostgresMatchStore, create_engine
 from rowen.api.store import FIRST_VERSION, StoredMatch
 from rowen.engine.public import (
     Action,
@@ -256,3 +257,81 @@ def test_a_match_survives_a_restart_of_the_api(
     assert seen.json()["version"] == played.json()["version"]
     assert again.status_code == 200
     assert UUID(again.json()["id"]) == UUID(started.json()["id"])
+
+
+def test_the_apis_role_may_delete_sessions_and_nothing_else(
+    migrations: Config, database_url: str
+) -> None:
+    # As online: rowen_app reads, adds and changes rows (docs/deploy.md), and
+    # the migration lets it delete sessions, to log out. Roles belong to the
+    # whole server, not to one database, so the test makes it only if it
+    # isn't there.
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "DO $$ BEGIN"
+                    " IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'rowen_app')"
+                    " THEN CREATE ROLE rowen_app; END IF; END $$"
+                )
+            )
+        command.downgrade(migrations, "a398e9df25d3")
+        command.upgrade(migrations, "head")
+        with engine.connect() as connection:
+            may_delete: dict[str, bool] = {
+                table: connection.execute(
+                    text("SELECT has_table_privilege('rowen_app', :table, 'DELETE')"),
+                    {"table": table},
+                ).scalar_one()
+                for table in ("matches", "accounts", "sessions")
+            }
+    finally:
+        engine.dispose()
+
+    assert may_delete == {"matches": False, "accounts": False, "sessions": True}
+
+
+def test_deleting_an_account_deletes_its_sessions(
+    postgres_accounts: PostgresAccountStore, database_url: str
+) -> None:
+    account = postgres_accounts.create_account("rui", "a hash")
+    assert account is not None
+    now = datetime(2026, 10, 22, tzinfo=UTC)
+    postgres_accounts.create_session(account, b"token", now + timedelta(days=1), now)
+
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM accounts WHERE id = :id"), {"id": account.id}
+            )
+    finally:
+        engine.dispose()
+
+    assert postgres_accounts.find_session(b"token", now) is None
+
+
+def test_a_session_survives_a_restart_of_the_api(
+    postgres_accounts: PostgresAccountStore, database_url: str
+) -> None:
+    app.dependency_overrides[get_accounts] = lambda: postgres_accounts
+    client = TestClient(app, base_url="https://testserver")
+    engine = create_engine(database_url)
+    try:
+        registered = client.post(
+            "/accounts", json={"username": "rui", "password": "dragon123"}
+        )
+        # The API starts again, with a new store on new connections.
+        app.dependency_overrides[get_accounts] = lambda: PostgresAccountStore(engine)
+        seen = client.get("/session")
+        logged_out = client.delete("/session")
+        after = client.get("/session")
+    finally:
+        app.dependency_overrides.clear()
+        engine.dispose()
+
+    assert registered.status_code == 201
+    assert seen.json() == {"username": "rui"}
+    assert logged_out.status_code == 204
+    assert after.status_code == 401

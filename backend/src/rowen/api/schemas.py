@@ -474,6 +474,25 @@ class Move(Schema):
     action: Action
 
 
+class Credentials(Schema):
+    """What a player sends to make an account or to log in.
+
+    A username is 3 to 20 lower-case letters, digits, ``_`` or ``-``, so two
+    usernames that look the same are the same. A password is 8 to 128
+    characters, any of them: at least 8, as NIST asks (SP 800-63B), and at
+    most 128, so a hash never has to be worked out from a huge one.
+    """
+
+    username: Annotated[str, Field(pattern=r"^[a-z0-9_-]{3,20}$")]
+    password: Annotated[str, Field(min_length=8, max_length=128)]
+
+
+class Account(Schema):
+    """The account of the player who is logged in: never its password's hash."""
+
+    username: str
+
+
 # What went wrong, for a program to read: the browser can show its own text.
 # too_many_requests comes from nginx, in front of the API, when an address
 # sends more requests than its limits allow (frontend/nginx.conf); the API
@@ -488,6 +507,10 @@ type ErrorCode = Literal[
     "method_not_allowed",
     "server_error",
     "too_many_requests",
+    "username_taken",
+    "wrong_credentials",
+    "not_logged_in",
+    "forbidden_origin",
 ]
 
 

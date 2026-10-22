@@ -14,7 +14,8 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 
-from rowen.api.database import PostgresMatchStore, create_engine
+from rowen.api.accounts import AccountStore, MemoryAccountStore
+from rowen.api.database import PostgresAccountStore, PostgresMatchStore, create_engine
 from rowen.api.store import MatchStore, MemoryMatchStore
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
@@ -67,4 +68,23 @@ def any_store(request: pytest.FixtureRequest) -> MatchStore:
     if request.param == "memory":
         return MemoryMatchStore()
     store: MatchStore = request.getfixturevalue("postgres_store")
+    return store
+
+
+@pytest.fixture
+def postgres_accounts(database_url: str) -> Iterator[PostgresAccountStore]:
+    """Return a store of accounts in the test database, with none in it."""
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(text("TRUNCATE accounts, sessions"))
+    yield PostgresAccountStore(engine)
+    engine.dispose()
+
+
+@pytest.fixture(params=["memory", "postgres"])
+def any_accounts(request: pytest.FixtureRequest) -> AccountStore:
+    """Return each store of accounts in turn, empty, as ``any_store`` does."""
+    if request.param == "memory":
+        return MemoryAccountStore()
+    store: AccountStore = request.getfixturevalue("postgres_accounts")
     return store

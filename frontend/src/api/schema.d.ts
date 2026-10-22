@@ -97,6 +97,65 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/accounts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Register
+     * @description Make an account, and log in with it.
+     *
+     *     If another account has the username, the answer is a 409.
+     */
+    post: operations["register"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Session
+     * @description Return the account the player is logged in with.
+     *
+     *     If the player isn't logged in, or their session expired, the answer is a
+     *     401. Once a day at most, the session is renewed: it then lasts 30 days
+     *     from now, and so does its cookie.
+     */
+    get: operations["get_session"];
+    put?: never;
+    /**
+     * Log In
+     * @description Log in with an account's username and password.
+     *
+     *     A username with no account and a wrong password get the same answer, a
+     *     401, so it doesn't tell which usernames have an account.
+     */
+    post: operations["log_in"];
+    /**
+     * Log Out
+     * @description Log out: the session ends, and the browser forgets its cookie.
+     *
+     *     The answer is the same if the player wasn't logged in.
+     */
+    delete: operations["log_out"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -107,6 +166,14 @@ export interface components {
      * @enum {string}
      */
     Ability: "agile" | "spy" | "medic" | "muster" | "bond" | "inspire";
+    /**
+     * Account
+     * @description The account of the player who is logged in: never its password's hash.
+     */
+    Account: {
+      /** Username */
+      username: string;
+    };
     Action:
       | components["schemas"]["PlayUnit"]
       | components["schemas"]["PlaySpecial"]
@@ -155,6 +222,21 @@ export interface components {
       player: number;
       /** Cards */
       cards: string[];
+    };
+    /**
+     * Credentials
+     * @description What a player sends to make an account or to log in.
+     *
+     *     A username is 3 to 20 lower-case letters, digits, ``_`` or ``-``, so two
+     *     usernames that look the same are the same. A password is 8 to 128
+     *     characters, any of them: at least 8, as NIST asks (SP 800-63B), and at
+     *     most 128, so a hash never has to be worked out from a huge one.
+     */
+    Credentials: {
+      /** Username */
+      username: string;
+      /** Password */
+      password: string;
     };
     /**
      * DeckSummary
@@ -214,7 +296,11 @@ export interface components {
       | "not_found"
       | "method_not_allowed"
       | "server_error"
-      | "too_many_requests";
+      | "too_many_requests"
+      | "username_taken"
+      | "wrong_credentials"
+      | "not_logged_in"
+      | "forbidden_origin";
     EventView:
       | components["schemas"]["UnitPlayed"]
       | components["schemas"]["UnitRevived"]
@@ -234,6 +320,11 @@ export interface components {
       | components["schemas"]["RedrawEnded"]
       | components["schemas"]["OpponentDrew"]
       | components["schemas"]["OpponentRedrew"];
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components["schemas"]["ValidationError"][];
+    };
     /**
      * HornPlayed
      * @description A player played a War Horn: ``engine.HornPlayed``.
@@ -764,6 +855,19 @@ export interface components {
       /** Strength */
       strength: number;
     };
+    /** ValidationError */
+    ValidationError: {
+      /** Location */
+      loc: (string | number)[];
+      /** Message */
+      msg: string;
+      /** Error Type */
+      type: string;
+      /** Input */
+      input?: unknown;
+      /** Context */
+      ctx?: Record<string, never>;
+    };
     /**
      * WeatherCleared
      * @description A player played Clear Skies: ``engine.WeatherCleared``.
@@ -961,6 +1065,159 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  register: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Credentials"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Account"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  get_session: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Account"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  log_in: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Credentials"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Account"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  log_out: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

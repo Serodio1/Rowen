@@ -142,7 +142,9 @@ in Frankfurt, near Cloud Run's `europe-west1`
 - the database's owner, `neondb_owner`, which CI uses to run the migrations
   (they make and change the tables);
 - `rowen_app`, which the API uses: it may only read, add and change rows,
-  never change a table.
+  never change a table. The one exception is deleting sessions, to log out,
+  which the migration that makes the `sessions` table allows
+  ([ADR 0014](adr/0014-accounts-with-sessions-in-postgresql.md)).
 
 **On Neon** (sign up at <https://neon.com>, with GitHub or an email), create
 a project: name `rowen`, Postgres version 18, region *AWS Europe Central 1
