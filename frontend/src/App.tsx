@@ -30,6 +30,8 @@ import {
   type Step,
 } from "./stage.ts";
 import { onFirstClick } from "./clicks.ts";
+import { AccountBar, AccountDialog } from "./Account.tsx";
+import { ALERT, BUTTON } from "./styles.ts";
 import {
   otherActions,
   playsOf,
@@ -46,13 +48,6 @@ import {
   type Happened,
 } from "./text.ts";
 
-// The look of the page's buttons and warnings (the wood and gold colours are
-// in index.css).
-const BUTTON =
-  "rounded-md border border-gold-600 bg-wood-700 px-3 py-1.5 font-display text-gold-200 shadow shadow-black/50 hover:bg-wood-600 hover:text-gold-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300 disabled:cursor-not-allowed disabled:opacity-50";
-const ALERT =
-  "rounded-md border border-red-400/60 bg-red-950/70 px-3 py-2 text-red-100";
-
 /**
  * The game's page: choose a deck to start a match against the AI, then play
  * it one move at a time, until it is over.
@@ -68,25 +63,61 @@ export function App({ api }: { api: Api }) {
   const [match, setMatch] = useState<Played | null>(null);
   // Whether the player left a match: the focus then goes to the decks.
   const [left, setLeft] = useState(false);
+  // Whether the dialog to log in is open: the rest of the page is out of
+  // reach meanwhile (inert), and the focus goes back to the top once it
+  // closes, since the button that opened it may be gone.
+  const [loggingIn, setLoggingIn] = useState(false);
+  const top = useRef<HTMLDivElement>(null);
+  const wasLoggingIn = useRef(false);
+  useEffect(() => {
+    if (wasLoggingIn.current && !loggingIn) {
+      top.current?.querySelector("button")?.focus();
+    }
+    wasLoggingIn.current = loggingIn;
+  }, [loggingIn]);
 
   return (
-    <main className="mx-auto max-w-384 px-2 py-3 lg:px-4 lg:py-2">
-      <h1 className="mb-2 text-center font-display text-3xl font-bold tracking-wide text-gold-300 drop-shadow lg:mb-1">
-        Rowen
-      </h1>
-      {match === null ? (
-        <ChooseDeck api={api} onStart={setMatch} focus={left} />
-      ) : (
-        <PlayMatch
+    <>
+      <main
+        className="mx-auto max-w-384 px-2 py-3 lg:px-4 lg:py-2"
+        inert={loggingIn}
+      >
+        <div
+          ref={top}
+          className="mb-2 flex flex-col items-center gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] lg:mb-1"
+        >
+          <h1 className="text-center font-display sm:col-start-2 text-3xl font-bold tracking-wide text-gold-300 drop-shadow">
+            Rowen
+          </h1>
+          <AccountBar
+            api={api}
+            onLogIn={() => {
+              setLoggingIn(true);
+            }}
+          />
+        </div>
+        {match === null ? (
+          <ChooseDeck api={api} onStart={setMatch} focus={left} />
+        ) : (
+          <PlayMatch
+            api={api}
+            started={match}
+            onLeave={() => {
+              setMatch(null);
+              setLeft(true);
+            }}
+          />
+        )}
+      </main>
+      {loggingIn && (
+        <AccountDialog
           api={api}
-          started={match}
-          onLeave={() => {
-            setMatch(null);
-            setLeft(true);
+          onClose={() => {
+            setLoggingIn(false);
           }}
         />
       )}
-    </main>
+    </>
   );
 }
 

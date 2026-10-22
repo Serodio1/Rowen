@@ -10,7 +10,8 @@ PostgreSQL, and a React + TypeScript frontend.
 > [`v0.3.0`](https://github.com/Serodio1/Rowen/releases): a match against the
 > AI can be played online, on a board with card art, animations and the
 > keyboard, through a web API, with the matches kept in PostgreSQL. Phase 4,
-> accounts and each player's matches, comes next.
+> accounts and each player's matches, is under way: a player can already make
+> an account and log in (or play as a guest, as before).
 
 ![A match in Rowen: the AI's rows above, the player's below, Hoarfrost on both
 melee rows, and a Plane shown large with what it does](docs/screenshot.webp)

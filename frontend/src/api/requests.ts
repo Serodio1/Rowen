@@ -8,7 +8,7 @@
  * sent when the page says so.
  */
 import { QueryClient, queryOptions } from "@tanstack/react-query";
-import type { Api, ErrorCode, Move } from "./client.ts";
+import type { Account, Api, Credentials, ErrorCode, Move } from "./client.ts";
 
 // What a request says when no answer came, or none from the API: the network
 // is down, the API isn't running, or a proxy answered in its place.
@@ -122,6 +122,54 @@ export function playMove(api: Api, matchId: string, move: Move) {
       body: move,
     }),
   );
+}
+
+/**
+ * The account the player is logged in with, or `null` for a guest.
+ *
+ * The page can't read the session's cookie (it is `HttpOnly`), so it asks
+ * the API, which reads it. Logging in and out put the new answer here.
+ */
+export function sessionQuery(api: Api) {
+  return queryOptions({
+    queryKey: ["session"],
+    queryFn: async (): Promise<Account | null> => {
+      try {
+        return await send(api.GET("/session"));
+      } catch (error) {
+        if (error instanceof RequestError && error.code === "not_logged_in") {
+          return null;
+        }
+        throw error;
+      }
+    },
+  });
+}
+
+/** Make an account, which also logs the player in with it. */
+export function register(api: Api, credentials: Credentials) {
+  return send(api.POST("/accounts", { body: credentials }));
+}
+
+/** Log in with an account's username and password. */
+export function logIn(api: Api, credentials: Credentials) {
+  return send(api.POST("/session", { body: credentials }));
+}
+
+/**
+ * Log out. The API answers 204, with no body, so this checks the status
+ * rather than the data.
+ */
+export async function logOut(api: Api): Promise<void> {
+  let answer;
+  try {
+    answer = await api.DELETE("/session");
+  } catch {
+    throw new RequestError(null, UNREACHABLE);
+  }
+  if (!answer.response.ok) {
+    throw turnedDown(answer.error);
+  }
 }
 
 /**
