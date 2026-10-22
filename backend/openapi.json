@@ -27,17 +27,35 @@
     "/matches": {
       "post": {
         "summary": "Create Match",
-        "description": "Start a match against the AI, which plays another deck.\n\nIf the AI starts, it plays until it is the player's turn, and its moves\ncome with the match. The ``Location`` header of the response\nholds the address of the match.",
+        "description": "Start a match against the AI, which plays another deck.\n\nIf the AI starts, it plays until it is the player's turn, and its moves\ncome with the match. The ``Location`` header of the response\nholds the address of the match. If the player is logged in, the match is\ntheirs.",
         "operationId": "create_match",
+        "parameters": [
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/NewMatch"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -51,14 +69,86 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
               }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "get": {
+        "summary": "List Matches",
+        "description": "Return the matches of the player who is logged in, newest first.\n\nA page holds up to 20. For the next one, ``before`` is the id of the last\nmatch of this one. If the player isn't logged in, the answer is a 401.",
+        "operationId": "list_matches",
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
             }
+          },
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Matches"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -77,6 +167,22 @@
               "type": "string",
               "format": "uuid",
               "title": "Match Id"
+            }
+          },
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
             }
           }
         ],
@@ -117,7 +223,7 @@
     "/matches/{match_id}/actions": {
       "post": {
         "summary": "Play",
-        "description": "Play the player's action, and then let the AI answer.\n\nThe action is one of the legal actions in the player's view, sent back as\nit is, with the version of the match that came with that view. If the\nmatch is at another version, the answer is a 409 and the match doesn't\nchange: get it again to see where it is. That is so also when another\nrequest for the same match is played first, while this one is. If the\naction isn't legal now, the answer is a 409 too.",
+        "description": "Play the player's action, and then let the AI answer.\n\nThe action is one of the legal actions in the player's view, sent back as\nit is, with the version of the match that came with that view. If the\nmatch is at another version, the answer is a 409 and the match doesn't\nchange: get it again to see where it is. That is so also when another\nrequest for the same match is played first, while this one is. If the\naction isn't legal now, the answer is a 409 too.\n\nIf the match ends, the store keeps how it ended with the last actions.",
         "operationId": "play",
         "parameters": [
           {
@@ -128,6 +234,22 @@
               "type": "string",
               "format": "uuid",
               "title": "Match Id"
+            }
+          },
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
             }
           }
         ],
@@ -181,6 +303,63 @@
               }
             },
             "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "summary": "Get Stats",
+        "description": "Return how the player's matches ended with each deck they played.\n\nIf the player isn't logged in, the answer is a 401.",
+        "operationId": "get_stats",
+        "parameters": [
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stats"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -548,6 +727,36 @@
         "title": "Credentials",
         "description": "What a player sends to make an account or to log in.\n\nA username is 3 to 20 lower-case letters, digits, ``_`` or ``-``, so two\nusernames that look the same are the same. A password is 8 to 128\ncharacters, any of them: at least 8, as NIST asks (SP 800-63B), and at\nmost 128, so a hash never has to be worked out from a huge one."
       },
+      "DeckStats": {
+        "properties": {
+          "deck": {
+            "type": "string",
+            "title": "Deck"
+          },
+          "won": {
+            "type": "integer",
+            "title": "Won"
+          },
+          "lost": {
+            "type": "integer",
+            "title": "Lost"
+          },
+          "drawn": {
+            "type": "integer",
+            "title": "Drawn"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "deck",
+          "won",
+          "lost",
+          "drawn"
+        ],
+        "title": "DeckStats",
+        "description": "How the player's matches with one deck ended: how many of each."
+      },
       "DeckSummary": {
         "properties": {
           "id": {
@@ -815,6 +1024,72 @@
         ],
         "title": "MatchEnded",
         "description": "A player has no lives left: ``engine.MatchEnded``."
+      },
+      "MatchSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "deck": {
+            "type": "string",
+            "title": "Deck"
+          },
+          "ai_deck": {
+            "type": "string",
+            "title": "Ai Deck"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Result"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "deck",
+          "ai_deck",
+          "started_at",
+          "result"
+        ],
+        "title": "MatchSummary",
+        "description": "A match in the list of the player's matches.\n\n``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.\n``result`` is None while the match goes on: the player can get it by its\nid and play on."
+      },
+      "Matches": {
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/MatchSummary"
+            },
+            "type": "array",
+            "title": "Matches"
+          },
+          "more": {
+            "type": "boolean",
+            "title": "More"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "matches",
+          "more"
+        ],
+        "title": "Matches",
+        "description": "A page of the player's matches, the newest first.\n\n``more`` says whether older ones are left: the next page comes from\nasking for those before the last match of this one."
       },
       "Move": {
         "properties": {
@@ -1231,6 +1506,40 @@
         "title": "RedrawEnded",
         "description": "A player is done redrawing: ``engine.RedrawEnded``."
       },
+      "Result": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "won",
+              "lost",
+              "drawn"
+            ],
+            "title": "Outcome"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/RoundScores"
+            },
+            "type": "array",
+            "title": "Rounds"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ended At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "outcome",
+          "rounds",
+          "ended_at"
+        ],
+        "title": "Result",
+        "description": "How a match ended.\n\n``outcome`` says whether the player won, lost or drew, ``rounds`` holds\neach round's totals, in order, and ``ended_at`` when the last action was\nplayed."
+      },
       "Revive": {
         "properties": {
           "type": {
@@ -1298,6 +1607,26 @@
         ],
         "title": "RoundEnded",
         "description": "Both players passed and the round was scored: ``engine.RoundEnded``."
+      },
+      "RoundScores": {
+        "properties": {
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "ai": {
+            "type": "integer",
+            "title": "Ai"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "player",
+          "ai"
+        ],
+        "title": "RoundScores",
+        "description": "A round's totals when it ended: the player's and the AI's."
       },
       "Row": {
         "type": "string",
@@ -1535,6 +1864,24 @@
         ],
         "title": "SpecialKind",
         "description": "The effect of a special card (rules, section 8)."
+      },
+      "Stats": {
+        "properties": {
+          "decks": {
+            "items": {
+              "$ref": "#/components/schemas/DeckStats"
+            },
+            "type": "array",
+            "title": "Decks"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decks"
+        ],
+        "title": "Stats",
+        "description": "How the player's matches ended with each deck they played.\n\nMatches that go on don't count, and a deck with none that ended isn't\nlisted."
       },
       "UnitCard": {
         "properties": {

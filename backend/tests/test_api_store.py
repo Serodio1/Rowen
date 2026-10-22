@@ -7,6 +7,8 @@ each. The others are about the store in memory only.
 
 import sys
 import threading
+from datetime import UTC, datetime
+from functools import partial
 from uuid import uuid4
 
 import pytest
@@ -23,11 +25,12 @@ from rowen.engine.public import Action, EndRedraw, Pass, Redraw
 # The store doesn't check the actions: the API does. These are just some.
 DECKS = ("humans", "robots")
 SOME_ACTIONS: tuple[Action, ...] = (Redraw(card="soldier"), EndRedraw())
+NOW = datetime(2026, 10, 22, 12, tzinfo=UTC)
 
 
 def create(store: MatchStore, seed: int = 0) -> StoredMatch:
-    """Keep a new match with the humans against the robots, and return it."""
-    return store.create(DECKS, seed, SOME_ACTIONS)
+    """Keep a new guest's match with the humans against the robots, and return it."""
+    return store.create(DECKS, seed, SOME_ACTIONS, owner=None, now=NOW)
 
 
 def test_a_match_is_kept_under_its_id_at_the_first_version(
@@ -35,7 +38,7 @@ def test_a_match_is_kept_under_its_id_at_the_first_version(
 ) -> None:
     store = any_store
 
-    match = store.create(DECKS, 12, SOME_ACTIONS)
+    match = store.create(DECKS, 12, SOME_ACTIONS, owner=None, now=NOW)
 
     assert match == StoredMatch(
         id=match.id,
@@ -43,6 +46,9 @@ def test_a_match_is_kept_under_its_id_at_the_first_version(
         seed=12,
         actions=SOME_ACTIONS,
         version=FIRST_VERSION,
+        owner=None,
+        created_at=NOW,
+        result=None,
     )
     assert store.get(match.id) == match
 
@@ -100,6 +106,9 @@ def test_actions_are_added_after_the_others_at_the_next_version(
         seed=7,
         actions=(*SOME_ACTIONS, Pass()),
         version=old.version + 1,
+        owner=None,
+        created_at=NOW,
+        result=None,
     )
     assert store.get(old.id) == new
 
@@ -186,16 +195,21 @@ def test_a_match_played_counts_as_used() -> None:
     assert store.get(first.id) == played
 
 
-@pytest.mark.parametrize("method", ["create", "get", "add_actions"])
+@pytest.mark.parametrize(
+    "method", ["create", "get", "add_actions", "list_matches", "stats"]
+)
 def test_a_thread_waits_while_another_one_uses_the_store(method: str) -> None:
     store = MemoryMatchStore()
     match = create(store)
-    arguments = {
-        "create": (DECKS, 0, SOME_ACTIONS),
-        "get": (match.id,),
-        "add_actions": (match.id, match.version, (Pass(),)),
+    owner = uuid4()
+    call = {
+        "create": partial(store.create, DECKS, 0, SOME_ACTIONS, owner=None, now=NOW),
+        "get": partial(store.get, match.id),
+        "add_actions": partial(store.add_actions, match.id, match.version, (Pass(),)),
+        "list_matches": partial(store.list_matches, owner, 20),
+        "stats": partial(store.stats, owner),
     }[method]
-    thread = threading.Thread(target=getattr(store, method), args=arguments)
+    thread = threading.Thread(target=call)
 
     # While the test holds the lock, the other thread can't get in.
     with store._lock:

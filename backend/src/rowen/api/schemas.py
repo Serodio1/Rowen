@@ -22,6 +22,7 @@ Each kind of card, of action and of event carries a ``type``, such as
 ``EndRedraw`` have no other field.
 """
 
+from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -472,6 +473,71 @@ class Move(Schema):
 
     version: int
     action: Action
+
+
+class RoundScores(Schema):
+    """A round's totals when it ended: the player's and the AI's."""
+
+    player: int
+    ai: int
+
+
+class Result(Schema):
+    """How a match ended.
+
+    ``outcome`` says whether the player won, lost or drew, ``rounds`` holds
+    each round's totals, in order, and ``ended_at`` when the last action was
+    played.
+    """
+
+    outcome: Literal["won", "lost", "drawn"]
+    rounds: tuple[RoundScores, ...]
+    ended_at: datetime
+
+
+class MatchSummary(Schema):
+    """A match in the list of the player's matches.
+
+    ``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.
+    ``result`` is None while the match goes on: the player can get it by its
+    id and play on.
+    """
+
+    id: UUID
+    deck: str
+    ai_deck: str
+    started_at: datetime
+    result: Result | None
+
+
+class Matches(Schema):
+    """A page of the player's matches, the newest first.
+
+    ``more`` says whether older ones are left: the next page comes from
+    asking for those before the last match of this one.
+    """
+
+    matches: tuple[MatchSummary, ...]
+    more: bool
+
+
+class DeckStats(Schema):
+    """How the player's matches with one deck ended: how many of each."""
+
+    deck: str
+    won: int
+    lost: int
+    drawn: int
+
+
+class Stats(Schema):
+    """How the player's matches ended with each deck they played.
+
+    Matches that go on don't count, and a deck with none that ended isn't
+    listed.
+    """
+
+    decks: tuple[DeckStats, ...]
 
 
 class Credentials(Schema):

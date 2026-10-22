@@ -71,12 +71,27 @@ def any_store(request: pytest.FixtureRequest) -> MatchStore:
     return store
 
 
+@pytest.fixture(params=["memory", "postgres"])
+def any_stores(request: pytest.FixtureRequest) -> tuple[MatchStore, AccountStore]:
+    """Return each pair of stores in turn, of matches and of accounts, empty.
+
+    For tests of matches with an owner: in PostgreSQL, the owner must be an
+    account in the same database.
+    """
+    if request.param == "memory":
+        return MemoryMatchStore(), MemoryAccountStore()
+    matches: MatchStore = request.getfixturevalue("postgres_store")
+    accounts: AccountStore = request.getfixturevalue("postgres_accounts")
+    return matches, accounts
+
+
 @pytest.fixture
 def postgres_accounts(database_url: str) -> Iterator[PostgresAccountStore]:
     """Return a store of accounts in the test database, with none in it."""
     engine = create_engine(database_url)
     with engine.begin() as connection:
-        connection.execute(text("TRUNCATE accounts, sessions"))
+        # The matches too, since they can have an account as their owner.
+        connection.execute(text("TRUNCATE accounts, sessions, matches"))
     yield PostgresAccountStore(engine)
     engine.dispose()
 

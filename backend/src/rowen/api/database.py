@@ -3,11 +3,12 @@
 There they survive a restart.
 
 Each match is a row of the ``matches`` table, as ``rowen.api.store`` describes
-it: the ids of the two decks, the seed, every action played so far and the
-version. The actions are a JSON list, each one in the shape the API sends it
-(``schemas.Action``), so the database holds no Python objects. Each account is
-a row of the ``accounts`` table and each session one of ``sessions``, as
-``rowen.api.accounts`` describes them.
+it: the ids of the two decks, the seed, every action played so far, the
+version, its owner and, once it is over, its result. The actions are a JSON
+list, each one in the shape the API sends it (``schemas.Action``), so the
+database holds no Python objects. Each account is a row of the ``accounts``
+table and each session one of ``sessions``, as ``rowen.api.accounts`` describes
+them.
 
 The tables are made by the migrations in ``backend/migrations`` (Alembic), never
 by this module: the rows' classes only say what the tables look like, and a
@@ -33,11 +34,13 @@ from sqlalchemy import (
     DateTime,
     Engine,
     ForeignKey,
+    Index,
     LargeBinary,
     String,
     delete,
     func,
     select,
+    tuple_,
     update,
 )
 from sqlalchemy import create_engine as _create_engine
@@ -54,7 +57,14 @@ from sqlalchemy.orm import (
 from rowen.api.accounts import StoredAccount, StoredSession
 from rowen.api.schemas import Action as ActionJson
 from rowen.api.schemas import from_action, to_action
-from rowen.api.store import FIRST_VERSION, StoredMatch
+from rowen.api.store import (
+    FIRST_VERSION,
+    DeckStats,
+    MatchResult,
+    MatchSummary,
+    Outcome,
+    StoredMatch,
+)
 from rowen.engine.public import Action
 
 # Turns a list of actions into JSON and back, checking each one's shape.
@@ -66,12 +76,29 @@ class Base(DeclarativeBase):
 
 
 class MatchRow(Base):
-    """A match, as a row of the ``matches`` table."""
+    """A match, as a row of the ``matches`` table.
+
+    The result is three columns, ``outcome``, ``rounds`` and ``ended_at``,
+    all empty (NULL) while the match goes on and all filled once it is over.
+    Deleting an account leaves its matches, with no owner (``ondelete``).
+    """
 
     __tablename__ = "matches"
-    # Seeds have 63 bits, so they fit a BIGINT, which has a sign
-    # (rowen.api.app.SEED_BITS). A negative one would be a bug.
-    __table_args__ = (CheckConstraint("seed >= 0", name="seed_not_negative"),)
+    __table_args__ = (
+        # Seeds have 63 bits, so they fit a BIGINT, which has a sign
+        # (rowen.api.app.SEED_BITS). A negative one would be a bug.
+        CheckConstraint("seed >= 0", name="seed_not_negative"),
+        CheckConstraint("outcome IN ('won', 'lost', 'drawn')", name="outcome_is_known"),
+        CheckConstraint(
+            "(outcome IS NULL) = (ended_at IS NULL)"
+            " AND (rounds IS NULL) = (ended_at IS NULL)",
+            name="result_is_whole",
+        ),
+        # An owner's matches, newest first, as list_matches reads them: the
+        # database finds them in this index, already in order, without
+        # reading every match.
+        Index("ix_matches_owner", "account_id", "created_at", "id"),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
     player_deck: Mapped[str] = mapped_column(String)
@@ -87,6 +114,13 @@ class MatchRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    account_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("accounts.id", ondelete="SET NULL")
+    )
+    outcome: Mapped[Outcome | None] = mapped_column(String)
+    # Each round's totals, the player's and then the AI's: [[12, 30], ...].
+    rounds: Mapped[list[list[int]] | None] = mapped_column(JSONB)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AccountRow(Base):
@@ -160,7 +194,13 @@ class PostgresMatchStore:
         self._engine = engine
 
     def create(
-        self, decks: tuple[str, str], seed: int, actions: tuple[Action, ...]
+        self,
+        decks: tuple[str, str],
+        seed: int,
+        actions: tuple[Action, ...],
+        *,
+        owner: UUID | None,
+        now: datetime,
     ) -> StoredMatch:
         """Keep a new match, at its first version, and return it."""
         player_deck, ai_deck = decks
@@ -171,6 +211,8 @@ class PostgresMatchStore:
             seed=seed,
             actions=_to_json(actions),
             version=FIRST_VERSION,
+            account_id=owner,
+            created_at=now,
         )
         with Session(self._engine) as session, session.begin():
             session.add(row)
@@ -184,15 +226,29 @@ class PostgresMatchStore:
             return None if row is None else _stored(row)
 
     def add_actions(
-        self, match_id: UUID, version: int, actions: tuple[Action, ...]
+        self,
+        match_id: UUID,
+        version: int,
+        actions: tuple[Action, ...],
+        result: MatchResult | None = None,
     ) -> StoredMatch | None:
         """Add actions to a match, but only if it is still at ``version``.
 
         One statement does it all, in the database: it finds the match only
         if it is at ``version``, adds the actions after the others (``||``
-        joins two JSON lists) and takes it to the next version. Two requests
-        can't both do it, since the second finds the match at another version.
+        joins two JSON lists), takes it to the next version and, if these
+        actions end it, keeps its result. Two requests can't both do it,
+        since the second finds the match at another version.
         """
+        ended = (
+            {}
+            if result is None
+            else {
+                "outcome": result.outcome,
+                "rounds": [list(scores) for scores in result.rounds],
+                "ended_at": result.ended_at,
+            }
+        )
         statement = (
             update(MatchRow)
             .where(MatchRow.id == match_id, MatchRow.version == version)
@@ -200,12 +256,77 @@ class PostgresMatchStore:
                 actions=MatchRow.actions.op("||")(_to_json(actions)),
                 version=MatchRow.version + 1,
                 updated_at=func.now(),
+                **ended,
             )
             .returning(MatchRow)
         )
         with Session(self._engine) as session, session.begin():
             row = session.scalars(statement).one_or_none()
             return None if row is None else _stored(row)
+
+    def list_matches(
+        self, owner: UUID, limit: int, before: UUID | None = None
+    ) -> tuple[MatchSummary, ...]:
+        """Return up to ``limit`` of an owner's matches, the newest first.
+
+        A page starts after the match ``before`` (a cursor): the matches
+        whose start and id, taken together, come before that match's. The
+        database finds them straight away in the index, however many pages
+        came before, where ``OFFSET`` would read and skip them all; and a
+        match started meanwhile doesn't move the next page along.
+        """
+        statement = (
+            select(MatchRow)
+            .where(MatchRow.account_id == owner)
+            .order_by(MatchRow.created_at.desc(), MatchRow.id.desc())
+            .limit(limit)
+        )
+        if before is not None:
+            cursor = (
+                select(MatchRow.created_at, MatchRow.id)
+                .where(MatchRow.id == before, MatchRow.account_id == owner)
+                .subquery()
+            )
+            # If ``before`` is no match of the owner's, the subquery is empty,
+            # and no match is older than nothing.
+            statement = statement.join(
+                cursor,
+                tuple_(MatchRow.created_at, MatchRow.id)
+                < tuple_(cursor.c.created_at, cursor.c.id),
+            )
+        with Session(self._engine) as session:
+            return tuple(
+                MatchSummary(
+                    id=row.id,
+                    decks=(row.player_deck, row.ai_deck),
+                    created_at=row.created_at,
+                    result=_result(row),
+                )
+                for row in session.scalars(statement)
+            )
+
+    def stats(self, owner: UUID) -> tuple[DeckStats, ...]:
+        """Return how an owner's matches ended with each deck they played.
+
+        The database counts them: one row per deck (``GROUP BY``), and in
+        each, how many of its matches have each outcome (``FILTER``).
+        """
+        statement = (
+            select(
+                MatchRow.player_deck,
+                func.count().filter(MatchRow.outcome == "won"),
+                func.count().filter(MatchRow.outcome == "lost"),
+                func.count().filter(MatchRow.outcome == "drawn"),
+            )
+            .where(MatchRow.account_id == owner, MatchRow.outcome.is_not(None))
+            .group_by(MatchRow.player_deck)
+            .order_by(MatchRow.player_deck)
+        )
+        with Session(self._engine) as session:
+            return tuple(
+                DeckStats(deck=deck, won=won, lost=lost, drawn=drawn)
+                for deck, won, lost, drawn in session.execute(statement)
+            )
 
 
 def _to_json(actions: tuple[Action, ...]) -> list[dict[str, Any]]:
@@ -226,6 +347,20 @@ def _stored(row: MatchRow) -> StoredMatch:
             to_action(action) for action in _ACTIONS.validate_python(row.actions)
         ),
         version=row.version,
+        owner=row.account_id,
+        created_at=row.created_at,
+        result=_result(row),
+    )
+
+
+def _result(row: MatchRow) -> MatchResult | None:
+    """Return the result of a match in a row, or None while it goes on."""
+    if row.outcome is None or row.rounds is None or row.ended_at is None:
+        return None
+    return MatchResult(
+        outcome=row.outcome,
+        rounds=tuple((player, ai) for player, ai in row.rounds),
+        ended_at=row.ended_at,
     )
 
 

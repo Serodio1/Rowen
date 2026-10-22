@@ -33,7 +33,14 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /**
+     * List Matches
+     * @description Return the matches of the player who is logged in, newest first.
+     *
+     *     A page holds up to 20. For the next one, ``before`` is the id of the last
+     *     match of this one. If the player isn't logged in, the answer is a 401.
+     */
+    get: operations["list_matches"];
     put?: never;
     /**
      * Create Match
@@ -41,7 +48,8 @@ export interface paths {
      *
      *     If the AI starts, it plays until it is the player's turn, and its moves
      *     come with the match. The ``Location`` header of the response
-     *     holds the address of the match.
+     *     holds the address of the match. If the player is logged in, the match is
+     *     theirs.
      */
     post: operations["create_match"];
     delete?: never;
@@ -89,8 +97,32 @@ export interface paths {
      *     change: get it again to see where it is. That is so also when another
      *     request for the same match is played first, while this one is. If the
      *     action isn't legal now, the answer is a 409 too.
+     *
+     *     If the match ends, the store keeps how it ended with the last actions.
      */
     post: operations["play"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/stats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Stats
+     * @description Return how the player's matches ended with each deck they played.
+     *
+     *     If the player isn't logged in, the answer is a 401.
+     */
+    get: operations["get_stats"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -239,6 +271,20 @@ export interface components {
       password: string;
     };
     /**
+     * DeckStats
+     * @description How the player's matches with one deck ended: how many of each.
+     */
+    DeckStats: {
+      /** Deck */
+      deck: string;
+      /** Won */
+      won: number;
+      /** Lost */
+      lost: number;
+      /** Drawn */
+      drawn: number;
+    };
+    /**
      * DeckSummary
      * @description A deck the player can choose: its id, to start a match, and its name.
      */
@@ -371,6 +417,44 @@ export interface components {
       type: "match_ended";
       /** Winner */
       winner: number | null;
+    };
+    /**
+     * MatchSummary
+     * @description A match in the list of the player's matches.
+     *
+     *     ``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.
+     *     ``result`` is None while the match goes on: the player can get it by its
+     *     id and play on.
+     */
+    MatchSummary: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Deck */
+      deck: string;
+      /** Ai Deck */
+      ai_deck: string;
+      /**
+       * Started At
+       * Format: date-time
+       */
+      started_at: string;
+      result: components["schemas"]["Result"] | null;
+    };
+    /**
+     * Matches
+     * @description A page of the player's matches, the newest first.
+     *
+     *     ``more`` says whether older ones are left: the next page comes from
+     *     asking for those before the last match of this one.
+     */
+    Matches: {
+      /** Matches */
+      matches: components["schemas"]["MatchSummary"][];
+      /** More */
+      more: boolean;
     };
     /**
      * Move
@@ -603,6 +687,28 @@ export interface components {
       player: number;
     };
     /**
+     * Result
+     * @description How a match ended.
+     *
+     *     ``outcome`` says whether the player won, lost or drew, ``rounds`` holds
+     *     each round's totals, in order, and ``ended_at`` when the last action was
+     *     played.
+     */
+    Result: {
+      /**
+       * Outcome
+       * @enum {string}
+       */
+      outcome: "won" | "lost" | "drawn";
+      /** Rounds */
+      rounds: components["schemas"]["RoundScores"][];
+      /**
+       * Ended At
+       * Format: date-time
+       */
+      ended_at: string;
+    };
+    /**
      * Revive
      * @description Revive a unit after a Medic: ``engine.Revive``.
      */
@@ -630,6 +736,16 @@ export interface components {
       scores: [number, number];
       /** Winner */
       winner: number | null;
+    };
+    /**
+     * RoundScores
+     * @description A round's totals when it ended: the player's and the AI's.
+     */
+    RoundScores: {
+      /** Player */
+      player: number;
+      /** Ai */
+      ai: number;
     };
     /**
      * Row
@@ -743,6 +859,17 @@ export interface components {
       | "war-horn"
       | "wildfire"
       | "scarecrow";
+    /**
+     * Stats
+     * @description How the player's matches ended with each deck they played.
+     *
+     *     Matches that go on don't count, and a deck with none that ended isn't
+     *     listed.
+     */
+    Stats: {
+      /** Decks */
+      decks: components["schemas"]["DeckStats"][];
+    };
     /**
      * UnitCard
      * @description A unit, as ``engine.UnitCard`` describes it.
@@ -943,12 +1070,56 @@ export interface operations {
       };
     };
   };
+  list_matches: {
+    parameters: {
+      query?: {
+        before?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Matches"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
   create_match: {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
-      cookie?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
     };
     requestBody: {
       content: {
@@ -983,7 +1154,9 @@ export interface operations {
       path: {
         match_id: string;
       };
-      cookie?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
     };
     requestBody?: never;
     responses: {
@@ -1023,7 +1196,9 @@ export interface operations {
       path: {
         match_id: string;
       };
-      cookie?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
     };
     requestBody: {
       content: {
@@ -1065,6 +1240,46 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  get_stats: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Stats"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

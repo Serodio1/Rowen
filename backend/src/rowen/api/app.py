@@ -10,11 +10,15 @@ player 0 and the AI player 1, as in the CLI. When the AI has a move to make, it
 makes it before the server answers, so the player always gets the match on
 their turn, unless the match is over.
 
-A player may also make an account and log in (ADR 0014), but needn't: a
-guest plays the same way. Logging in sets a cookie with the session's token,
-which the browser sends back with each request. A request that would change
-something and comes from a page of another site is turned down (``Origin``,
-below), against cross-site request forgery.
+A player may also make an account and log in (ADR 0014), but needn't: a guest
+plays the same way. A match a player starts while logged in is theirs: only
+they may see it and play it, and it is in the list of their matches, with how
+it ended, and in their stats. To anybody else, it is a match that doesn't exist
+(404), so the answer doesn't even say that the id is right. A guest's match is
+anybody's who has its id, as before. Logging in sets a cookie with the
+session's token, which the browser sends back with each request. A request that
+would change something and comes from a page of another site is turned down
+(``Origin``, below), against cross-site request forgery.
 
 When the API turns a request down, it always answers with the same shape, an
 ``Error``: a ``code`` for the browser and a ``message`` for a person. It does
@@ -54,24 +58,31 @@ from rowen.api.schemas import (
     Account,
     Credentials,
     Decks,
+    DeckStats,
     DeckSummary,
     Error,
     ErrorCode,
     Match,
+    Matches,
+    MatchSummary,
     Move,
     MovePlayed,
     NewMatch,
     Played,
+    Result,
+    RoundScores,
+    Stats,
     from_events,
     from_view,
     to_action,
 )
-from rowen.api.store import MatchStore, MemoryMatchStore, StoredMatch
+from rowen.api.store import MatchResult, MatchStore, MemoryMatchStore, StoredMatch
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
     Action,
     Event,
     GameState,
+    RoundEnded,
     apply,
     player_view,
     start_match,
@@ -98,6 +109,9 @@ SESSION_COOKIE = "__Host-session"
 # database.
 SESSION_LENGTH = timedelta(days=30)
 RENEW_AFTER = timedelta(days=1)
+
+# How many matches a page of the list of a player's matches holds at most.
+PAGE_SIZE = 20
 
 
 def _operation_id(route: APIRoute) -> str:
@@ -256,12 +270,16 @@ def create_match(
     response: Response,
     store: Store,
     seed: Seed,
+    accounts: Accounts,
+    now: Now,
+    token: Token = None,
 ) -> Played:
     """Start a match against the AI, which plays another deck.
 
     If the AI starts, it plays until it is the player's turn, and its moves
     come with the match. The ``Location`` header of the response
-    holds the address of the match.
+    holds the address of the match. If the player is logged in, the match is
+    theirs.
     """
     decks = deck_ids()
     if new_match.deck not in decks:
@@ -273,7 +291,14 @@ def create_match(
     ai_deck = next(deck for deck in decks if deck != new_match.deck)
     state = start_match((load_deck(new_match.deck), load_deck(ai_deck)), seed=seed)
     state, actions, moves = _ai_plays(state)
-    match = store.create((new_match.deck, ai_deck), seed, actions)
+    player = _logged_in(accounts, token, now)
+    match = store.create(
+        (new_match.deck, ai_deck),
+        seed,
+        actions,
+        owner=None if player is None else player.id,
+        now=now,
+    )
     # url_path_for leaves out root_path, which behind nginx is /api (uvicorn's
     # --root-path in backend/Dockerfile), so it is added here.
     path = app.url_path_for("get_match", match_id=str(match.id))
@@ -290,9 +315,11 @@ def create_match(
     "/matches/{match_id}",
     responses=_errors(status.HTTP_404_NOT_FOUND, status.HTTP_422_UNPROCESSABLE_CONTENT),
 )
-def get_match(match_id: UUID, store: Store) -> Match:
+def get_match(
+    match_id: UUID, store: Store, accounts: Accounts, now: Now, token: Token = None
+) -> Match:
     """Return a match as the player may see it."""
-    match = _match(store, match_id)
+    match = _match(store, match_id, _logged_in(accounts, token, now))
     return Match(
         id=match.id,
         version=match.version,
@@ -308,7 +335,14 @@ def get_match(match_id: UUID, store: Store) -> Match:
         status.HTTP_422_UNPROCESSABLE_CONTENT,
     ),
 )
-def play(match_id: UUID, move: Move, store: Store) -> Played:
+def play(
+    match_id: UUID,
+    move: Move,
+    store: Store,
+    accounts: Accounts,
+    now: Now,
+    token: Token = None,
+) -> Played:
     """Play the player's action, and then let the AI answer.
 
     The action is one of the legal actions in the player's view, sent back as
@@ -317,8 +351,10 @@ def play(match_id: UUID, move: Move, store: Store) -> Played:
     change: get it again to see where it is. That is so also when another
     request for the same match is played first, while this one is. If the
     action isn't legal now, the answer is a 409 too.
+
+    If the match ends, the store keeps how it ended with the last actions.
     """
-    old = _match(store, match_id)
+    old = _match(store, match_id, _logged_in(accounts, token, now))
     # Checked first: an action chosen from an old view may also be legal now,
     # and it would be played twice.
     if move.version != old.version:
@@ -338,7 +374,9 @@ def play(match_id: UUID, move: Move, store: Store) -> Played:
     state, events = apply(state, played)
     first = _move(state, events)
     state, answer, answer_moves = _ai_plays(state)
-    new = store.add_actions(match_id, old.version, (played, *answer))
+    actions = (played, *answer)
+    result = _result(old, actions, now) if _over(state) else None
+    new = store.add_actions(match_id, old.version, actions, result)
     if new is None:
         raise _match_changed()
     return Played(
@@ -346,6 +384,57 @@ def play(match_id: UUID, move: Move, store: Store) -> Played:
         version=new.version,
         view=from_view(player_view(state, HUMAN)),
         moves=(first, *answer_moves),
+    )
+
+
+@app.get(
+    "/matches",
+    responses=_errors(
+        status.HTTP_401_UNAUTHORIZED, status.HTTP_422_UNPROCESSABLE_CONTENT
+    ),
+)
+def list_matches(
+    store: Store,
+    accounts: Accounts,
+    now: Now,
+    token: Token = None,
+    before: UUID | None = None,
+) -> Matches:
+    """Return the matches of the player who is logged in, newest first.
+
+    A page holds up to 20. For the next one, ``before`` is the id of the last
+    match of this one. If the player isn't logged in, the answer is a 401.
+    """
+    player = _player(accounts, token, now)
+    # One more than a page, to know whether there are more.
+    found = store.list_matches(player.id, PAGE_SIZE + 1, before)
+    return Matches(
+        matches=tuple(
+            MatchSummary(
+                id=match.id,
+                deck=match.decks[0],
+                ai_deck=match.decks[1],
+                started_at=match.created_at,
+                result=None if match.result is None else _result_json(match.result),
+            )
+            for match in found[:PAGE_SIZE]
+        ),
+        more=len(found) > PAGE_SIZE,
+    )
+
+
+@app.get("/stats", responses=_errors(status.HTTP_401_UNAUTHORIZED))
+def get_stats(accounts: Accounts, store: Store, now: Now, token: Token = None) -> Stats:
+    """Return how the player's matches ended with each deck they played.
+
+    If the player isn't logged in, the answer is a 401.
+    """
+    player = _player(accounts, token, now)
+    return Stats(
+        decks=tuple(
+            DeckStats(deck=deck.deck, won=deck.won, lost=deck.lost, drawn=deck.drawn)
+            for deck in store.stats(player.id)
+        )
     )
 
 
@@ -414,11 +503,7 @@ def get_session(
     """
     session = None if token is None else accounts.find_session(_hash_token(token), now)
     if token is None or session is None:
-        raise ApiError(
-            status.HTTP_401_UNAUTHORIZED,
-            "not_logged_in",
-            "The player isn't logged in.",
-        )
+        raise _not_logged_in()
     if session.expires_at - now < SESSION_LENGTH - RENEW_AFTER:
         accounts.renew_session(session.token_hash, now + SESSION_LENGTH)
         _set_cookie(response, token)
@@ -435,6 +520,31 @@ def log_out(response: Response, accounts: Accounts, token: Token = None) -> None
         accounts.delete_session(_hash_token(token))
     response.delete_cookie(
         SESSION_COOKIE, path="/", secure=True, httponly=True, samesite="lax"
+    )
+
+
+def _logged_in(
+    accounts: AccountStore, token: str | None, now: datetime
+) -> StoredAccount | None:
+    """Return the account the player is logged in with, or None for a guest."""
+    session = None if token is None else accounts.find_session(_hash_token(token), now)
+    return None if session is None else session.account
+
+
+def _player(accounts: AccountStore, token: str | None, now: datetime) -> StoredAccount:
+    """Return the account the player is logged in with, or turn the request down."""
+    player = _logged_in(accounts, token, now)
+    if player is None:
+        raise _not_logged_in()
+    return player
+
+
+def _not_logged_in() -> ApiError:
+    """Return the error for a request that needs a player who is logged in."""
+    return ApiError(
+        status.HTTP_401_UNAUTHORIZED,
+        "not_logged_in",
+        "The player isn't logged in.",
     )
 
 
@@ -480,10 +590,20 @@ def _set_cookie(response: Response, token: str) -> None:
     )
 
 
-def _match(store: MatchStore, match_id: UUID) -> StoredMatch:
-    """Return a match, or turn the request down if there is none."""
+def _match(
+    store: MatchStore, match_id: UUID, player: StoredAccount | None
+) -> StoredMatch:
+    """Return a match the player may see, or turn the request down.
+
+    ``player`` is the account the player is logged in with, or None. A match
+    with an owner is only its owner's: to anybody else, the answer is the
+    same as when there is no such match, so it doesn't tell that the id is
+    right.
+    """
     match = store.get(match_id)
-    if match is None:
+    if match is None or (
+        match.owner is not None and (player is None or player.id != match.owner)
+    ):
         raise ApiError(
             status.HTTP_404_NOT_FOUND,
             "match_not_found",
@@ -507,11 +627,57 @@ def _replay(match: StoredMatch) -> GameState:
     The engine is deterministic, so this is the state they made when they
     were played (ADR 0003).
     """
-    player_deck, ai_deck = match.decks
-    state = start_match((load_deck(player_deck), load_deck(ai_deck)), seed=match.seed)
-    for action in match.actions:
-        state, _ = apply(state, action)
+    state, _ = _play_again(match.decks, match.seed, match.actions)
     return state
+
+
+def _play_again(
+    decks: tuple[str, str], seed: int, actions: tuple[Action, ...]
+) -> tuple[GameState, tuple[tuple[int, int], ...]]:
+    """Return the state actions make from the start, and each round's totals.
+
+    The totals are those of the rounds that ended, in order.
+    """
+    player_deck, ai_deck = decks
+    state = start_match((load_deck(player_deck), load_deck(ai_deck)), seed=seed)
+    rounds: tuple[tuple[int, int], ...] = ()
+    for action in actions:
+        state, events = apply(state, action)
+        rounds += tuple(
+            event.scores for event in events if isinstance(event, RoundEnded)
+        )
+    return state, rounds
+
+
+def _over(state: GameState) -> bool:
+    """Return whether a match is over."""
+    return player_view(state, HUMAN).match_over
+
+
+def _result(
+    match: StoredMatch, actions: tuple[Action, ...], now: datetime
+) -> MatchResult:
+    """Return how a match ended, once ``actions`` ended it.
+
+    Each round's totals come only in the event that ends it, and the store
+    keeps no events, so the match is played again to find them: once a match.
+    """
+    state, rounds = _play_again(match.decks, match.seed, (*match.actions, *actions))
+    winner = player_view(state, HUMAN).winner
+    return MatchResult(
+        outcome="drawn" if winner is None else "won" if winner == HUMAN else "lost",
+        rounds=rounds,
+        ended_at=now,
+    )
+
+
+def _result_json(result: MatchResult) -> Result:
+    """Return how a match ended, as the API sends it."""
+    return Result(
+        outcome=result.outcome,
+        rounds=tuple(RoundScores(player=player, ai=ai) for player, ai in result.rounds),
+        ended_at=result.ended_at,
+    )
 
 
 def _ai_plays(

@@ -32,6 +32,8 @@ from rowen.engine.public import (
     Row,
 )
 
+NOW = datetime(2026, 10, 22, 12, tzinfo=UTC)
+
 # A seed of 16 digits, which no error message holds by chance.
 SECRET_SEED = 7_319_555_123_456_789
 
@@ -51,7 +53,9 @@ EVERY_KIND: tuple[Action, ...] = (
 def test_every_kind_of_action_comes_back_as_it_was_kept(
     postgres_store: PostgresMatchStore,
 ) -> None:
-    match = postgres_store.create(("humans", "robots"), 1, EVERY_KIND[:4])
+    match = postgres_store.create(
+        ("humans", "robots"), 1, EVERY_KIND[:4], owner=None, now=NOW
+    )
     added = postgres_store.add_actions(match.id, match.version, EVERY_KIND[4:])
 
     assert added is not None
@@ -61,7 +65,7 @@ def test_every_kind_of_action_comes_back_as_it_was_kept(
 
 @pytest.mark.parametrize("seed", [0, 2**63 - 1])
 def test_seeds_of_63_bits_fit(postgres_store: PostgresMatchStore, seed: int) -> None:
-    match = postgres_store.create(("humans", "robots"), seed, ())
+    match = postgres_store.create(("humans", "robots"), seed, (), owner=None, now=NOW)
 
     stored = postgres_store.get(match.id)
 
@@ -73,14 +77,16 @@ def test_the_database_turns_down_a_negative_seed(
     postgres_store: PostgresMatchStore,
 ) -> None:
     with pytest.raises(IntegrityError, match="seed_not_negative"):
-        postgres_store.create(("humans", "robots"), -1, ())
+        postgres_store.create(("humans", "robots"), -1, (), owner=None, now=NOW)
 
 
 def test_a_match_outlives_the_store_that_kept_it(
     postgres_store: PostgresMatchStore, database_url: str
 ) -> None:
     # A new store, with connections of its own, as after a restart.
-    match = postgres_store.create(("humans", "robots"), 1, (Pass(),))
+    match = postgres_store.create(
+        ("humans", "robots"), 1, (Pass(),), owner=None, now=NOW
+    )
     engine = create_engine(database_url)
     try:
         found = PostgresMatchStore(engine).get(match.id)
@@ -98,7 +104,7 @@ def test_of_two_requests_at_once_only_one_adds_its_actions(
     # the test holds the match's row (FOR UPDATE) until both are waiting for
     # it, then lets them go. A store that read the version first and then
     # wrote the actions would keep both.
-    match = postgres_store.create(("humans", "robots"), 1, ())
+    match = postgres_store.create(("humans", "robots"), 1, (), owner=None, now=NOW)
     results: list[StoredMatch | None] = []
 
     def add(action: Action) -> None:
@@ -153,7 +159,7 @@ def test_a_connection_the_database_closed_is_replaced(
 ) -> None:
     # As when the database sleeps (Neon does after 5 idle minutes) or
     # restarts: the store's connections are closed under it.
-    match = postgres_store.create(("humans", "robots"), 1, ())
+    match = postgres_store.create(("humans", "robots"), 1, (), owner=None, now=NOW)
     engine = create_engine(database_url)
     try:
         with engine.begin() as connection:
@@ -177,7 +183,9 @@ def test_a_failed_statement_never_shows_the_seed(database_url: str) -> None:
     )
     try:
         with pytest.raises(DBAPIError) as error:
-            PostgresMatchStore(engine).create(("humans", "robots"), SECRET_SEED, ())
+            PostgresMatchStore(engine).create(
+                ("humans", "robots"), SECRET_SEED, (), owner=None, now=NOW
+            )
     finally:
         engine.dispose()
 
@@ -188,7 +196,10 @@ def test_a_failed_statement_never_shows_the_seed(database_url: str) -> None:
 def test_a_move_says_when_the_match_was_last_played(
     postgres_store: PostgresMatchStore, database_url: str
 ) -> None:
-    match = postgres_store.create(("humans", "robots"), 1, ())
+    # created_at is the time the API gives, updated_at the database's own.
+    match = postgres_store.create(
+        ("humans", "robots"), 1, (), owner=None, now=datetime.now(UTC)
+    )
     postgres_store.add_actions(match.id, match.version, (Pass(),))
 
     engine = create_engine(database_url)
