@@ -45,6 +45,13 @@ export type Action = View["legal_actions"][number];
 export type Move =
   paths["/matches/{match_id}/actions"]["post"]["requestBody"]["content"]["application/json"];
 
+/** The account the player is logged in with: its username. */
+export type Account = MethodResponse<Api, "get", "/session">;
+
+/** What the player sends to make an account or to log in. */
+export type Credentials =
+  paths["/session"]["post"]["requestBody"]["content"]["application/json"];
+
 /**
  * What went wrong with a request, as the API says it: `"match_not_found"`.
  * A string is the same in the schema's types as in the client's.
