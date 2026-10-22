@@ -169,9 +169,11 @@ jobs:
       # the match is still there, kept in PostgreSQL. A move every quarter of a
       # second stays under nginx's limit of 5 requests a second. Then, that the
       # API ignores an address a visitor writes in X-Forwarded-For. Then an
-      # account, as the page makes it (with its Origin): logged in, a log out
-      # from another site turned down (403), a log out, and the old cookie
-      # worth nothing. Last, nginx's limits (they use up the buckets, so they
+      # account, as the page makes it (with its Origin): logged in, a match of
+      # its own, in its list (and none older than it, so nginx passes the
+      # query on), out of a guest's reach (404), no stats yet, a log out from
+      # another site turned down (403), a log out, and the old cookie worth
+      # nothing. Last, nginx's limits (they use up the buckets, so they
       # come last): a request over 16 KB, for a new match and for a move, new
       # matches in a row, each with another address in X-Forwarded-For, until
       # nginx answers 429 with its error, logins with a wrong password in a
@@ -221,6 +223,13 @@ jobs:
           curl --fail --silent --show-error --cookie-jar "$jar" --header 'Content-Type: application/json' \
             --header "Origin: $url" --data "$account" "$url/api/accounts" | jq --exit-status '.username | startswith("smoke")'
           curl --fail --silent --show-error --cookie "$jar" "$url/api/session" | jq --exit-status '.username | startswith("smoke")'
+          mine=$(curl --fail --silent --show-error --cookie "$jar" --header 'Content-Type: application/json' \
+            --header "Origin: $url" --data '{"deck": "robots"}' "$url/api/matches" | jq --raw-output .id)
+          curl --fail --silent --show-error --cookie "$jar" "$url/api/matches" \
+            | jq --exit-status ".matches[0].id == \"$mine\" and .matches[0].result == null"
+          curl --fail --silent --show-error --cookie "$jar" "$url/api/matches?before=$mine" | jq --exit-status '.matches == []'
+          [ "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$url/api/matches/$mine")" = 404 ]
+          curl --fail --silent --show-error --cookie "$jar" "$url/api/stats" | jq --exit-status '.decks == []'
           answer=$(curl --silent --show-error --write-out '\n%{http_code}' --cookie "$jar" \
             --header 'Origin: https://evil.example' --request DELETE "$url/api/session")
           [ "$(tail --lines 1 <<< "$answer")" = 403 ]
