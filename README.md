@@ -106,7 +106,11 @@ view and what happened. A player may also make an account: `POST /accounts`
 with `{"username": "rui", "password": "at least 8 characters"}` logs them in
 with a session cookie, `POST /session` logs in again, `GET /session` says who
 is logged in and `DELETE /session` logs out
-([ADR 0014](docs/adr/0014-accounts-with-sessions-in-postgresql.md)). When the API turns a request down, it answers with a
+([ADR 0014](docs/adr/0014-accounts-with-sessions-in-postgresql.md)). A match
+started while logged in is the player's alone: `GET /matches` lists theirs,
+newest first, 20 at a time (`?before=<id>` for the next page), and
+`GET /stats` counts their wins, losses and draws with each deck
+([ADR 0015](docs/adr/0015-players-own-their-matches.md)). When the API turns a request down, it answers with a
 `code` and a `message`, such as `illegal_action`. `--reload` restarts the
 server whenever the Python code in `src` changes.
 Run like this, the API keeps its matches in memory, so they are lost when it

@@ -6,6 +6,7 @@ same responses, without running a server.
 
 import shutil
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -61,6 +62,8 @@ AI_REVIVES = 26
 AI_DRAWS_AND_REDRAWS = 14
 
 DECKS = {deck_id: load_deck(deck_id) for deck_id in deck_ids()}
+
+NOW = datetime(2026, 10, 22, 12, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -524,7 +527,8 @@ def test_the_openapi_schema_lists_the_endpoints(client: TestClient) -> None:
     assert response.status_code == 200
     paths = response.json()["paths"]
     assert set(paths["/decks"]) == {"get"}
-    assert set(paths["/matches"]) == {"post"}
+    assert set(paths["/matches"]) == {"get", "post"}
+    assert set(paths["/stats"]) == {"get"}
     assert set(paths["/matches/{match_id}"]) == {"get"}
     assert set(paths["/matches/{match_id}/actions"]) == {"post"}
     assert set(paths["/accounts"]) == {"post"}
@@ -538,6 +542,8 @@ def test_the_openapi_schema_lists_the_endpoints(client: TestClient) -> None:
         ("/matches", "post", {"422"}),
         ("/matches/{match_id}", "get", {"404", "422"}),
         ("/matches/{match_id}/actions", "post", {"404", "409", "422"}),
+        ("/matches", "get", {"401", "422"}),
+        ("/stats", "get", {"401", "422"}),
     ],
 )
 def test_the_openapi_schema_says_how_each_endpoint_turns_requests_down(
@@ -682,7 +688,7 @@ def test_the_player_can_never_make_a_move_of_the_ais(
     # seed the AI wins the coin flip, and nobody lets it play.
     state = start_match((DECKS["humans"], DECKS["robots"]), seed=AI_STARTS)
     assert player_view(state, HUMAN).legal_actions == ()
-    match = store.create(("humans", "robots"), AI_STARTS, ())
+    match = store.create(("humans", "robots"), AI_STARTS, (), owner=None, now=NOW)
     ai_view = schemas.from_view(player_view(state, AI)).model_dump(mode="json")
 
     for action in ai_view["legal_actions"]:

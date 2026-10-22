@@ -27,6 +27,7 @@ plus a section on the alternatives that were considered.
 | [0012](0012-deploy-from-ci.md) | Deploy from CI on every merge, signed in to Google with no stored key | Accepted |
 | [0013](0013-keep-matches-in-postgresql.md) | Keep each match in PostgreSQL as its seed and actions | Accepted |
 | [0014](0014-accounts-with-sessions-in-postgresql.md) | Log players in with Argon2id passwords and sessions kept in PostgreSQL | Accepted |
+| [0015](0015-players-own-their-matches.md) | Give a logged-in player's matches an owner, keep their results and list them by cursor | Accepted |
 
 ## Writing a new ADR
 

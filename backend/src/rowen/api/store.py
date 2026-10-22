@@ -14,8 +14,16 @@ a millisecond or two. The store never sees a state.
 
 A store maps the id of each match to that record and its version (below). The
 id is a random UUID (version 4): 122 random bits from the operating system, so
-nobody can guess the id of a match that isn't theirs. Whoever has the id can
-see the match and play it, so the id is all the player needs.
+nobody can guess the id of a match that isn't theirs. A guest's match has no
+owner: whoever has the id can see it and play it, so the id is all the player
+needs. A match started by a player who is logged in has their account as its
+owner, and only they may see it (the API checks that, not the store).
+
+When a match is over, the store also keeps its result: whether the player won,
+lost or drew, each round's totals and when it ended. The API works it out and
+gives it with the last actions (``add_actions``). With the results, a store
+lists an owner's matches, newest first, a page at a time (``list_matches``),
+and counts their wins, losses and draws with each deck (``stats``).
 
 Anyone can start a match, so the store in memory holds at most
 ``max_matches`` of them: otherwise, starting matches without end would fill
@@ -38,9 +46,10 @@ an ``UPDATE ... WHERE id = :id AND version = :version``.
 
 import threading
 import uuid
-from collections import OrderedDict
-from dataclasses import dataclass
-from typing import Protocol
+from collections import Counter, OrderedDict
+from dataclasses import dataclass, replace
+from datetime import datetime
+from typing import Literal, Protocol
 from uuid import UUID
 
 from rowen.engine.public import Action
@@ -53,6 +62,25 @@ MAX_MATCHES = 1000
 FIRST_VERSION = 1
 
 
+# How a match ended, for the player (not the AI).
+type Outcome = Literal["won", "lost", "drawn"]
+
+
+@dataclass(frozen=True)
+class MatchResult:
+    """How a match ended.
+
+    Attributes:
+        outcome: Whether the player won, lost or drew.
+        rounds: Each round's totals, in order: the player's and then the AI's.
+        ended_at: When the last action was played.
+    """
+
+    outcome: Outcome
+    rounds: tuple[tuple[int, int], ...]
+    ended_at: datetime
+
+
 @dataclass(frozen=True)
 class StoredMatch:
     """A match as the store keeps it: what it takes to play it again.
@@ -63,6 +91,9 @@ class StoredMatch:
         seed: The seed the match started with. It is never sent to a player.
         actions: Every action played since the match started, in order.
         version: Goes up by one each time actions are added.
+        owner: The id of the account that started it, or None for a guest.
+        created_at: When it started.
+        result: How it ended, or None while it goes on.
     """
 
     id: UUID
@@ -70,18 +101,64 @@ class StoredMatch:
     seed: int
     actions: tuple[Action, ...]
     version: int
+    owner: UUID | None
+    created_at: datetime
+    result: MatchResult | None
+
+
+@dataclass(frozen=True)
+class MatchSummary:
+    """A match in the list of an owner's matches: no seed, no actions.
+
+    Attributes:
+        id: The match's id.
+        decks: The ids of the decks, the player's and then the AI's.
+        created_at: When it started.
+        result: How it ended, or None while it goes on.
+    """
+
+    id: UUID
+    decks: tuple[str, str]
+    created_at: datetime
+    result: MatchResult | None
+
+
+@dataclass(frozen=True)
+class DeckStats:
+    """How an owner's matches with one of the decks ended, counted.
+
+    Matches that go on don't count.
+
+    Attributes:
+        deck: The id of the deck the player played.
+        won: How many of them the player won.
+        lost: How many they lost.
+        drawn: How many were draws.
+    """
+
+    deck: str
+    won: int
+    lost: int
+    drawn: int
 
 
 class MatchStore(Protocol):
     """What the API needs from a store: what each store does."""
 
     def create(
-        self, decks: tuple[str, str], seed: int, actions: tuple[Action, ...]
+        self,
+        decks: tuple[str, str],
+        seed: int,
+        actions: tuple[Action, ...],
+        *,
+        owner: UUID | None,
+        now: datetime,
     ) -> StoredMatch:
         """Keep a new match, at its first version, and return it.
 
         ``actions`` are those played before the match is kept: the AI's
-        first moves, if it starts.
+        first moves, if it starts. ``owner`` is the account of the player who
+        starts it, if they are logged in, and ``now`` when it starts.
         """
         ...
 
@@ -90,13 +167,41 @@ class MatchStore(Protocol):
         ...
 
     def add_actions(
-        self, match_id: UUID, version: int, actions: tuple[Action, ...]
+        self,
+        match_id: UUID,
+        version: int,
+        actions: tuple[Action, ...],
+        result: MatchResult | None = None,
     ) -> StoredMatch | None:
         """Add actions to a match, but only if it is still at ``version``.
+
+        ``result`` is how the match ended, if these actions end it.
 
         Return the match as it is now kept, at the next version, or None if
         nothing was added: the match is at another version, or there is no
         match with that id.
+        """
+        ...
+
+    def list_matches(
+        self, owner: UUID, limit: int, before: UUID | None = None
+    ) -> tuple[MatchSummary, ...]:
+        """Return up to ``limit`` of an owner's matches, the newest first.
+
+        With ``before``, the id of one of the owner's matches, only those
+        older than it: the next page, after a page that ended with it. If it
+        is no match of the owner's, none.
+
+        Two matches that started at the same time come in the order of their
+        ids, so each one is on exactly one page.
+        """
+        ...
+
+    def stats(self, owner: UUID) -> tuple[DeckStats, ...]:
+        """Return how an owner's matches ended with each deck they played.
+
+        One record for each deck with a match that ended, in the order of
+        the decks' ids.
         """
         ...
 
@@ -116,13 +221,19 @@ class MemoryMatchStore:
         self._lock = threading.Lock()
 
     def create(
-        self, decks: tuple[str, str], seed: int, actions: tuple[Action, ...]
+        self,
+        decks: tuple[str, str],
+        seed: int,
+        actions: tuple[Action, ...],
+        *,
+        owner: UUID | None,
+        now: datetime,
     ) -> StoredMatch:
         """Keep a new match, at its first version, and return it.
 
         ``actions`` are those played before the match is kept: the AI's
         first moves, if it starts. If the store is full, the match left
-        unused the longest is lost.
+        unused the longest is lost, even if it has an owner.
         """
         match = StoredMatch(
             id=uuid.uuid4(),
@@ -130,6 +241,9 @@ class MemoryMatchStore:
             seed=seed,
             actions=actions,
             version=FIRST_VERSION,
+            owner=owner,
+            created_at=now,
+            result=None,
         )
         with self._lock:
             self._matches[match.id] = match
@@ -149,9 +263,15 @@ class MemoryMatchStore:
             return match
 
     def add_actions(
-        self, match_id: UUID, version: int, actions: tuple[Action, ...]
+        self,
+        match_id: UUID,
+        version: int,
+        actions: tuple[Action, ...],
+        result: MatchResult | None = None,
     ) -> StoredMatch | None:
         """Add actions to a match, but only if it is still at ``version``.
+
+        ``result`` is how the match ended, if these actions end it.
 
         Return the match as it is now kept, at the next version, or None if
         nothing was added: the match is at another version, or it was pushed
@@ -163,13 +283,62 @@ class MemoryMatchStore:
             old = self._matches.get(match_id)
             if old is None or old.version != version:
                 return None
-            new = StoredMatch(
-                id=match_id,
-                decks=old.decks,
-                seed=old.seed,
+            new = replace(
+                old,
                 actions=old.actions + actions,
                 version=version + 1,
+                result=old.result if result is None else result,
             )
             self._matches[match_id] = new
             self._matches.move_to_end(match_id)
             return new
+
+    def list_matches(
+        self, owner: UUID, limit: int, before: UUID | None = None
+    ) -> tuple[MatchSummary, ...]:
+        """Return up to ``limit`` of an owner's matches, the newest first.
+
+        With ``before``, only those older than that match of the owner's.
+        Listing a match doesn't count as using it.
+        """
+        with self._lock:
+            owned = [match for match in self._matches.values() if match.owner == owner]
+        owned.sort(key=_order, reverse=True)
+        if before is not None:
+            cursor = next((match for match in owned if match.id == before), None)
+            if cursor is None:
+                return ()
+            owned = [match for match in owned if _order(match) < _order(cursor)]
+        return tuple(
+            MatchSummary(
+                id=match.id,
+                decks=match.decks,
+                created_at=match.created_at,
+                result=match.result,
+            )
+            for match in owned[:limit]
+        )
+
+    def stats(self, owner: UUID) -> tuple[DeckStats, ...]:
+        """Return how an owner's matches ended with each deck they played."""
+        with self._lock:
+            ended = [
+                (match.decks[0], match.result.outcome)
+                for match in self._matches.values()
+                if match.owner == owner and match.result is not None
+            ]
+        counts = Counter(ended)
+        return tuple(
+            DeckStats(
+                deck=deck,
+                won=counts[deck, "won"],
+                lost=counts[deck, "lost"],
+                drawn=counts[deck, "drawn"],
+            )
+            for deck in sorted({deck for deck, _ in ended})
+        )
+
+
+def _order(match: StoredMatch) -> tuple[datetime, UUID]:
+    """Return what orders matches in a list: when they started, then the id."""
+    return match.created_at, match.id
