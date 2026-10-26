@@ -1,12 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import type { Api, Credentials } from "./api/client.ts";
-import { logIn, logOut, register, sessionQuery } from "./api/requests.ts";
+import {
+  forgetMatches,
+  logIn,
+  logOut,
+  register,
+  sessionQuery,
+} from "./api/requests.ts";
 import { ALERT, BUTTON } from "./styles.ts";
 
 /**
  * Who is logged in, at the top of the page: "Log in" for a guest, or the
- * username and "Log out". A guest needn't log in to play (ADR 0014).
+ * username, "My matches" and "Log out". A guest needn't log in to play (ADR
+ * 0014).
  *
  * While the page doesn't know yet, it shows nothing, so "Log in" doesn't
  * flash before the username. If it can't ask, the player is taken for a
@@ -14,13 +21,20 @@ import { ALERT, BUTTON } from "./styles.ts";
  *
  * @param onLogIn - Called when the player asks to log in: the page opens the
  *   dialog.
+ * @param onShowMatches - Called when the player asks for their matches, or
+ *   `undefined` when the page can't show them now: there is no button then.
+ * @param onLogOut - Called once the player is logged out.
  */
 export function AccountBar({
   api,
   onLogIn,
+  onShowMatches,
+  onLogOut,
 }: {
   api: Api;
   onLogIn: () => void;
+  onShowMatches: (() => void) | undefined;
+  onLogOut: () => void;
 }) {
   const queryClient = useQueryClient();
   const session = useQuery(sessionQuery(api));
@@ -29,6 +43,8 @@ export function AccountBar({
     mutationFn: () => logOut(api),
     onSuccess: () => {
       queryClient.setQueryData(sessionQuery(api).queryKey, null);
+      forgetMatches(queryClient);
+      onLogOut();
     },
   });
 
@@ -53,6 +69,11 @@ export function AccountBar({
             Logged in as{" "}
             <strong className="text-gold-200">{account.username}</strong>
           </span>
+          {onShowMatches !== undefined && (
+            <button type="button" className={BUTTON} onClick={onShowMatches}>
+              My matches
+            </button>
+          )}
           <button
             type="button"
             className={BUTTON}
@@ -101,6 +122,8 @@ export function AccountDialog({
       making ? register(api, credentials) : logIn(api, credentials),
     onSuccess: (account) => {
       queryClient.setQueryData(sessionQuery(api).queryKey, account);
+      // Those of whoever was logged in before, if anybody.
+      forgetMatches(queryClient);
       onClose();
     },
   });

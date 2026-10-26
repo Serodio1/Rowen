@@ -131,7 +131,7 @@ test("logging in sends the username in lower case, and closes the dialog", async
   });
   expect(screen.getByText("rui")).toBeInTheDocument();
   // The button that opened the dialog is gone: the focus goes to the top.
-  expect(screen.getByRole("button", { name: "Log out" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "My matches" })).toHaveFocus();
 });
 
 test("the dialog keeps the rest of the page out of reach", async () => {

@@ -45,6 +45,15 @@ export type Action = View["legal_actions"][number];
 export type Move =
   paths["/matches/{match_id}/actions"]["post"]["requestBody"]["content"]["application/json"];
 
+/** A page of the player's matches, the newest first, and whether more are left. */
+export type Matches = MethodResponse<Api, "get", "/matches">;
+
+/** One of the player's matches, in the list: `result` is null while it goes on. */
+export type MatchSummary = Matches["matches"][number];
+
+/** How the player's matches with one deck ended: how many of each. */
+export type DeckStats = MethodResponse<Api, "get", "/stats">["decks"][number];
+
 /** The account the player is logged in with: its username. */
 export type Account = MethodResponse<Api, "get", "/session">;
 
