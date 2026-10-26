@@ -9,7 +9,6 @@
  */
 import {
   infiniteQueryOptions,
-  MutationCache,
   QueryCache,
   QueryClient,
   queryOptions,
@@ -63,8 +62,10 @@ export function createQueryClient(): QueryClient {
     }
   };
   const client: QueryClient = new QueryClient({
+    // Only queries: the list and the stats are what the API turns down so.
+    // (A move by someone no longer logged in gets a 404: the match isn't a
+    // guest's.)
     queryCache: new QueryCache({ onError: notLoggedIn }),
-    mutationCache: new MutationCache({ onError: notLoggedIn }),
     defaultOptions: {
       queries: {
         // The decks don't change while the page is open, and a match only
