@@ -11,7 +11,7 @@ import { ALERT, BUTTON } from "./styles.ts";
 
 /**
  * Who is logged in, at the top of the page: "Log in" for a guest, or the
- * username, "My matches" and "Log out". A guest needn't log in to play (ADR
+ * username, "My matches", "My decks" and "Log out". A guest needn't log in to play (ADR
  * 0014).
  *
  * While the page doesn't know yet, it shows nothing, so "Log in" doesn't
@@ -22,15 +22,18 @@ import { ALERT, BUTTON } from "./styles.ts";
  *   dialog.
  * @param onShowMatches - Called when the player asks for their matches, or
  *   `undefined` when the page can't show them now: there is no button then.
+ * @param onShowDecks - The same for the decks they built.
  */
 export function AccountBar({
   api,
   onLogIn,
   onShowMatches,
+  onShowDecks,
 }: {
   api: Api;
   onLogIn: () => void;
   onShowMatches: (() => void) | undefined;
+  onShowDecks: (() => void) | undefined;
 }) {
   const queryClient = useQueryClient();
   const session = useQuery(sessionQuery(api));
@@ -73,6 +76,11 @@ export function AccountBar({
           {onShowMatches !== undefined && (
             <button type="button" className={BUTTON} onClick={onShowMatches}>
               My matches
+            </button>
+          )}
+          {onShowDecks !== undefined && (
+            <button type="button" className={BUTTON} onClick={onShowDecks}>
+              My decks
             </button>
           )}
           <button

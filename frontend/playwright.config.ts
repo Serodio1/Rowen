@@ -21,11 +21,11 @@ export default defineConfig({
   // side by side, they went over the limit, and a request was turned down
   // (429).
   //
-  // The tests together start 4 matches and log in 3 times (an account made
+  // The tests together start 4 matches and log in 4 times (an account made
   // counts as a login), and nginx lets one visitor start 6 matches and log in
   // 6 times at once, then 10 and 5 more a minute. A new test that starts
   // matches or logs in uses up this budget: running all the tests twice in
-  // the same minute already gets close to it, and the Smoke test in CI, which
+  // the same minute goes over it (8 logins), and the Smoke test in CI, which
   // starts 2 more matches and makes 1 more account, comes after them.
   workers: 1,
   // In CI, each step is printed, and the report is written for the job to

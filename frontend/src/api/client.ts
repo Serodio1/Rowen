@@ -54,6 +54,25 @@ export type MatchSummary = Matches["matches"][number];
 /** How the player's matches with one deck ended: how many of each. */
 export type DeckStats = MethodResponse<Api, "get", "/stats">["decks"][number];
 
+/**
+ * What a deck built from a faction may hold: each card once, with the most
+ * copies it may have, and how many units and special cards a deck needs.
+ */
+export type Choices = MethodResponse<Api, "get", "/decks/{deck_id}/choices">;
+
+/** A card a built deck may hold, and the most copies of it. */
+export type Choice = Choices["cards"][number];
+
+/** The decks the player built, and how many they may keep. */
+export type PlayerDecks = MethodResponse<Api, "get", "/my-decks">;
+
+/** A deck the player built: its name, faction and copies of each card. */
+export type PlayerDeck = PlayerDecks["decks"][number];
+
+/** What the page sends to build a deck or change one: all of it at once. */
+export type DeckChoice =
+  paths["/my-decks"]["post"]["requestBody"]["content"]["application/json"];
+
 /** The account the player is logged in with: its username. */
 export type Account = MethodResponse<Api, "get", "/session">;
 
