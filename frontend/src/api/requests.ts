@@ -200,8 +200,9 @@ export function playMove(api: Api, matchId: string, move: Move) {
 export function sessionQuery(api: Api) {
   return queryOptions({
     queryKey: SESSION,
+    // Out of date at once, so it is asked for again when the tab is back
+    // (TanStack Query does so for what is out of date).
     staleTime: 0,
-    refetchOnWindowFocus: true,
     queryFn: async (): Promise<Account | null> => {
       try {
         return await send(api.GET("/session"));

@@ -822,3 +822,24 @@ test("a match the player comes back to says how its last round went", async () =
     await screen.findByText("Round 1: you won, 5 to 3."),
   ).toBeInTheDocument();
 });
+
+test("opening the list while a match starts doesn't open the match over it", async () => {
+  const match = later();
+  renderApp({
+    ...NO_MATCHES,
+    "POST /api/matches": match.response,
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
+  await openMatches();
+  await screen.findByText("No match yet: choose a deck to play one.");
+
+  match.answer(
+    Response.json((newMatch() as { body: unknown }).body, { status: 201 }),
+  );
+  await settle();
+
+  expect(screen.getByRole("heading", { name: "My matches" })).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "Keep this hand" }),
+  ).not.toBeInTheDocument();
+});
