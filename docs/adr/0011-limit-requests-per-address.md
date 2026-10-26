@@ -1,6 +1,8 @@
 # ADR 0011: Limit the API's requests per visitor's address, in nginx
 
-- **Status:** Accepted
+- **Status:** Accepted; the matches moved from memory to PostgreSQL in
+  [ADR 0013](0013-keep-matches-in-postgresql.md), and how nginx finds an
+  IPv6 block changed (see the end)
 - **Date:** 2026-10-16
 
 ## Context
@@ -88,3 +90,12 @@ arrived as `203.0.113.9,<the visitor's address>`.
 - CI cannot check the part that only Google's front end exercises
   (`set_real_ip_from`), since in Compose no request comes from there:
   `docs/deploy.md` says how to check it after a deployment.
+
+## Update (2026-10-26)
+
+Reading the block from the address's text let one /64 count as two
+visitors: nginx writes a block whose fourth group is 0 either with that 0
+(`2001:db8:1:0:5::`) or with `::` in its place (`2001:db8:1::5`), and each
+form had its own bucket, so the block got twice the limits. nginx now reads
+the first 8 bytes of the address as it keeps it (`$binary_remote_addr`), which
+has one form for each block. The decision, one /64 per visitor, is the same.

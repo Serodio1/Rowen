@@ -22,6 +22,9 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    # A job that hangs is stopped after this long, not after GitHub's six
+    # hours. Each job takes a few minutes.
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
@@ -75,6 +78,7 @@ jobs:
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: frontend
@@ -122,6 +126,7 @@ jobs:
   docker:
     name: Docker
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
@@ -279,6 +284,7 @@ jobs:
     needs: [backend, frontend, docker]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Only main may use this environment (its rule on GitHub), and Google only
     # trusts jobs that run in it. Its variables say which project and account.
     environment:
@@ -334,22 +340,25 @@ jobs:
           DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
         run: uv run --locked --no-dev alembic upgrade head
 
-      # Waits until the new revision's containers start and it gets all the
-      # requests; fails if they do not start.
+      # Starts the new revision beside the one that answers now, which keeps
+      # all the requests (ADR 0016). Fails if its containers do not start.
       - name: Deploy
         run: |
-          sed -e "s/PROJECT_ID/$PROJECT_ID/g" -e "s/IMAGE_TAG/$TAG/g" deploy/cloud-run.yaml > "$RUNNER_TEMP/rowen-run.yaml"
+          serving=$(gcloud run services describe rowen --region=europe-west1 --format=json \
+            | jq --raw-output --exit-status '.status.traffic[] | select(.percent == 100) | .revisionName')
+          sed -e "s/PROJECT_ID/$PROJECT_ID/g" -e "s/IMAGE_TAG/$TAG/g" -e "s/SERVING_REVISION/$serving/g" \
+            deploy/cloud-run.yaml > "$RUNNER_TEMP/rowen-run.yaml"
           gcloud run services replace "$RUNNER_TEMP/rowen-run.yaml" --region=europe-west1
 
-      # The game answers online: the page with its security header, the
-      # decks through nginx, then a new match, read back from the database
-      # (one new match of the runner's own limit). The first request tries
-      # again for a while, in case the instance is still starting.
-      - name: Check the game online
-        id: check
+      # The new revision answers at its own address: the page with its
+      # security header, the decks through nginx, then a new match, read back
+      # from the database (one new match of the runner's own limit). The first
+      # request tries again for a while, in case the instance is still
+      # starting. If any of this fails, the visitors never meet the revision.
+      - name: Check the new revision
         run: |
-          url=$(gcloud run services describe rowen --region=europe-west1 --format='value(status.url)')
-          echo "url=$url" >> "$GITHUB_OUTPUT"
+          url=$(gcloud run services describe rowen --region=europe-west1 --format=json \
+            | jq --raw-output --exit-status '.status.traffic[] | select(.tag == "candidate") | .url')
           page=$(curl --fail --silent --show-error --head --retry 5 --retry-all-errors --retry-delay 3 "$url/")
           grep --quiet --ignore-case "content-security-policy: default-src 'self'" <<< "$page"
           curl --fail --silent --show-error "$url/api/decks" | grep --quiet '"humans"'
@@ -357,3 +366,13 @@ jobs:
             --data '{"deck": "humans"}' "$url/api/matches")
           id=$(jq --raw-output .id <<< "$match")
           curl --fail --silent --show-error "$url/api/matches/$id" | jq --exit-status '.version == 1'
+
+      # Only now do the visitors' requests go to the new revision, and the
+      # game's own address must still answer with the page.
+      - name: Move the traffic
+        id: check
+        run: |
+          gcloud run services update-traffic rowen --region=europe-west1 --to-revisions="rowen-$TAG=100"
+          url=$(gcloud run services describe rowen --region=europe-west1 --format='value(status.url)')
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          curl --fail --silent --show-error --head "$url/" > /dev/null

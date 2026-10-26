@@ -28,6 +28,7 @@ plus a section on the alternatives that were considered.
 | [0013](0013-keep-matches-in-postgresql.md) | Keep each match in PostgreSQL as its seed and actions | Accepted |
 | [0014](0014-accounts-with-sessions-in-postgresql.md) | Log players in with Argon2id passwords and sessions kept in PostgreSQL | Accepted |
 | [0015](0015-players-own-their-matches.md) | Give a logged-in player's matches an owner, keep their results and list them by cursor | Accepted |
+| [0016](0016-check-a-revision-before-it-gets-the-requests.md) | Check a new revision before it gets the requests, built from fixed base images | Accepted |
 
 ## Writing a new ADR
 

@@ -11,7 +11,9 @@ PostgreSQL, and a React + TypeScript frontend.
 > AI can be played online, on a board with card art, animations and the
 > keyboard, through a web API, with the matches kept in PostgreSQL. Phase 4,
 > accounts and each player's matches, is under way: a player can already make
-> an account and log in (or play as a guest, as before).
+> an account and log in (or play as a guest, as before), find their matches
+> under "My matches", resume an unfinished one, and see how many they won,
+> lost and drew with each deck.
 
 ![A match in Rowen: the AI's rows above, the player's below, Hoarfrost on both
 melee rows, and a Plane shown large with what it does](docs/screenshot.webp)
@@ -124,7 +126,7 @@ and online.
 ## Run the frontend
 
 The browser interface is a React app in `frontend/`. It needs
-[Node.js](https://nodejs.org/) 24.14.1 or later, which comes with npm 11.10 or
+[Node.js](https://nodejs.org/) 24.15.0 or later, which comes with npm 11.10 or
 later:
 
 ```sh
@@ -252,6 +254,6 @@ nginx, that the game answers.
 
 ## License
 
-The code is released under the [MIT License](LICENSE). The cards' art was
-generated with Grok and Gemini: see [docs/art.md](docs/art.md) for where it
-comes from and the tools' terms.
+The code is released under the [MIT License](LICENSE). The cards' art is not
+(see [NOTICE](NOTICE)): it was generated with Grok and Gemini, and
+[docs/art.md](docs/art.md) says where it comes from and the tools' terms.
