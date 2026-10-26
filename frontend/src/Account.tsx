@@ -1,13 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useId, useState } from "react";
 import type { Api, Credentials } from "./api/client.ts";
-import {
-  forgetMatches,
-  logIn,
-  logOut,
-  register,
-  sessionQuery,
-} from "./api/requests.ts";
+import { logIn, logOut, register, sessionQuery } from "./api/requests.ts";
 import { ALERT, BUTTON } from "./styles.ts";
 
 /**
@@ -23,18 +22,15 @@ import { ALERT, BUTTON } from "./styles.ts";
  *   dialog.
  * @param onShowMatches - Called when the player asks for their matches, or
  *   `undefined` when the page can't show them now: there is no button then.
- * @param onLogOut - Called once the player is logged out.
  */
 export function AccountBar({
   api,
   onLogIn,
   onShowMatches,
-  onLogOut,
 }: {
   api: Api;
   onLogIn: () => void;
   onShowMatches: (() => void) | undefined;
-  onLogOut: () => void;
 }) {
   const queryClient = useQueryClient();
   const session = useQuery(sessionQuery(api));
@@ -42,12 +38,16 @@ export function AccountBar({
     mutationKey: ["log_out"],
     mutationFn: () => logOut(api),
     onSuccess: () => {
+      // The page then forgets the player's matches (App).
       queryClient.setQueryData(sessionQuery(api).queryKey, null);
-      // Their matches are theirs alone: whoever logs in next gets their own.
-      forgetMatches(queryClient);
-      onLogOut();
     },
   });
+  // A match being started or asked for, to play on, would come back as the
+  // account's after the player logged out: no logging out meanwhile.
+  const waiting =
+    useIsMutating({ mutationKey: ["start"] }) +
+      useIsMutating({ mutationKey: ["resume"] }) >
+    0;
 
   if (session.isPending) {
     return null;
@@ -78,7 +78,7 @@ export function AccountBar({
           <button
             type="button"
             className={BUTTON}
-            disabled={leave.isPending}
+            disabled={leave.isPending || waiting}
             onClick={() => {
               leave.mutate();
             }}

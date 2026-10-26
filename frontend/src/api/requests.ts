@@ -9,6 +9,7 @@
  */
 import {
   infiniteQueryOptions,
+  QueryCache,
   QueryClient,
   queryOptions,
 } from "@tanstack/react-query";
@@ -48,9 +49,23 @@ declare module "@tanstack/react-query" {
  * Make the cache the page keeps its answers in.
  *
  * `main.tsx` makes the one the page uses, and each test makes its own.
+ *
+ * Any request the API turns down with `not_logged_in` means the player isn't
+ * logged in any more, whatever the page thought: they logged out in another
+ * tab, or the session ended. The cache then says so, and the page shows them
+ * as a guest.
  */
 export function createQueryClient(): QueryClient {
-  return new QueryClient({
+  const notLoggedIn = (error: Error) => {
+    if (error instanceof RequestError && error.code === "not_logged_in") {
+      client.setQueryData(SESSION, null);
+    }
+  };
+  const client: QueryClient = new QueryClient({
+    // Only queries: the list and the stats are what the API turns down so.
+    // (A move by someone no longer logged in gets a 404: the match isn't a
+    // guest's.)
+    queryCache: new QueryCache({ onError: notLoggedIn }),
     defaultOptions: {
       queries: {
         // The decks don't change while the page is open, and a match only
@@ -75,7 +90,11 @@ export function createQueryClient(): QueryClient {
       },
     },
   });
+  return client;
 }
+
+// Where the cache keeps who is logged in.
+const SESSION = ["session"] as const;
 
 /** The decks the player can choose from. */
 export function decksQuery(api: Api) {
@@ -175,10 +194,16 @@ export function playMove(api: Api, matchId: string, move: Move) {
  *
  * The page can't read the session's cookie (it is `HttpOnly`), so it asks
  * the API, which reads it. Logging in and out put the new answer here.
+ *
+ * It is asked for again each time the player comes back to the page's tab:
+ * they may have logged out, or in, in another tab meanwhile.
  */
 export function sessionQuery(api: Api) {
   return queryOptions({
-    queryKey: ["session"],
+    queryKey: SESSION,
+    // Out of date at once, so it is asked for again when the tab is back
+    // (TanStack Query does so for what is out of date).
+    staleTime: 0,
     queryFn: async (): Promise<Account | null> => {
       try {
         return await send(api.GET("/session"));

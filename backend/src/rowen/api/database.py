@@ -38,6 +38,7 @@ from sqlalchemy import (
     LargeBinary,
     String,
     delete,
+    event,
     func,
     select,
     tuple_,
@@ -45,6 +46,8 @@ from sqlalchemy import (
 )
 from sqlalchemy import create_engine as _create_engine
 from sqlalchemy.dialects.postgresql import JSONB, insert
+from sqlalchemy.engine import ExceptionContext
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -169,17 +172,48 @@ def create_engine(url: str) -> Engine:
 
     ``url`` is like ``postgresql+psycopg://user:password@host/database``.
 
-    When a statement fails, SQLAlchemy's error holds the statement's values,
-    and the error goes to the server's log: ``hide_parameters`` leaves them
-    out, since they include the seed of a match, which must stay secret.
+    When a statement fails, its error goes to the server's log, and the seed
+    of a match must stay secret. So the error leaves out:
+
+    - the statement's values: ``hide_parameters``;
+    - PostgreSQL's detail of the error, such as ``Failing row contains
+      (...)`` when a row breaks a CHECK, which lists the whole row, seed and
+      all: ``_without_detail``.
     """
-    return _create_engine(
+    engine = _create_engine(
         url,
         pool_pre_ping=True,
         hide_parameters=True,
         pool_timeout=POOL_TIMEOUT,
         connect_args={"connect_timeout": CONNECT_TIMEOUT},
     )
+    event.listen(engine, "handle_error", _without_detail)
+    return engine
+
+
+def _without_detail(context: ExceptionContext) -> None:
+    """Raise a statement's error again, without PostgreSQL's detail.
+
+    psycopg's error says the detail in its message, and SQLAlchemy's error,
+    of the same kind (an ``IntegrityError`` for a CHECK), repeats that
+    message: both are made again from the first line alone, which names the
+    constraint. SQLAlchemy chains the error raised here to psycopg's, so both
+    must leave the detail out.
+    """
+    error = context.original_exception
+    diag = getattr(error, "diag", None)
+    wrapped = context.sqlalchemy_exception
+    # A psycopg error has a diag, and SQLAlchemy wraps it in a DBAPIError.
+    if (
+        diag is None
+        or diag.message_detail is None
+        or not isinstance(wrapped, DBAPIError)
+    ):
+        return
+    error.args = (diag.message_primary,)
+    raise type(wrapped)(
+        context.statement or "", None, error, hide_parameters=True
+    ) from None
 
 
 class PostgresMatchStore:
@@ -320,7 +354,10 @@ class PostgresMatchStore:
             )
             .where(MatchRow.account_id == owner, MatchRow.outcome.is_not(None))
             .group_by(MatchRow.player_deck)
-            .order_by(MatchRow.player_deck)
+            # In the order of the characters' codes, as Python's sorted() and
+            # the memory store, whatever order the database's language
+            # setting (collation) would give: "a-b" before "a_b".
+            .order_by(MatchRow.player_deck.collate("C"))
         )
         with Session(self._engine) as session:
             return tuple(
@@ -408,11 +445,9 @@ class PostgresAccountStore:
     ) -> None:
         """Keep a new session of an account, until ``expires_at``.
 
-        The account's sessions that expired before ``now`` are deleted.
+        Every session that expired before ``now``, any account's, is deleted.
         """
-        expired = delete(SessionRow).where(
-            SessionRow.account_id == account.id, SessionRow.expires_at <= now
-        )
+        expired = delete(SessionRow).where(SessionRow.expires_at <= now)
         with Session(self._engine) as session, session.begin():
             session.execute(expired)
             session.add(

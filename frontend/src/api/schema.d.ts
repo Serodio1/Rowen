@@ -1295,7 +1295,9 @@ export interface operations {
       query?: never;
       header?: never;
       path?: never;
-      cookie?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
     };
     requestBody: {
       content: {
@@ -1377,7 +1379,9 @@ export interface operations {
       query?: never;
       header?: never;
       path?: never;
-      cookie?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
     };
     requestBody: {
       content: {

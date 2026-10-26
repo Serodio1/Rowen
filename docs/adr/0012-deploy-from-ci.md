@@ -1,6 +1,7 @@
 # ADR 0012: Deploy from CI on every merge, signed in to Google with no stored key
 
-- **Status:** Accepted
+- **Status:** Accepted; how a new revision gets the requests, and what the
+  check online does, changed in [ADR 0016](0016-check-a-revision-before-it-gets-the-requests.md)
 - **Date:** 2026-10-17
 
 ## Context

@@ -5,6 +5,7 @@ They run only when TEST_DATABASE_URL is set (tests/conftest.py).
 
 import threading
 import time
+import traceback
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -18,7 +19,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from rowen.api.app import app, get_accounts, get_store, new_seed
 from rowen.api.database import PostgresAccountStore, PostgresMatchStore, create_engine
-from rowen.api.store import FIRST_VERSION, StoredMatch
+from rowen.api.store import FIRST_VERSION, MatchResult, StoredMatch
 from rowen.engine.public import (
     Action,
     EndRedraw,
@@ -246,6 +247,54 @@ def test_a_failed_statement_never_shows_the_seed(database_url: str) -> None:
 
     assert str(SECRET_SEED) not in str(error.value)
     assert "parameters hidden" in str(error.value)
+
+
+def test_a_row_that_breaks_a_check_never_shows_the_seed(
+    postgres_store: PostgresMatchStore,
+) -> None:
+    # PostgreSQL's detail lists the whole row, seed and all ("Failing row
+    # contains ..."): a bug that writes a result the table turns down must not
+    # put it in the server's log, in any error of the chain.
+    match = postgres_store.create(
+        ("humans", "robots"), SECRET_SEED, (), owner=None, now=NOW
+    )
+    weird = MatchResult(outcome="weird", rounds=(), ended_at=NOW)  # type: ignore[arg-type]
+
+    with pytest.raises(IntegrityError, match="outcome_is_known") as error:
+        postgres_store.add_actions(match.id, match.version, (), weird)
+
+    log = "".join(traceback.format_exception(error.value))
+    assert str(SECRET_SEED) not in log
+    assert "Failing row" not in log
+
+
+def test_stats_come_in_the_order_of_the_decks_ids_whatever_the_collation(
+    postgres_store: PostgresMatchStore, database_url: str
+) -> None:
+    # Under a language's collation (ICU's here), "a_b" comes before "a-b";
+    # in the order of the characters' codes, as in Python, after.
+    engine = create_engine(database_url)
+    collate = "ALTER TABLE matches ALTER COLUMN player_deck TYPE varchar COLLATE {}"
+    try:
+        with engine.begin() as connection:
+            connection.execute(text(collate.format('"und-x-icu"')))
+        owner = PostgresAccountStore(engine).create_account("rui", "hash")
+        assert owner is not None
+        won = MatchResult(outcome="won", rounds=((1, 0), (1, 0)), ended_at=NOW)
+        for deck in ["a_b", "a-b"]:
+            match = postgres_store.create(
+                (deck, "robots"), 1, (), owner=owner.id, now=NOW
+            )
+            postgres_store.add_actions(match.id, match.version, (), won)
+
+        decks = [stats.deck for stats in postgres_store.stats(owner.id)]
+    finally:
+        with engine.begin() as connection:
+            connection.execute(text(collate.format('"default"')))
+            connection.execute(text("TRUNCATE matches, accounts CASCADE"))
+        engine.dispose()
+
+    assert decks == sorted(decks) == ["a-b", "a_b"]
 
 
 def test_a_move_says_when_the_match_was_last_played(

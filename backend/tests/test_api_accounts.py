@@ -133,21 +133,22 @@ def test_a_deleted_session_is_gone(any_accounts: AccountStore) -> None:
     assert store.find_session(b"other", NOW) is not None
 
 
-def test_a_new_session_deletes_the_accounts_expired_ones(
-    any_accounts: AccountStore,
-) -> None:
+def test_a_new_session_deletes_every_expired_one(any_accounts: AccountStore) -> None:
+    # Those of accounts that never log in again too: none pile up.
     store = any_accounts
     rui = create(store, "rui")
     ana = create(store, "ana")
     store.create_session(rui, b"expired", NOW, NOW - timedelta(days=30))
     store.create_session(rui, b"current", LATER, NOW - timedelta(days=30))
-    store.create_session(ana, b"ana's", NOW, NOW - timedelta(days=30))
+    store.create_session(ana, b"ana's expired", NOW, NOW - timedelta(days=30))
+    store.create_session(ana, b"ana's current", LATER, NOW - timedelta(days=30))
 
     store.create_session(rui, b"new", LATER, NOW)
 
-    # Seen from before they expired: only the one deleted is gone.
+    # Seen from before they expired: only the ones deleted are gone.
     before = NOW - timedelta(days=1)
     assert store.find_session(b"expired", before) is None
+    assert store.find_session(b"ana's expired", before) is None
     assert store.find_session(b"current", before) is not None
-    assert store.find_session(b"ana's", before) is not None
+    assert store.find_session(b"ana's current", before) is not None
     assert store.find_session(b"new", before) is not None

@@ -2,7 +2,15 @@
 # dependencies and the project with uv, the second keeps only the result, so
 # the image has neither uv nor the build files.
 
-FROM python:3.14-slim-trixie AS build
+# Each base image is named by its digest (the hash of its contents) as well as
+# its tag. A tag moves when its makers publish a new build, so CI's two builds
+# of one commit (the Docker job, which tests it, and the Deploy job) could
+# start from different bases; a digest never moves (ADR 0016). To take a new
+# build (security fixes), change the digest to the one that
+#   docker buildx imagetools inspect <the image's name and tag>
+# prints as "Digest".
+
+FROM python:3.14-slim-trixie@sha256:35caba83af2fe6da9a5d922f9b0156f21d1246a48278c58a08bd253303ba42e8 AS build
 
 # The same uv for everyone who builds the image. Its minor version matches
 # uv_build in pyproject.toml, so uv builds the project itself, and it was
@@ -30,7 +38,7 @@ RUN uv sync --locked --no-dev --no-install-project
 COPY src ./src
 RUN uv sync --locked --no-dev --no-editable
 
-FROM python:3.14-slim-trixie
+FROM python:3.14-slim-trixie@sha256:35caba83af2fe6da9a5d922f9b0156f21d1246a48278c58a08bd253303ba42e8
 
 # The server runs as a user with no special rights, not as root.
 RUN useradd --system --no-create-home rowen

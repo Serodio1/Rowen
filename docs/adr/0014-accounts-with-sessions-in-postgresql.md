@@ -28,7 +28,9 @@ behind Vite in development ([ADR 0009](0009-docker-images-behind-nginx.md)).
   hashes are worked out at once (76 MiB), so 40 logins at the same time can't
   use up the API's memory. A username with no account is still checked
   against a hash, so the answer takes as long and is the same as for a wrong
-  password.
+  password. A password is put in Unicode's NFKC form first (added after the
+  review of 26/10), so an "é" typed as one character or as "e" and an accent
+  is the same password.
 - **Sessions are rows of a `sessions` table in PostgreSQL**
   ([ADR 0013](0013-keep-matches-in-postgresql.md)). Logging in makes a
   token of 32 random bytes and sends it in a cookie; the table keeps only its

@@ -43,7 +43,8 @@ export default defineConfig(
           ...getDefaultSelectors(),
           {
             kind: "variable",
-            name: "^(BUTTON|ALERT)$",
+            // Every constant that holds classes: add a new one here.
+            name: "^(BUTTON|ALERT|PANEL|FIELD|HELD|SHOWN)$",
             match: [{ type: "strings" }],
           },
           {

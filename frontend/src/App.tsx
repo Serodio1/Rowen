@@ -14,6 +14,7 @@ import {
   forgetMatches,
   matchQuery,
   playMove,
+  sessionQuery,
   startMatch,
   type RequestError,
 } from "./api/requests.ts";
@@ -33,7 +34,7 @@ import {
 import { onFirstClick } from "./clicks.ts";
 import { AccountBar, AccountDialog } from "./Account.tsx";
 import { MyMatches } from "./Matches.tsx";
-import { ALERT, BUTTON } from "./styles.ts";
+import { ALERT, BUTTON, PANEL } from "./styles.ts";
 import {
   otherActions,
   playsOf,
@@ -45,6 +46,7 @@ import {
   actionText,
   cardNames,
   cardText,
+  eventText,
   happened,
   resultText,
   type Happened,
@@ -62,9 +64,17 @@ import {
  *   with a fake `fetch` in tests.
  */
 export function App({ api }: { api: Api }) {
+  const queryClient = useQueryClient();
   // The match being played, as it started or as the player came back to it,
-  // or null while there is none.
-  const [match, setMatch] = useState<Played | null>(null);
+  // and the account it is played with (null for a guest), or null while
+  // there is none.
+  const [match, setMatch] = useState<{
+    played: Played;
+    owner: string | null;
+  } | null>(null);
+  // Whether the end of the match is shown, over the whole page: the top of
+  // the page is out of reach meanwhile too.
+  const [ended, setEnded] = useState(false);
   // Whether the player's matches are shown, while no match is played.
   const [listing, setListing] = useState(false);
   // Whether the player left a match: the focus then goes to the decks.
@@ -73,6 +83,31 @@ export function App({ api }: { api: Api }) {
   // reach meanwhile (inert), and the focus goes back to the top once it
   // closes, since the button that opened it may be gone.
   const [loggingIn, setLoggingIn] = useState(false);
+  // Who is logged in: a username, null for a guest, or undefined while the
+  // page doesn't know yet.
+  const session = useQuery(sessionQuery(api));
+  const username = session.isSuccess
+    ? (session.data?.username ?? null)
+    : undefined;
+  const lastUsername = useRef(username);
+  useEffect(() => {
+    // Someone else is logged in now: the player logged out, here or in
+    // another tab, or logged in with another account. Their matches are
+    // theirs alone: the page forgets the list, and leaves the match if it
+    // was played with the account that is gone (it is kept, to play on once
+    // that account logs in again). A guest's match goes on.
+    const before = lastUsername.current;
+    lastUsername.current = username;
+    if (before === undefined || username === undefined || before === username) {
+      return;
+    }
+    forgetMatches(queryClient);
+    if (before !== null) {
+      setMatch((match) => (match?.owner === before ? null : match));
+      setListing(false);
+      setLeft(true);
+    }
+  }, [username, queryClient]);
   const top = useRef<HTMLDivElement>(null);
   const wasLoggingIn = useRef(false);
   useEffect(() => {
@@ -91,6 +126,7 @@ export function App({ api }: { api: Api }) {
         <div
           ref={top}
           className="mb-2 flex flex-col items-center gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] lg:mb-1"
+          inert={ended}
         >
           <h1 className="text-center font-display sm:col-start-2 text-3xl font-bold tracking-wide text-gold-300 drop-shadow">
             Rowen
@@ -109,14 +145,6 @@ export function App({ api }: { api: Api }) {
                   }
                 : undefined
             }
-            onLogOut={() => {
-              // The player's matches are theirs alone: the page can't play
-              // on one, or list them, once they are logged out. The match is
-              // kept, to play on once they log in again.
-              setMatch(null);
-              setListing(false);
-              setLeft(true);
-            }}
           />
         </div>
         {match === null ? (
@@ -124,7 +152,10 @@ export function App({ api }: { api: Api }) {
             <MyMatches
               api={api}
               onResume={(resumed) => {
-                setMatch({ ...resumed, moves: [] });
+                setMatch({
+                  played: { ...resumed, moves: [] },
+                  owner: username ?? null,
+                });
                 setListing(false);
               }}
               onBack={() => {
@@ -133,12 +164,21 @@ export function App({ api }: { api: Api }) {
               }}
             />
           ) : (
-            <ChooseDeck api={api} onStart={setMatch} focus={left} />
+            <ChooseDeck
+              api={api}
+              onStart={(played) => {
+                setMatch({ played, owner: username ?? null });
+              }}
+              focus={left}
+            />
           )
         ) : (
           <PlayMatch
+            // A new match is a new PlayMatch, with its own log.
+            key={match.played.id}
             api={api}
-            started={match}
+            started={match.played}
+            onEnded={setEnded}
             onLeave={() => {
               setMatch(null);
               setLeft(true);
@@ -185,15 +225,14 @@ function ChooseDeck({
   const start = useMutation({
     mutationKey: ["start"],
     mutationFn: (deck: string) => startMatch(api, deck),
-    onSuccess: (match) => {
+    onSuccess: () => {
       // The match is in the player's list now.
       forgetMatches(queryClient);
-      onStart(match);
     },
   });
 
   return (
-    <section className="wood mx-auto flex max-w-xl flex-col items-center gap-4 rounded-xl border-2 border-wood-600 p-6 shadow-2xl shadow-black/60">
+    <section className={PANEL}>
       <h2
         ref={heading}
         tabIndex={-1}
@@ -238,7 +277,10 @@ function ChooseDeck({
                 if (queryClient.isMutating({ mutationKey: ["start"] }) > 0) {
                   return;
                 }
-                start.mutate(deck.id);
+                // Given here, and not to useMutation, so it isn't called
+                // once the decks are gone, as when the player opened their
+                // matches meanwhile.
+                start.mutate(deck.id, { onSuccess: onStart });
               })}
             >
               {deck.name}
@@ -272,15 +314,19 @@ function namesOf(played: Played): [string, string][] {
  *
  * @param started - The match as it started, with what the AI did if it
  *   started, or as the player came back to it, with no moves.
+ * @param onEnded - Called with whether the end of the match is shown over
+ *   the whole page.
  * @param onLeave - Called when the player is done with the match.
  */
 function PlayMatch({
   api,
   started,
+  onEnded,
   onLeave,
 }: {
   api: Api;
   started: Played;
+  onEnded: (ended: boolean) => void;
   onLeave: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -412,6 +458,15 @@ function PlayMatch({
       focusing.current = false;
     }
   }, [version, ready]);
+  // Whether the end of the match is shown (see `over` below), for the rest
+  // of the page, which is then out of reach too.
+  const ended = match.data.view.match_over && progress.step >= steps.length;
+  useEffect(() => {
+    onEnded(ended);
+    return () => {
+      onEnded(false);
+    };
+  }, [ended, onEnded]);
   const failed = match.isError;
   useEffect(() => {
     // The moves are disabled: the focus goes to what the player can do.
@@ -427,10 +482,10 @@ function PlayMatch({
     // The server doesn't know the match: it was kept in the memory of a
     // server that restarted, or the link is wrong.
     return (
-      <section className="wood mx-auto flex max-w-xl flex-col items-center gap-4 rounded-xl border-2 border-wood-600 p-6 shadow-2xl shadow-black/60">
+      <section className={PANEL}>
         <h2 className="font-display text-2xl text-gold-300">Match not found</h2>
         <p role="alert" className={ALERT}>
-          This match is no longer on the server.
+          The server has no such match, or it is another account&apos;s.
         </p>
         <button type="button" className={BUTTON} onClick={onLeave}>
           Start a new match
@@ -474,13 +529,20 @@ function PlayMatch({
     },
   };
   // How the last round went, until the next move; while the round that ended
-  // in the last moves is still on the board, the one before.
+  // in the last moves is still on the board, the one before. In a match the
+  // player came back to, before their first move, the last round that ended
+  // in it, if one did.
+  const lastRound = match.data.rounds.at(-1);
   const round =
-    (board.round === view.round ? log[0]?.round : log[1]?.round) ?? null;
+    log.length === 0
+      ? lastRound === undefined
+        ? null
+        : eventText(lastRound, view.player, new Map(), match.data.rounds.length)
+      : ((board.round === view.round ? log[0]?.round : log[1]?.round) ?? null);
   // Once the match is over and its last move played out, the end of the
   // match is over the whole page: the rest is out of reach meanwhile, for the
   // keyboard too.
-  const over = view.match_over && progress.step >= steps.length;
+  const over = ended;
   // On a wide screen, the board is on the left, and on its right the round,
   // how the last one went, what to do and what happened, so it all fits on
   // one screen. On a narrow one, they are in that order, with the board

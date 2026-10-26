@@ -76,6 +76,7 @@ def test_unit_group_is_read() -> None:
     [
         ("abilty", "spy", "units[0]: unknown fields: abilty"),
         ("strength", "6", "units[0]: strength must be of type int, got '6'"),
+        ("strength", True, "units[0]: strength must be of type int, got True"),
         ("strength", -1, "units[0]: sniper: strength can't be negative"),
         ("rows", "ranged", "units[0]: rows must be of type list, got 'ranged'"),
         ("rows", ["air"], "units[0]: 'air' is not a valid Row"),
@@ -83,6 +84,7 @@ def test_unit_group_is_read() -> None:
         ("group", "snipers", "units[0]: sniper: only Bond and Muster units"),
         ("legend", "yes", "units[0]: legend must be of type bool, got 'yes'"),
         ("copies", 0, "units[0]: copies must be a whole number of at least 1"),
+        ("copies", True, "units[0]: copies must be a whole number of at least 1"),
     ],
 )
 def test_invalid_unit_is_rejected(field: str, value: object, message: str) -> None:
