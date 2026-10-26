@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 import { playOn } from "./moves.ts";
 
 // With reduced motion, as some players ask their system for: each move shows
