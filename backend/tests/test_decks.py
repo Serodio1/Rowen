@@ -51,7 +51,8 @@ def test_one_id_means_one_card() -> None:
 
 
 # A faction to build decks from: seven plain units, a Bond group with more
-# copies than MAX_COPIES, a Muster group with fewer, and a Legend.
+# copies than MAX_COPIES, a Muster group with fewer, a Spy with more but no
+# group, and a Legend.
 PLAIN = tuple(
     UnitCard(id=f"unit-{n}", name=f"Unit {n}", rows=(Row.MELEE,), strength=n)
     for n in range(7)
@@ -72,13 +73,14 @@ MUSTER = UnitCard(
     ability=Ability.MUSTER,
     group="musters",
 )
+SPY = UnitCard(id="spy", name="Spy", rows=(Row.MELEE,), strength=1, ability=Ability.SPY)
 LEGEND = UnitCard(
     id="legend", name="Legend", rows=(Row.SIEGE,), strength=10, legend=True
 )
 FACTION = Deck(
     id="faction",
     name="Faction",
-    cards=(*PLAIN * 2, *(BOND,) * 5, *(MUSTER,) * 2, LEGEND, WAR_HORN),
+    cards=(*PLAIN * 2, *(BOND,) * 5, *(MUSTER,) * 2, *(SPY,) * 4, LEGEND, WAR_HORN),
 )
 HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
 FOG = SpecialCard(id="thick-fog", name="Thick Fog", kind=SpecialKind.THICK_FOG)
@@ -107,6 +109,8 @@ def test_a_group_may_have_as_many_copies_as_its_factions_deck_if_more() -> None:
     assert max_copies(BOND, FACTION) == 5
     # It has only 2 Musters: 3, as for any card.
     assert max_copies(MUSTER, FACTION) == 3
+    # 4 Spies, but a Spy has no group to keep whole.
+    assert max_copies(SPY, FACTION) == 3
 
 
 def test_the_choices_are_the_factions_units_once_and_every_special() -> None:
@@ -114,6 +118,7 @@ def test_the_choices_are_the_factions_units_once_and_every_special() -> None:
         *PLAIN,
         BOND,
         MUSTER,
+        SPY,
         LEGEND,
         WAR_HORN,
         HOARFROST,
