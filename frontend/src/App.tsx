@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 import type {
   Api,
@@ -6,7 +11,10 @@ import type {
   Event,
   Match,
   Move,
+  NewMatch,
   Played,
+  PlayerDeck,
+  PlayerDecks,
   View,
 } from "./api/client.ts";
 import {
@@ -14,6 +22,7 @@ import {
   forgetDecks,
   forgetMatches,
   matchQuery,
+  playerDecksQuery,
   playMove,
   sessionQuery,
   startMatch,
@@ -189,6 +198,7 @@ export function App({ api }: { api: Api }) {
                 setMatch({ played, owner: username ?? null });
               }}
               focus={left}
+              loggedIn={username !== undefined && username !== null}
             />
           )
         ) : (
@@ -219,19 +229,24 @@ export function App({ api }: { api: Api }) {
 
 /**
  * The decks the player can choose from: choosing one starts a match with it.
+ * A player who is logged in can also choose one of the decks they built.
  *
  * @param onStart - Called with the match once it has started.
  * @param focus - Whether to put the focus on the heading, as when the player
  *   left a match: the button they pressed is gone.
+ * @param loggedIn - Whether the player is logged in, and so has decks of
+ *   their own.
  */
 function ChooseDeck({
   api,
   onStart,
   focus,
+  loggedIn,
 }: {
   api: Api;
   onStart: (match: Played) => void;
   focus: boolean;
+  loggedIn: boolean;
 }) {
   const queryClient = useQueryClient();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -241,14 +256,41 @@ function ChooseDeck({
     }
   }, [focus]);
   const decks = useQuery(decksQuery(api));
+  // A guest has none: the API would turn them down.
+  const playerDecks = useQuery({
+    ...playerDecksQuery(api),
+    enabled: loggedIn,
+  });
   const start = useMutation({
     mutationKey: ["start"],
-    mutationFn: (deck: string) => startMatch(api, deck),
+    mutationFn: (deck: NewMatch) => startMatch(api, deck),
     onSuccess: () => {
       // The match is in the player's list now.
       forgetMatches(queryClient);
     },
+    onError: (error) => {
+      // The deck is gone: the player deleted it in another tab. Ask for
+      // their decks again, so its button goes too.
+      if (error.code === "deck_not_found") {
+        forgetDecks(queryClient);
+      }
+    },
   });
+  // One match at a time: no second click while one starts.
+  const startWith = (deck: NewMatch) =>
+    onFirstClick(() => {
+      // Two clicks in the same instant both come before the page shows the
+      // buttons disabled.
+      if (queryClient.isMutating({ mutationKey: ["start"] }) > 0) {
+        return;
+      }
+      // Given here, and not to useMutation, so it isn't called once the
+      // decks are gone, as when the player opened their matches meanwhile.
+      start.mutate(deck, { onSuccess: onStart });
+    });
+  // The name of a faction's deck, from its id.
+  const factionName = (id: string) =>
+    decks.data?.find((deck) => deck.id === id)?.name ?? id;
 
   return (
     <section className={PANEL}>
@@ -288,25 +330,92 @@ function ChooseDeck({
               key={deck.id}
               type="button"
               className={`${BUTTON} px-8 py-4 text-xl`}
-              // One match at a time: no second click while one starts.
               disabled={start.isPending}
-              onClick={onFirstClick(() => {
-                // Two clicks in the same instant both come before the page
-                // shows the buttons disabled.
-                if (queryClient.isMutating({ mutationKey: ["start"] }) > 0) {
-                  return;
-                }
-                // Given here, and not to useMutation, so it isn't called
-                // once the decks are gone, as when the player opened their
-                // matches meanwhile.
-                start.mutate(deck.id, { onSuccess: onStart });
-              })}
+              onClick={startWith({ deck: deck.id })}
             >
               {deck.name}
             </button>
           ))}
         </div>
       )}
+      {loggedIn && (
+        <YourDecks
+          decks={playerDecks}
+          factionName={factionName}
+          starting={start.isPending}
+          onStart={(deck) => startWith({ my_deck: deck.id })}
+        />
+      )}
+    </section>
+  );
+}
+
+/**
+ * The decks the player built, in the decks' place: choosing one starts a
+ * match with it.
+ *
+ * @param decks - The query for the player's decks.
+ * @param factionName - Returns the name of a faction's deck from its id.
+ * @param starting - Whether a match is starting: no second one meanwhile.
+ * @param onStart - Returns what a click on the deck's button does.
+ */
+function YourDecks({
+  decks,
+  factionName,
+  starting,
+  onStart,
+}: {
+  decks: UseQueryResult<PlayerDecks>;
+  factionName: (id: string) => string;
+  starting: boolean;
+  onStart: (deck: PlayerDeck) => ReturnType<typeof onFirstClick>;
+}) {
+  const heading = useId();
+  return (
+    <section
+      aria-labelledby={heading}
+      className="flex flex-col items-center gap-3"
+    >
+      <h3 id={heading} className="font-display text-xl text-gold-300">
+        Your decks
+      </h3>
+      {decks.isPending && <p className="italic">Loading your decks…</p>}
+      {decks.isError && (
+        <>
+          <p role="alert" className={ALERT}>
+            {decks.error.message}
+          </p>
+          <button
+            type="button"
+            className={BUTTON}
+            onClick={() => {
+              void decks.refetch();
+            }}
+          >
+            Try again
+          </button>
+        </>
+      )}
+      {decks.isSuccess &&
+        (decks.data.decks.length === 0 ? (
+          <p className="italic">
+            No deck of your own yet: build one in My decks.
+          </p>
+        ) : (
+          <div className="flex flex-wrap justify-center gap-3">
+            {decks.data.decks.map((deck) => (
+              <button
+                key={deck.id}
+                type="button"
+                className={BUTTON}
+                disabled={starting}
+                onClick={onStart(deck)}
+              >
+                {deck.name} ({factionName(deck.deck)})
+              </button>
+            ))}
+          </div>
+        ))}
     </section>
   );
 }

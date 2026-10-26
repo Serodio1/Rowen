@@ -179,7 +179,8 @@ export function MyMatches({
 
 /**
  * One match in the list: the decks, when it started, and how it ended, or a
- * button to play on.
+ * button to play on. A deck the player built shows the name it had when the
+ * match started, and its faction.
  *
  * @param name - Returns a deck's name from its id.
  * @param resuming - Whether a match is being asked for, to play on: no
@@ -202,8 +203,12 @@ function Summary({
     <li className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gold-600/60 px-3 py-2">
       <div id={id}>
         <p>
-          <strong className="text-gold-200">{name(match.deck)}</strong> against{" "}
-          {name(match.ai_deck)}
+          <strong className="text-gold-200">
+            {match.deck_name === null
+              ? name(match.deck)
+              : `${match.deck_name} (${name(match.deck)})`}
+          </strong>{" "}
+          against {name(match.ai_deck)}
         </p>
         <p className="text-sm opacity-80">
           <time dateTime={match.started_at}>{when(match.started_at)}</time>

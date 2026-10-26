@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { playOn } from "./moves.ts";
+
+test.use({ reducedMotion: "reduce" });
 
 // A deck as a player builds one, through nginx, the API and the database: the
-// rules come from the API, and the deck is kept and deleted there.
-test("builds a deck from a faction's cards, keeps it and deletes it", async ({
+// rules come from the API, and the deck is kept, played and deleted there.
+test("builds a deck from a faction's cards, plays it and deletes it", async ({
   page,
 }) => {
   await page.goto("/");
@@ -39,6 +42,22 @@ test("builds a deck from a faction's cards, keeps it and deletes it", async ({
 
   const list = page.getByRole("list", { name: "Your decks" });
   await expect(list).toContainText("All of them");
+
+  // Played from the decks to play, and listed with its name.
+  await page.getByRole("button", { name: "Back" }).click();
+  await page
+    .getByRole("region", { name: "Your decks" })
+    .getByRole("button", { name: "All of them (Humans)" })
+    .click();
+  await playOn(page, 2);
+  await page.reload();
+  await page.getByRole("button", { name: "My matches" }).click();
+  await expect(page.getByRole("listitem")).toContainText(
+    "All of them (Humans) against Robots",
+  );
+
+  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "My decks" }).click();
   await page.getByRole("button", { name: "Delete All of them" }).click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(page.getByText("No deck built yet.")).toBeVisible();

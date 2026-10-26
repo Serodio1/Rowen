@@ -45,6 +45,12 @@ export type Action = View["legal_actions"][number];
 export type Move =
   paths["/matches/{match_id}/actions"]["post"]["requestBody"]["content"]["application/json"];
 
+/**
+ * What the page sends to start a match: the id of a faction's own deck, or,
+ * for a player who is logged in, that of a deck they built. Never both.
+ */
+export type NewMatch = { deck: string } | { my_deck: string };
+
 /** A page of the player's matches, the newest first, and whether more are left. */
 export type Matches = MethodResponse<Api, "get", "/matches">;
 
