@@ -1,21 +1,27 @@
 """Decks: the cards a player brings to a match."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
-from rowen.engine.cards import Card, UnitCard
+from rowen.engine.cards import Card, SpecialCard, UnitCard
 
 # Deck limits (rules, section 12).
 MIN_UNITS = 22
 MAX_SPECIALS = 10
+
+# The most copies of one card a deck a player builds may have (rules, section
+# 12): a Legend only one, and a Bond or Muster unit as many as its faction's
+# own deck has, if that is more, so the player can still have the whole group.
+MAX_COPIES = 3
 
 
 @dataclass(frozen=True, kw_only=True)
 class Deck:
     """A deck of cards, before it is shuffled for a match.
 
-    In the MVP each faction has one preconstructed deck (rules, section 12), so
-    a deck is named after its faction. Creating a deck checks its limits, so an
-    invalid deck can never exist in the program.
+    Each faction has a deck of its own, named after it (rules, section 12),
+    and a player may build others from its cards (``build_deck``). Creating a
+    deck checks its limits, so an invalid deck can never exist in the program.
 
     Attributes:
         id: Unique identifier, lowercase with hyphens (``"humans"``).
@@ -46,3 +52,77 @@ class Deck:
             if card.id in cards_by_id and cards_by_id[card.id] != card:
                 raise ValueError(f"{self.id}: two different cards use the id {card.id}")
             cards_by_id[card.id] = card
+
+
+def max_copies(card: Card, faction: Deck) -> int:
+    """Return the most copies of a card a deck built from a faction may have.
+
+    Args:
+        card: One of the cards of ``choices(faction, ...)``.
+        faction: The faction's own deck, whose cards a player builds from.
+    """
+    if isinstance(card, UnitCard):
+        if card.legend:
+            return 1
+        if card.group is not None:
+            return max(MAX_COPIES, faction.cards.count(card))
+    return MAX_COPIES
+
+
+def choices(faction: Deck, specials: Mapping[str, SpecialCard]) -> tuple[Card, ...]:
+    """Return the cards a deck built from a faction may hold, one of each.
+
+    They are the faction's units, in the order of its own deck, and then every
+    special card, which is neutral.
+
+    Args:
+        faction: The faction's own deck.
+        specials: Every special card, by id.
+    """
+    units = {card.id: card for card in faction.cards if isinstance(card, UnitCard)}
+    return (*units.values(), *specials.values())
+
+
+def build_deck(
+    *,
+    id: str,
+    name: str,
+    faction: Deck,
+    specials: Mapping[str, SpecialCard],
+    copies: Mapping[str, int],
+) -> Deck:
+    """Build the deck a player chose from a faction's cards.
+
+    The cards come in the order of ``choices``, whatever the order of
+    ``copies``: the same choice is always the same deck, and so is shuffled
+    the same way by the same seed (ADR 0003).
+
+    Args:
+        id: The deck's id.
+        name: The deck's name, as the player gave it.
+        faction: The faction's own deck, whose cards the player builds from.
+        specials: Every special card, by id.
+        copies: How many copies of each card the player chose, by the card's
+            id. A card that isn't chosen is left out.
+
+    Raises:
+        ValueError: If a card isn't one of the faction's choices, if it has
+            fewer than 1 copy or more than ``max_copies``, or if the deck
+            breaks the deck limits. The message says which.
+    """
+    available = choices(faction, specials)
+    known = {card.id for card in available}
+    unknown = sorted(copies.keys() - known)
+    if unknown:
+        raise ValueError(f"{id}: {faction.name} has no card {unknown[0]}")
+
+    cards: list[Card] = []
+    for card in available:
+        if card.id not in copies:
+            continue
+        count = copies[card.id]
+        most = max_copies(card, faction)
+        if not 1 <= count <= most:
+            raise ValueError(f"{id}: {card.id} can have 1 to {most} copies, got {count}")
+        cards += [card] * count
+    return Deck(id=id, name=name, cards=tuple(cards))
