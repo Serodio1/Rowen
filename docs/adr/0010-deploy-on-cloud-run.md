@@ -1,6 +1,7 @@
 # ADR 0010: Deploy the game on Google Cloud Run, nginx and the API in one service
 
-- **Status:** Accepted
+- **Status:** Accepted; the matches moved from memory to PostgreSQL in
+  [ADR 0013](0013-keep-matches-in-postgresql.md)
 - **Date:** 2026-10-16
 
 ## Context

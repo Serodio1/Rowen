@@ -1,0 +1,8 @@
+Rowen
+Copyright (c) 2026 Rui Vasconcelos
+
+The MIT License in LICENSE covers the code and the documentation. It does not
+cover the cards' art (frontend/src/art/) or the screenshot made from it
+(docs/screenshot.webp): those pictures were generated with AI tools and are
+here to be shown with the game. docs/art.md says where each one comes from
+and the tools' terms.
