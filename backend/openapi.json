@@ -369,15 +369,33 @@
         "summary": "Register",
         "description": "Make an account, and log in with it.\n\nIf another account has the username, the answer is a 409.",
         "operationId": "register",
+        "parameters": [
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Credentials"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -391,24 +409,24 @@
             }
           },
           "409": {
-            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
               }
-            }
+            },
+            "description": "Conflict"
           },
           "422": {
-            "description": "Unprocessable Content",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
               }
-            }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -418,6 +436,24 @@
         "summary": "Log In",
         "description": "Log in with an account's username and password.\n\nA username with no account and a wrong password get the same answer, a\n401, so it doesn't tell which usernames have an account.",
         "operationId": "log_in",
+        "parameters": [
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {

@@ -130,15 +130,19 @@ def _object(
 
 
 def _get[T](fields: Mapping[str, object], key: str, kind: type[T]) -> T:
-    """Return a field, checking that its value has the expected type."""
+    """Return a field, checking that its value has the expected type.
+
+    In Python a bool is also an int, but ``true`` is no strength: it must be
+    an int that isn't a bool.
+    """
     value = fields[key]
-    if not isinstance(value, kind):
+    if not isinstance(value, kind) or (kind is int and isinstance(value, bool)):
         raise ValueError(f"{key} must be of type {kind.__name__}, got {value!r}")
     return value
 
 
 def _copies(value: object) -> int:
-    """Check a number of copies: a whole number, at least 1."""
-    if not isinstance(value, int) or value < 1:
+    """Check a number of copies: a whole number (not a bool), at least 1."""
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise ValueError(f"copies must be a whole number of at least 1, got {value!r}")
     return value

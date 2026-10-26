@@ -29,6 +29,17 @@ def test_a_password_matches_only_its_own_hash() -> None:
     assert not check_password(hash_password("dragon124"), "dragon123")
 
 
+def test_a_password_typed_in_another_unicode_form_still_matches() -> None:
+    # "é" as one character (NFC), as most keyboards type it, and as "e" and
+    # a combining accent (NFD), as some devices do: the same password.
+    composed = "caf\u00e9 dragon"
+    decomposed = "cafe\u0301 dragon"
+    assert composed != decomposed
+
+    assert check_password(hash_password(composed), decomposed)
+    assert check_password(hash_password(decomposed), composed)
+
+
 def test_with_no_account_no_password_matches() -> None:
     assert not check_password(None, "there is no account with this username")
     assert not check_password(None, "dragon123")

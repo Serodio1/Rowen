@@ -215,6 +215,33 @@ def test_logging_out_ends_the_session(client: TestClient) -> None:
     assert logged_in_as(client) is None
 
 
+def test_logging_in_again_ends_the_browsers_last_session(client: TestClient) -> None:
+    # The new cookie takes the place of the last one, so nobody could use
+    # that session any more: it doesn't stay in the store for 30 days.
+    register(client)
+    last = client.cookies[SESSION_COOKIE]
+
+    assert client.post("/session", json=RUI).status_code == 200
+
+    assert logged_in_as(client) == "rui"
+    client.cookies.set(SESSION_COOKIE, last)
+    assert logged_in_as(client) is None
+
+
+def test_making_another_account_ends_the_browsers_last_session(
+    client: TestClient,
+) -> None:
+    register(client)
+    last = client.cookies[SESSION_COOKIE]
+
+    response = client.post("/accounts", json={**RUI, "username": "ana"})
+    assert response.status_code == 201
+
+    assert logged_in_as(client) == "ana"
+    client.cookies.set(SESSION_COOKIE, last)
+    assert logged_in_as(client) is None
+
+
 def test_logging_out_when_not_logged_in_is_fine(client: TestClient) -> None:
     assert client.delete("/session").status_code == 204
 

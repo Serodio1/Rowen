@@ -77,8 +77,8 @@ class AccountStore(Protocol):
     ) -> None:
         """Keep a new session of an account, until ``expires_at``.
 
-        The account's sessions that expired before ``now`` are deleted, so
-        they don't pile up.
+        Every session that expired before ``now``, any account's, is deleted,
+        so they don't pile up.
         """
         ...
 
@@ -137,13 +137,13 @@ class MemoryAccountStore:
     ) -> None:
         """Keep a new session of an account, until ``expires_at``.
 
-        The account's sessions that expired before ``now`` are deleted.
+        Every session that expired before ``now`` is deleted.
         """
         with self._lock:
             self._sessions = {
                 key: session
                 for key, session in self._sessions.items()
-                if session.account.id != account.id or session.expires_at > now
+                if session.expires_at > now
             }
             self._sessions[token_hash] = StoredSession(
                 token_hash=token_hash, account=account, expires_at=expires_at
