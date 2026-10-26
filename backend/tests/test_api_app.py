@@ -142,7 +142,7 @@ def ai_answers(
 
 def replay(match: StoredMatch) -> GameState:
     """Return the state of a stored match: its actions played again."""
-    state, _ = _play_again(match.decks, match.seed, match.actions)
+    state, _ = _play_again(match)
     return state
 
 
@@ -558,17 +558,25 @@ def test_the_openapi_schema_lists_the_endpoints(client: TestClient) -> None:
     assert set(paths["/matches/{match_id}/actions"]) == {"post"}
     assert set(paths["/accounts"]) == {"post"}
     assert set(paths["/session"]) == {"get", "post", "delete"}
+    assert set(paths["/decks/{deck_id}/choices"]) == {"get"}
+    assert set(paths["/my-decks"]) == {"get", "post"}
+    assert set(paths["/my-decks/{deck_id}"]) == {"put", "delete"}
 
 
 @pytest.mark.parametrize(
     ("path", "method", "errors"),
     [
         ("/decks", "get", set()),
-        ("/matches", "post", {"422"}),
+        ("/matches", "post", {"401", "404", "422"}),
         ("/matches/{match_id}", "get", {"404", "422"}),
         ("/matches/{match_id}/actions", "post", {"404", "409", "422"}),
         ("/matches", "get", {"401", "422"}),
         ("/stats", "get", {"401", "422"}),
+        ("/decks/{deck_id}/choices", "get", {"404", "422"}),
+        ("/my-decks", "get", {"401", "422"}),
+        ("/my-decks", "post", {"401", "409", "422"}),
+        ("/my-decks/{deck_id}", "put", {"401", "404", "422"}),
+        ("/my-decks/{deck_id}", "delete", {"401", "404", "422"}),
     ],
 )
 def test_the_openapi_schema_says_how_each_endpoint_turns_requests_down(

@@ -27,7 +27,7 @@
     "/matches": {
       "post": {
         "summary": "Create Match",
-        "description": "Start a match against the AI, which plays another deck.\n\nIf the AI starts, it plays until it is the player's turn, and its moves\ncome with the match. The ``Location`` header of the response\nholds the address of the match. If the player is logged in, the match is\ntheirs.",
+        "description": "Start a match against the AI, which plays another faction's own deck.\n\nThe player plays a faction's own deck (``deck``) or, while logged in, one\nthey built (``my_deck``): the match keeps a copy of it, so changing or\ndeleting the deck later doesn't change the match (ADR 0017).\n\nIf the AI starts, it plays until it is the player's turn, and its moves\ncome with the match. The ``Location`` header of the response\nholds the address of the match. If the player is logged in, the match is\ntheirs.",
         "operationId": "create_match",
         "parameters": [
           {
@@ -67,6 +67,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -402,14 +422,14 @@
             "description": "Not Found"
           },
           "422": {
-            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
-            }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -459,14 +479,14 @@
             "description": "Unauthorized"
           },
           "422": {
-            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
-            }
+            },
+            "description": "Unprocessable Content"
           }
         }
       },
@@ -1512,6 +1532,17 @@
             "type": "string",
             "title": "Deck"
           },
+          "deck_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck Name"
+          },
           "ai_deck": {
             "type": "string",
             "title": "Ai Deck"
@@ -1537,12 +1568,13 @@
         "required": [
           "id",
           "deck",
+          "deck_name",
           "ai_deck",
           "started_at",
           "result"
         ],
         "title": "MatchSummary",
-        "description": "A match in the list of the player's matches.\n\n``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.\n``result`` is None while the match goes on: the player can get it by its\nid and play on."
+        "description": "A match in the list of the player's matches.\n\n``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.\nWhen the player played a deck they built, ``deck`` is its faction's and\n``deck_name`` the name it had then; otherwise ``deck_name`` is None.\n``result`` is None while the match goes on: the player can get it by its\nid and play on."
       },
       "Matches": {
         "properties": {
@@ -1611,17 +1643,33 @@
       "NewMatch": {
         "properties": {
           "deck": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Deck"
+          },
+          "my_deck": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "My Deck"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": [
-          "deck"
-        ],
         "title": "NewMatch",
-        "description": "What the player sends to start a match: the id of their deck."
+        "description": "What the player sends to start a match: the deck they play.\n\nEither ``deck``, the id of a faction's own deck (``{\"deck\": \"humans\"}``),\nor ``my_deck``, the id of a deck they built, while they are logged in:\none of the two, never both."
       },
       "NothingToRevive": {
         "properties": {

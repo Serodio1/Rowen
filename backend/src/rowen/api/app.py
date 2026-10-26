@@ -90,10 +90,17 @@ from rowen.api.schemas import (
     to_action,
 )
 from rowen.api.schemas import RoundEnded as RoundEndedJson
-from rowen.api.store import MatchResult, MatchStore, MemoryMatchStore, StoredMatch
+from rowen.api.store import (
+    DeckCopy,
+    MatchResult,
+    MatchStore,
+    MemoryMatchStore,
+    StoredMatch,
+)
 from rowen.data import deck_ids, load_deck, load_specials
 from rowen.engine.public import (
     Action,
+    Deck,
     Event,
     GameState,
     RoundEnded,
@@ -290,7 +297,11 @@ def list_decks() -> Decks:
 @app.post(
     "/matches",
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(status.HTTP_422_UNPROCESSABLE_CONTENT),
+    responses=_errors(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ),
 )
 def create_match(
     new_match: NewMatch,
@@ -299,29 +310,50 @@ def create_match(
     store: Store,
     seed: Seed,
     accounts: Accounts,
+    decks: PlayerDeckStore,
     now: Now,
     token: Token = None,
 ) -> Played:
-    """Start a match against the AI, which plays another deck.
+    """Start a match against the AI, which plays another faction's own deck.
+
+    The player plays a faction's own deck (``deck``) or, while logged in, one
+    they built (``my_deck``): the match keeps a copy of it, so changing or
+    deleting the deck later doesn't change the match (ADR 0017).
 
     If the AI starts, it plays until it is the player's turn, and its moves
     come with the match. The ``Location`` header of the response
     holds the address of the match. If the player is logged in, the match is
     theirs.
     """
-    decks = deck_ids()
-    if new_match.deck not in decks:
-        raise _unknown_deck(status.HTTP_422_UNPROCESSABLE_CONTENT)
-    ai_deck = next(deck for deck in decks if deck != new_match.deck)
-    state = start_match((load_deck(new_match.deck), load_deck(ai_deck)), seed=seed)
-    state, actions, moves = _ai_plays(state)
     player = _logged_in(accounts, token, now)
+    if new_match.my_deck is not None:
+        if player is None:
+            raise _not_logged_in()
+        kept = decks.get_deck(player.id, new_match.my_deck)
+        if kept is None:
+            raise _deck_not_found()
+        faction = kept.faction
+        built: DeckCopy | None = DeckCopy(name=kept.name, copies=kept.copies)
+    # NewMatch has a deck when it has no my_deck.
+    elif new_match.deck is not None and new_match.deck in deck_ids():
+        faction, built = new_match.deck, None
+    else:
+        raise _unknown_deck(status.HTTP_422_UNPROCESSABLE_CONTENT)
+    try:
+        player_deck = _deck(faction, built)
+    except ValueError:
+        # A deck kept before the rules changed may break them now.
+        raise _invalid_deck() from None
+    ai_deck = next(deck for deck in deck_ids() if deck != faction)
+    state = start_match((player_deck, load_deck(ai_deck)), seed=seed)
+    state, actions, moves = _ai_plays(state)
     match = store.create(
-        (new_match.deck, ai_deck),
+        (faction, ai_deck),
         seed,
         actions,
         owner=None if player is None else player.id,
         now=now,
+        built=built,
     )
     # url_path_for leaves out root_path, which behind nginx is /api (uvicorn's
     # --root-path in backend/Dockerfile), so it is added here.
@@ -346,7 +378,7 @@ def get_match(
 ) -> Match:
     """Return a match as the player may see it."""
     match = _match(store, match_id, _logged_in(accounts, token, now))
-    state, rounds = _play_again(match.decks, match.seed, match.actions)
+    state, rounds = _play_again(match)
     return Match(
         id=match.id,
         version=match.version,
@@ -388,7 +420,7 @@ def play(
     if move.version != old.version:
         raise _match_changed()
     played = to_action(move.action)
-    state, rounds = _play_again(old.decks, old.seed, old.actions)
+    state, rounds = _play_again(old)
     # The engine works out the legal actions of the player's view. When it
     # isn't the player's turn there are none, so the player can never make a
     # move of the AI's.
@@ -444,6 +476,7 @@ def list_matches(
             MatchSummary(
                 id=match.id,
                 deck=match.decks[0],
+                deck_name=match.deck_name,
                 ai_deck=match.decks[1],
                 started_at=match.created_at,
                 result=None if match.result is None else _result_json(match.result),
@@ -476,7 +509,7 @@ def get_stats(accounts: Accounts, store: Store, now: Now, token: Token = None) -
 
 @app.get(
     "/decks/{deck_id}/choices",
-    responses=_errors(status.HTTP_404_NOT_FOUND),
+    responses=_errors(status.HTTP_404_NOT_FOUND, status.HTTP_422_UNPROCESSABLE_CONTENT),
 )
 def get_choices(deck_id: str) -> Choices:
     """Return what a player may put in a deck they build from a faction's cards.
@@ -488,7 +521,12 @@ def get_choices(deck_id: str) -> Choices:
     return from_choices(load_deck(deck_id), load_specials())
 
 
-@app.get("/my-decks", responses=_errors(status.HTTP_401_UNAUTHORIZED))
+@app.get(
+    "/my-decks",
+    responses=_errors(
+        status.HTTP_401_UNAUTHORIZED, status.HTTP_422_UNPROCESSABLE_CONTENT
+    ),
+)
 def list_player_decks(
     accounts: Accounts, decks: PlayerDeckStore, now: Now, token: Token = None
 ) -> PlayerDecks:
@@ -701,13 +739,35 @@ def _check_deck(choice: DeckChoice) -> None:
             copies=choice.copies,
         )
     except ValueError:
-        raise ApiError(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "invalid_deck",
-            "This deck breaks the rules: each card must be one the deck may hold, "
-            "with 1 copy up to the most it may have, and a deck needs enough units "
-            "and not too many special cards (GET /decks/{id}/choices).",
-        ) from None
+        raise _invalid_deck() from None
+
+
+def _invalid_deck() -> ApiError:
+    """Return the error for a deck that breaks the rules."""
+    return ApiError(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "invalid_deck",
+        "This deck breaks the rules: each card must be one the deck may hold, "
+        "with 1 copy up to the most it may have, and a deck needs enough units "
+        "and not too many special cards (GET /decks/{id}/choices).",
+    )
+
+
+def _deck(faction: str, built: DeckCopy | None) -> Deck:
+    """Return the deck a player plays: their faction's own, or one they built.
+
+    Raises:
+        ValueError: If the deck they built breaks the rules.
+    """
+    if built is None:
+        return load_deck(faction)
+    return build_deck(
+        id=faction,
+        name=built.name,
+        faction=load_deck(faction),
+        specials=load_specials(),
+        copies=built.copies,
+    )
 
 
 def _player_deck(deck: StoredDeck) -> PlayerDeck:
@@ -846,20 +906,23 @@ def _match_changed() -> ApiError:
 
 
 def _play_again(
-    decks: tuple[str, str], seed: int, actions: tuple[Action, ...]
+    match: StoredMatch,
 ) -> tuple[GameState, tuple[RoundEndedJson, ...]]:
-    """Return the state actions make from the start, and the end of each round.
+    """Return the state a match's actions make from the start, and each round's end.
 
     The engine is deterministic, so this is the state they made when they were
-    played (ADR 0003).
+    played (ADR 0003). The player's deck is made again from the match's own
+    copy, if they built it (ADR 0017), never from the deck as it is now.
 
     The rounds are those that ended, in order, as the API sends them. The
     state doesn't keep them: they come only in the event that ends a round.
     """
-    player_deck, ai_deck = decks
-    state = start_match((load_deck(player_deck), load_deck(ai_deck)), seed=seed)
+    player_deck, ai_deck = match.decks
+    state = start_match(
+        (_deck(player_deck, match.built), load_deck(ai_deck)), seed=match.seed
+    )
     rounds: tuple[RoundEndedJson, ...] = ()
-    for action in actions:
+    for action in match.actions:
         state, events = apply(state, action)
         rounds += tuple(
             RoundEndedJson(type="round_ended", scores=event.scores, winner=event.winner)

@@ -120,7 +120,9 @@ which cards a deck of that faction may hold and how many copies of each, and
 `/my-decks` lists their decks (`GET`), builds one (`POST`, with
 `{"name": "Mine", "deck": "humans", "copies": {"human": 5, ...}}`), changes
 one (`PUT /my-decks/{id}`) or deletes one (`DELETE /my-decks/{id}`), up to
-10. When the API turns a request down, it answers with a
+10. `POST /matches` with `{"my_deck": "<id>"}` starts a match with one; the
+match keeps a copy of it, so changing the deck later doesn't change the match
+([ADR 0017](docs/adr/0017-keep-a-copy-of-a-built-deck-in-each-match.md)). When the API turns a request down, it answers with a
 `code` and a `message`, such as `illegal_action`. `--reload` restarts the
 server whenever the Python code in `src` changes.
 Run like this, the API keeps its matches in memory, so they are lost when it
