@@ -65,6 +65,7 @@ from rowen.api.schemas import Action as ActionJson
 from rowen.api.schemas import from_action, to_action
 from rowen.api.store import (
     FIRST_VERSION,
+    DeckCopy,
     DeckStats,
     MatchResult,
     MatchSummary,
@@ -100,6 +101,10 @@ class MatchRow(Base):
             " AND (rounds IS NULL) = (ended_at IS NULL)",
             name="result_is_whole",
         ),
+        CheckConstraint(
+            "(player_copies IS NULL) = (player_deck_name IS NULL)",
+            name="player_deck_copy_is_whole",
+        ),
         # An owner's matches, newest first, as list_matches reads them: the
         # database finds them in this index, already in order, without
         # reading every match.
@@ -127,6 +132,13 @@ class MatchRow(Base):
     # Each round's totals, the player's and then the AI's: [[12, 30], ...].
     rounds: Mapped[list[list[int]] | None] = mapped_column(JSONB)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # A copy of the deck the player built, both empty when they play their
+    # faction's own (player_deck): its name, and how many copies of each card.
+    player_deck_name: Mapped[str | None] = mapped_column(String)
+    # none_as_null: None is SQL's NULL, not JSON's null, which is a value.
+    player_copies: Mapped[dict[str, int] | None] = mapped_column(
+        JSONB(none_as_null=True)
+    )
 
 
 class AccountRow(Base):
@@ -266,6 +278,7 @@ class PostgresMatchStore:
         *,
         owner: UUID | None,
         now: datetime,
+        built: DeckCopy | None = None,
     ) -> StoredMatch:
         """Keep a new match, at its first version, and return it."""
         player_deck, ai_deck = decks
@@ -278,6 +291,8 @@ class PostgresMatchStore:
             version=FIRST_VERSION,
             account_id=owner,
             created_at=now,
+            player_deck_name=None if built is None else built.name,
+            player_copies=None if built is None else dict(built.copies),
         )
         with Session(self._engine) as session, session.begin():
             session.add(row)
@@ -366,6 +381,7 @@ class PostgresMatchStore:
                     decks=(row.player_deck, row.ai_deck),
                     created_at=row.created_at,
                     result=_result(row),
+                    deck_name=row.player_deck_name,
                 )
                 for row in session.scalars(statement)
             )
@@ -418,7 +434,15 @@ def _stored(row: MatchRow) -> StoredMatch:
         owner=row.account_id,
         created_at=row.created_at,
         result=_result(row),
+        built=_built(row),
     )
+
+
+def _built(row: MatchRow) -> DeckCopy | None:
+    """Return the copy of the deck the player built, in a row, or None."""
+    if row.player_deck_name is None or row.player_copies is None:
+        return None
+    return DeckCopy(name=row.player_deck_name, copies=dict(row.player_copies))
 
 
 def _result(row: MatchRow) -> MatchResult | None:

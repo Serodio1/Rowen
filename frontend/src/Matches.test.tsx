@@ -70,6 +70,7 @@ function summary(changes: Partial<MatchSummary> = {}): MatchSummary {
   return {
     id: "a-match",
     deck: "humans",
+    deck_name: null,
     ai_deck: "robots",
     started_at: STARTED_AT,
     result: null,

@@ -117,6 +117,7 @@ def test_a_match_started_logged_in_is_in_the_players_list(
             {
                 "id": match["id"],
                 "deck": "humans",
+                "deck_name": None,
                 "ai_deck": "robots",
                 "started_at": "2026-10-22T12:00:00Z",
                 "result": None,

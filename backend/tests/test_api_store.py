@@ -18,6 +18,7 @@ from rowen.api.accounts import AccountStore
 from rowen.api.store import (
     FIRST_VERSION,
     MAX_MATCHES,
+    DeckCopy,
     DeckStats,
     MatchResult,
     MatchStore,
@@ -295,6 +296,41 @@ def test_a_match_keeps_its_owner(
 
     assert match.owner == owner
     assert store.get(match.id) == match
+
+
+def test_a_match_keeps_a_copy_of_the_deck_the_player_built(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    store, _ = any_stores
+    owner = owner_of(any_stores)
+    copies = {"human": 5, "soldier": 3}
+    built = DeckCopy(name="Mine", copies=copies)
+
+    match = store.create(DECKS, 0, SOME_ACTIONS, owner=owner, now=NOW, built=built)
+    # The deck the copy came from changes, as a dict the store was given.
+    copies["human"] = 1
+
+    kept = store.get(match.id)
+    assert kept is not None
+    assert kept.built == DeckCopy(name="Mine", copies={"human": 5, "soldier": 3})
+    assert kept == match
+    (listed,) = store.list_matches(owner, 10)
+    assert listed.deck_name == "Mine"
+
+
+def test_a_match_with_the_factions_own_deck_has_no_copy(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    store, _ = any_stores
+    owner = owner_of(any_stores)
+
+    match = start(store, owner)
+
+    assert match.built is None
+    kept = store.get(match.id)
+    assert kept is not None
+    assert kept.built is None
+    assert store.list_matches(owner, 10)[0].deck_name is None
 
 
 def test_the_actions_that_end_a_match_keep_its_result(

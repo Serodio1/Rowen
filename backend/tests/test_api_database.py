@@ -100,6 +100,9 @@ def test_the_database_turns_down_a_negative_seed(
         ("rounds = '[]'", "result_is_whole"),
         ("ended_at = now()", "result_is_whole"),
         ("outcome = 'won', rounds = '[]'", "result_is_whole"),
+        # Only part of a copy of the player's deck.
+        ("player_deck_name = 'Mine'", "player_deck_copy_is_whole"),
+        ("player_copies = '{}'", "player_deck_copy_is_whole"),
     ],
 )
 def test_the_database_turns_down_a_result_that_cant_be(

@@ -8,7 +8,10 @@ database, so they survive a restart. The same tests run against both
 
 A match is kept as what it takes to play it again: the ids of the two decks,
 the seed, and every action played so far, the player's and the AI's, in
-order. The engine is deterministic, so the same decks, seed and actions always
+order. When the player plays a deck they built, the match also keeps a copy
+of it, its name and how many copies of each card (``DeckCopy``): the deck
+itself may change or go, but the match must always play again the same way
+(ADR 0017). The engine is deterministic, so the same decks, seed and actions always
 make the same state (ADR 0003): the API plays the actions again to get it, in
 a millisecond or two. The store never sees a state.
 
@@ -47,6 +50,7 @@ an ``UPDATE ... WHERE id = :id AND version = :version``.
 import threading
 import uuid
 from collections import Counter, OrderedDict
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Literal, Protocol
@@ -82,18 +86,34 @@ class MatchResult:
 
 
 @dataclass(frozen=True)
+class DeckCopy:
+    """A copy of a deck a player built, kept with a match they play with it.
+
+    Attributes:
+        name: The deck's name when the match started.
+        copies: How many copies of each card, by the card's id.
+    """
+
+    name: str
+    copies: Mapping[str, int]
+
+
+@dataclass(frozen=True)
 class StoredMatch:
     """A match as the store keeps it: what it takes to play it again.
 
     Attributes:
         id: The match's id.
-        decks: The ids of the decks, the player's and then the AI's.
+        decks: The ids of the decks, the player's and then the AI's. For a
+            deck the player built, the id of its faction's own deck.
         seed: The seed the match started with. It is never sent to a player.
         actions: Every action played since the match started, in order.
         version: Goes up by one each time actions are added.
         owner: The id of the account that started it, or None for a guest.
         created_at: When it started.
         result: How it ended, or None while it goes on.
+        built: A copy of the deck the player built, or None if they play
+            their faction's own.
     """
 
     id: UUID
@@ -104,6 +124,7 @@ class StoredMatch:
     owner: UUID | None
     created_at: datetime
     result: MatchResult | None
+    built: DeckCopy | None = None
 
 
 @dataclass(frozen=True)
@@ -115,12 +136,15 @@ class MatchSummary:
         decks: The ids of the decks, the player's and then the AI's.
         created_at: When it started.
         result: How it ended, or None while it goes on.
+        deck_name: The name of the deck the player built, or None if they
+            played their faction's own.
     """
 
     id: UUID
     decks: tuple[str, str]
     created_at: datetime
     result: MatchResult | None
+    deck_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -153,12 +177,14 @@ class MatchStore(Protocol):
         *,
         owner: UUID | None,
         now: datetime,
+        built: DeckCopy | None = None,
     ) -> StoredMatch:
         """Keep a new match, at its first version, and return it.
 
         ``actions`` are those played before the match is kept: the AI's
         first moves, if it starts. ``owner`` is the account of the player who
-        starts it, if they are logged in, and ``now`` when it starts.
+        starts it, if they are logged in, ``now`` when it starts, and
+        ``built`` a copy of the deck the player built, if they play one.
         """
         ...
 
@@ -228,6 +254,7 @@ class MemoryMatchStore:
         *,
         owner: UUID | None,
         now: datetime,
+        built: DeckCopy | None = None,
     ) -> StoredMatch:
         """Keep a new match, at its first version, and return it.
 
@@ -244,6 +271,9 @@ class MemoryMatchStore:
             owner=owner,
             created_at=now,
             result=None,
+            built=None
+            if built is None
+            else DeckCopy(name=built.name, copies=dict(built.copies)),
         )
         with self._lock:
             self._matches[match.id] = match
@@ -315,6 +345,7 @@ class MemoryMatchStore:
                 decks=match.decks,
                 created_at=match.created_at,
                 result=match.result,
+                deck_name=None if match.built is None else match.built.name,
             )
             for match in owned[:limit]
         )

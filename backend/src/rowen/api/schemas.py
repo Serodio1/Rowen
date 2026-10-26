@@ -24,10 +24,17 @@ Each kind of card, of action and of event carries a ``type``, such as
 
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StringConstraints
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictInt,
+    StringConstraints,
+    model_validator,
+)
 
 from rowen.engine import public as engine
 
@@ -488,9 +495,22 @@ class PlayerDecks(Schema):
 
 
 class NewMatch(Schema):
-    """What the player sends to start a match: the id of their deck."""
+    """What the player sends to start a match: the deck they play.
 
-    deck: str
+    Either ``deck``, the id of a faction's own deck (``{"deck": "humans"}``),
+    or ``my_deck``, the id of a deck they built, while they are logged in:
+    one of the two, never both.
+    """
+
+    deck: str | None = None
+    my_deck: UUID | None = None
+
+    @model_validator(mode="after")
+    def _one_deck(self) -> Self:
+        """Turn the request down unless it names exactly one deck."""
+        if (self.deck is None) == (self.my_deck is None):
+            raise ValueError("Send either deck or my_deck, but not both.")
+        return self
 
 
 class Match(Schema):
@@ -569,12 +589,15 @@ class MatchSummary(Schema):
     """A match in the list of the player's matches.
 
     ``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.
+    When the player played a deck they built, ``deck`` is its faction's and
+    ``deck_name`` the name it had then; otherwise ``deck_name`` is None.
     ``result`` is None while the match goes on: the player can get it by its
     id and play on.
     """
 
     id: UUID
     deck: str
+    deck_name: str | None
     ai_deck: str
     started_at: datetime
     result: Result | None

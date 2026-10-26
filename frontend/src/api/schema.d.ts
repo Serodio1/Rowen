@@ -44,7 +44,11 @@ export interface paths {
     put?: never;
     /**
      * Create Match
-     * @description Start a match against the AI, which plays another deck.
+     * @description Start a match against the AI, which plays another faction's own deck.
+     *
+     *     The player plays a faction's own deck (``deck``) or, while logged in, one
+     *     they built (``my_deck``): the match keeps a copy of it, so changing or
+     *     deleting the deck later doesn't change the match (ADR 0017).
      *
      *     If the AI starts, it plays until it is the player's turn, and its moves
      *     come with the match. The ``Location`` header of the response
@@ -556,6 +560,8 @@ export interface components {
      * @description A match in the list of the player's matches.
      *
      *     ``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.
+     *     When the player played a deck they built, ``deck`` is its faction's and
+     *     ``deck_name`` the name it had then; otherwise ``deck_name`` is None.
      *     ``result`` is None while the match goes on: the player can get it by its
      *     id and play on.
      */
@@ -567,6 +573,8 @@ export interface components {
       id: string;
       /** Deck */
       deck: string;
+      /** Deck Name */
+      deck_name: string | null;
       /** Ai Deck */
       ai_deck: string;
       /**
@@ -617,11 +625,17 @@ export interface components {
     };
     /**
      * NewMatch
-     * @description What the player sends to start a match: the id of their deck.
+     * @description What the player sends to start a match: the deck they play.
+     *
+     *     Either ``deck``, the id of a faction's own deck (``{"deck": "humans"}``),
+     *     or ``my_deck``, the id of a deck they built, while they are logged in:
+     *     one of the two, never both.
      */
     NewMatch: {
       /** Deck */
-      deck: string;
+      deck?: string | null;
+      /** My Deck */
+      my_deck?: string | null;
     };
     /**
      * NothingToRevive
@@ -1302,6 +1316,24 @@ export interface operations {
           "application/json": components["schemas"]["Played"];
         };
       };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
       /** @description Unprocessable Content */
       422: {
         headers: {
@@ -1479,13 +1511,13 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
-      /** @description Validation Error */
+      /** @description Unprocessable Content */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["Error"];
         };
       };
     };
@@ -1519,13 +1551,13 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
-      /** @description Validation Error */
+      /** @description Unprocessable Content */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["Error"];
         };
       };
     };
