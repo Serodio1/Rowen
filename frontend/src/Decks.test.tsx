@@ -345,3 +345,32 @@ test("a deck the player can't save because they logged out elsewhere shows them 
     screen.queryByRole("heading", { name: /Change Mine|My decks/ }),
   ).not.toBeInTheDocument();
 });
+
+test("after a player logs out, the next one doesn't see their decks", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+    "DELETE /api/session": { status: 204, body: null },
+  };
+  renderApp(answers);
+  await openDecks();
+  await screen.findByRole("list", { name: "Your decks" });
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+  answers["POST /api/session"] = { status: 200, body: { username: "ana" } };
+  answers["GET /api/my-decks"] = decks([]);
+  fireEvent.click(await screen.findByRole("button", { name: "Log in" }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("Username"), {
+    target: { value: "ana" },
+  });
+  fireEvent.change(within(dialog).getByLabelText("Password"), {
+    target: { value: "phoenix456" },
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Log in" }));
+  await openDecks();
+
+  expect(await screen.findByText("No deck built yet.")).toBeInTheDocument();
+  expect(screen.queryByText("Mine")).not.toBeInTheDocument();
+});
