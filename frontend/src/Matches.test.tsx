@@ -173,6 +173,19 @@ test("a player who is logged in sees how their matches with each deck ended, and
   ).toHaveFocus();
 });
 
+test("a match played with a deck the player built shows its name and faction", async () => {
+  renderApp({
+    ...RUI,
+    "GET /api/stats": stats([]),
+    "GET /api/matches": page([summary({ deck_name: "Mine" })]),
+  });
+  await openMatches();
+
+  expect(await screen.findByRole("listitem")).toHaveTextContent(
+    "Mine (Humans) against Robots",
+  );
+});
+
 test("a guest has no list of matches", async () => {
   renderApp({
     ...RUI,
@@ -502,9 +515,14 @@ test("logging out during a match leaves it, and the decks show", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Log out" }));
 
-  expect(
-    await screen.findByRole("heading", { name: "Choose your deck" }),
-  ).toHaveFocus();
+  // The heading can show before the effect that puts the focus on it has run:
+  // the page leaves the match in an effect of its own, once it knows who is
+  // logged in, and not straight after a click.
+  await waitFor(() => {
+    expect(
+      screen.getByRole("heading", { name: "Choose your deck" }),
+    ).toHaveFocus();
+  });
   expect(screen.getByRole("button", { name: "Log in" })).toBeInTheDocument();
 });
 
@@ -622,9 +640,14 @@ test("a request turned down as not logged in shows the player as a guest", async
   expect(
     await screen.findByRole("button", { name: "Log in" }),
   ).toBeInTheDocument();
-  expect(
-    await screen.findByRole("heading", { name: "Choose your deck" }),
-  ).toHaveFocus();
+  // The heading can show before the effect that puts the focus on it has run:
+  // the page leaves the match in an effect of its own, once it knows who is
+  // logged in, and not straight after a click.
+  await waitFor(() => {
+    expect(
+      screen.getByRole("heading", { name: "Choose your deck" }),
+    ).toHaveFocus();
+  });
   expect(screen.queryByText(/Logged in as/)).not.toBeInTheDocument();
 });
 
@@ -648,9 +671,14 @@ test("coming back to the tab asks again who is logged in", async () => {
   });
 
   // The match was the account's: the page leaves it.
-  expect(
-    await screen.findByRole("heading", { name: "Choose your deck" }),
-  ).toHaveFocus();
+  // The heading can show before the effect that puts the focus on it has run:
+  // the page leaves the match in an effect of its own, once it knows who is
+  // logged in, and not straight after a click.
+  await waitFor(() => {
+    expect(
+      screen.getByRole("heading", { name: "Choose your deck" }),
+    ).toHaveFocus();
+  });
   expect(screen.getByRole("button", { name: "Log in" })).toBeInTheDocument();
 });
 

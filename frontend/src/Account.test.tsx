@@ -312,6 +312,8 @@ test("a log out that didn't work says so, and the player stays in", async () => 
   renderApp({
     "GET /api/decks": DECKS_ANSWER,
     "GET /api/session": RUI,
+    // Asked for on the decks to play: none, so they show no alert.
+    "GET /api/my-decks": { status: 200, body: { decks: [], most: 10 } },
     "DELETE /api/session": {
       status: 403,
       body: { code: "forbidden_origin", message: "From another site." },

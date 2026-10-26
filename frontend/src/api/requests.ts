@@ -21,6 +21,7 @@ import type {
   DeckChoice,
   ErrorCode,
   Move,
+  NewMatch,
 } from "./client.ts";
 
 // What a request says when no answer came, or none from the API: the network
@@ -247,9 +248,12 @@ export async function deleteDeck(api: Api, id: string): Promise<void> {
   }
 }
 
-/** Start a match against the AI with the deck `deck`. */
-export function startMatch(api: Api, deck: string) {
-  return send(api.POST("/matches", { body: { deck } }));
+/**
+ * Start a match against the AI with a faction's own deck,
+ * `{ deck: "humans" }`, or with a deck the player built, `{ my_deck: id }`.
+ */
+export function startMatch(api: Api, deck: NewMatch) {
+  return send(api.POST("/matches", { body: deck }));
 }
 
 /**

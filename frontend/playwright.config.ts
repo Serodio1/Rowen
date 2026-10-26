@@ -21,7 +21,7 @@ export default defineConfig({
   // side by side, they went over the limit, and a request was turned down
   // (429).
   //
-  // The tests together start 4 matches and log in 4 times (an account made
+  // The tests together start 5 matches and log in 4 times (an account made
   // counts as a login), and nginx lets one visitor start 6 matches and log in
   // 6 times at once, then 10 and 5 more a minute. A new test that starts
   // matches or logs in uses up this budget: running all the tests twice in

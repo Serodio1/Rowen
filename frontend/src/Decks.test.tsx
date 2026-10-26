@@ -11,11 +11,12 @@ import { App } from "./App.tsx";
 import {
   createApi,
   type Choices,
+  type Played,
   type PlayerDeck,
   type PlayerDecks,
 } from "./api/client.ts";
 import { createQueryClient } from "./api/requests.ts";
-import { CAPTAIN, DECKS, HOARFROST, SOLDIER } from "./test-data.ts";
+import { CAPTAIN, DECKS, HOARFROST, SOLDIER, view } from "./test-data.ts";
 
 /** An answer of the fake API: a status and a JSON body. */
 type Answer = { status: number; body: unknown };
@@ -373,4 +374,111 @@ test("after a player logs out, the next one doesn't see their decks", async () =
 
   expect(await screen.findByText("No deck built yet.")).toBeInTheDocument();
   expect(screen.queryByText("Mine")).not.toBeInTheDocument();
+});
+
+/** Return the part of the decks to play with the player's own. */
+async function yourDecks() {
+  return within(await screen.findByRole("region", { name: "Your decks" }));
+}
+
+test("a player plays a deck they built from the decks to play", async () => {
+  const sent = renderApp({
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+    "POST /api/matches": {
+      status: 201,
+      body: {
+        id: "m1",
+        version: 0,
+        view: view(),
+        moves: [],
+        rounds: [],
+      } satisfies Played,
+    },
+  });
+
+  // Its name, and its faction's.
+  const mine = await (
+    await yourDecks()
+  ).findByRole("button", { name: "Mine (Humans)" });
+  fireEvent.click(mine, { detail: 1 });
+
+  expect(
+    await screen.findByRole("button", { name: "Keep this hand" }),
+  ).toBeEnabled();
+  expect(sent.filter((request) => request.to === "POST /api/matches")).toEqual([
+    { to: "POST /api/matches", body: { my_deck: "d1" } },
+  ]);
+});
+
+test("a guest has no decks of their own to play", async () => {
+  const sent = renderApp({
+    ...RUI,
+    "GET /api/session": {
+      status: 401,
+      body: { code: "not_logged_in", message: "The player isn't logged in." },
+    },
+  });
+
+  await screen.findByRole("button", { name: "Log in" });
+  expect(screen.getByRole("button", { name: "Humans" })).toBeInTheDocument();
+  expect(
+    screen.queryByRole("region", { name: "Your decks" }),
+  ).not.toBeInTheDocument();
+  // The API would turn them down.
+  expect(sent.map((request) => request.to)).not.toContain("GET /api/my-decks");
+});
+
+test("a player with no deck of their own is told where to build one", async () => {
+  renderApp({ ...RUI, "GET /api/my-decks": decks([]) });
+
+  expect(
+    await (
+      await yourDecks()
+    ).findByText("No deck of your own yet: build one in My decks."),
+  ).toBeInTheDocument();
+});
+
+test("the player's decks that didn't come can be asked for again", async () => {
+  const answers: Record<string, Answer> = { ...RUI };
+  renderApp(answers);
+
+  const decksToPlay = await yourDecks();
+  expect(await decksToPlay.findByRole("alert")).toHaveTextContent(
+    "Could not reach the server.",
+  );
+
+  answers["GET /api/my-decks"] = decks([MINE]);
+  fireEvent.click(decksToPlay.getByRole("button", { name: "Try again" }));
+  expect(
+    await decksToPlay.findByRole("button", { name: "Mine (Humans)" }),
+  ).toBeInTheDocument();
+});
+
+test("a deck deleted in another tab says so, and its button goes", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+    "POST /api/matches": {
+      status: 404,
+      body: { code: "deck_not_found", message: "The player has no such deck." },
+    },
+  };
+  renderApp(answers);
+
+  const decksToPlay = await yourDecks();
+  const mine = await decksToPlay.findByRole("button", {
+    name: "Mine (Humans)",
+  });
+  answers["GET /api/my-decks"] = decks([]);
+  fireEvent.click(mine, { detail: 1 });
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "The player has no such deck.",
+  );
+  expect(
+    await decksToPlay.findByText(
+      "No deck of your own yet: build one in My decks.",
+    ),
+  ).toBeInTheDocument();
 });
