@@ -124,7 +124,9 @@ export function MyMatches({
           )}
         </>
       )}
-      {matches.isSuccess &&
+      {/* Not only on success: when the next page didn't come, the pages
+          that came are still there. */}
+      {matches.data !== undefined &&
         (matches.data.pages[0]?.matches.length === 0 ? (
           <p className="italic">No match yet: choose a deck to play one.</p>
         ) : (

@@ -308,7 +308,8 @@ def create_match(
         id=match.id,
         version=match.version,
         view=from_view(player_view(state, HUMAN)),
-        rounds=_rounds(moves),
+        # The AI's first moves never end a round: the player hasn't passed.
+        rounds=(),
         moves=moves,
     )
 

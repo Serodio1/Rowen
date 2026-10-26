@@ -43,6 +43,7 @@ export function AccountBar({
     mutationFn: () => logOut(api),
     onSuccess: () => {
       queryClient.setQueryData(sessionQuery(api).queryKey, null);
+      // Their matches are theirs alone: whoever logs in next gets their own.
       forgetMatches(queryClient);
       onLogOut();
     },
@@ -122,8 +123,6 @@ export function AccountDialog({
       making ? register(api, credentials) : logIn(api, credentials),
     onSuccess: (account) => {
       queryClient.setQueryData(sessionQuery(api).queryKey, account);
-      // Those of whoever was logged in before, if anybody.
-      forgetMatches(queryClient);
       onClose();
     },
   });

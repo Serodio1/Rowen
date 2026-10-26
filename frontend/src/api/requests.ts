@@ -142,7 +142,7 @@ export function statsQuery(api: Api) {
 
 /**
  * Forget the player's list of matches and their stats, so the page asks for
- * them again: after a match starts or ends, or when someone else logs in.
+ * them again: after a match starts or ends, or once the player logs out.
  * The list starts again from its first page.
  */
 export function forgetMatches(queryClient: QueryClient) {
