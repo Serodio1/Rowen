@@ -180,11 +180,17 @@ The round ends when **both players have passed**.
 Nobody sees the order of the cards in a deck. The server only sends each player
 what they are allowed to see.
 
-## 12. Decks (MVP)
+## 12. Decks
 
-Each faction has one preconstructed deck. Deck building (choosing your own cards)
-arrives in Phase 4, with limits based on the original: at least **22 units** and
-at most **10 special cards**.
+Each faction has one preconstructed deck. A player may also build their own
+from one faction's cards: its units and the special cards, which are neutral.
+Every deck, built or not, has at least **22 units** and at most **10 special
+cards**, as in the original. A built deck has at most **3 copies** of each card,
+except:
+
+- a **Legend**: 1 copy;
+- a **Bond** or **Muster** unit: as many as the faction's own deck has, if that
+  is more (5 Humans, 4 Planes), so the whole group can be in the deck.
 
 ## 13. Later (not in the MVP)
 

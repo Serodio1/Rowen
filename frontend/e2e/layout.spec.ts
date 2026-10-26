@@ -34,6 +34,16 @@ test("the match fits a laptop's screen, and nothing sticks out on a phone", asyn
     await page.locator("[data-target]").first().click();
     await expect(entries).toHaveCount(count + 1);
   }
+  // After a Medic, the units to revive take the hand's place until one is
+  // chosen (and a revived Medic revives again): finish, so the hand is back.
+  const revive = page.getByRole("list", {
+    name: "Revive a unit from your discard pile",
+  });
+  while (await revive.isVisible()) {
+    await revive.locator("[data-choosable]").first().click();
+    await page.locator("[data-target]").first().click();
+  }
+  await expect(hand).toBeVisible();
 
   // A row is as high with cards as without: the board doesn't grow as the
   // rows fill up, so it still fits once they all have cards.
