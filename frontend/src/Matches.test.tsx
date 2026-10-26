@@ -1,12 +1,13 @@
-import { QueryClientProvider } from "@tanstack/react-query";
+import { focusManager, QueryClientProvider } from "@tanstack/react-query";
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test } from "vitest";
 import { App } from "./App.tsx";
 import {
   createApi,
@@ -109,6 +110,11 @@ function later() {
     answer = resolve;
   });
   return { response, answer };
+}
+
+/** Wait until a request the page may have just sent has been answered. */
+function settle() {
+  return new Promise((resolve) => setTimeout(resolve));
 }
 
 /** Open the list of the player's matches. */
@@ -582,4 +588,237 @@ test("once a match ends, the list and the stats are asked for again", async () =
   await screen.findByRole("button", { name: "Resume" });
 
   expect(asked(requests)).toEqual([2, 2]);
+});
+
+const GUEST_ANSWER: Answer = {
+  status: 401,
+  body: { code: "not_logged_in", message: "The player isn't logged in." },
+};
+
+/** Return the answer of the API to a new match, at `view`. */
+function newMatch(match = view()): Answer {
+  return {
+    status: 201,
+    body: {
+      id: "a-match",
+      version: 1,
+      view: match,
+      rounds: [],
+      moves: [],
+    } satisfies Played,
+  };
+}
+
+test("a request turned down as not logged in shows the player as a guest", async () => {
+  // The player logged out in another tab: this one still thinks not.
+  renderApp({
+    ...RUI,
+    "GET /api/stats": GUEST_ANSWER,
+    "GET /api/matches": GUEST_ANSWER,
+  });
+  await openMatches();
+
+  expect(
+    await screen.findByRole("button", { name: "Log in" }),
+  ).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Choose your deck" }),
+  ).toHaveFocus();
+  expect(screen.queryByText(/Logged in as/)).not.toBeInTheDocument();
+});
+
+test("coming back to the tab asks again who is logged in", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "POST /api/matches": newMatch(),
+  };
+  renderApp(answers);
+  fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
+  await screen.findByRole("button", { name: "Keep this hand" });
+
+  // Logged out in another tab, while this one was hidden.
+  answers["GET /api/session"] = GUEST_ANSWER;
+  act(() => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+  onTestFinished(() => {
+    focusManager.setFocused(undefined);
+  });
+
+  // The match was the account's: the page leaves it.
+  expect(
+    await screen.findByRole("heading", { name: "Choose your deck" }),
+  ).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Log in" })).toBeInTheDocument();
+});
+
+test("another account logged in elsewhere gets its own list", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/stats": stats([]),
+    "GET /api/matches": page([summary()]),
+  };
+  const requests = renderApp(answers);
+  await openMatches();
+  await screen.findByRole("listitem");
+
+  answers["GET /api/session"] = { status: 200, body: { username: "ana" } };
+  answers["GET /api/matches"] = page([]);
+  act(() => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+  onTestFinished(() => {
+    focusManager.setFocused(undefined);
+  });
+  expect(await screen.findByText("ana")).toBeInTheDocument();
+  await openMatches();
+
+  expect(
+    await screen.findByText("No match yet: choose a deck to play one."),
+  ).toBeInTheDocument();
+  expect(requests.filter((to) => to === "GET /api/matches")).toHaveLength(2);
+});
+
+test("a guest's match goes on when they log in and out", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/session": GUEST_ANSWER,
+    "POST /api/matches": newMatch(),
+    "POST /api/session": { status: 200, body: { username: "rui" } },
+    "DELETE /api/session": { status: 204, body: null },
+  };
+  renderApp(answers);
+  fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
+  await screen.findByRole("button", { name: "Keep this hand" });
+
+  fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+  fireEvent.change(screen.getByLabelText("Username"), {
+    target: { value: "rui" },
+  });
+  fireEvent.change(screen.getByLabelText("Password"), {
+    target: { value: "dragon123" },
+  });
+  fireEvent.submit(
+    screen.getByRole("dialog").querySelector("form") as HTMLFormElement,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Log out" }));
+  await screen.findByRole("button", { name: "Log in" });
+
+  expect(screen.getByRole("button", { name: "Keep this hand" })).toBeEnabled();
+});
+
+test("no logging out while a match starts", async () => {
+  const match = later();
+  renderApp({ ...RUI, "POST /api/matches": match.response });
+  fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
+
+  // Its answer would be a match of the account, for a guest.
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Log out" })).toBeDisabled();
+  });
+  match.answer(
+    Response.json((newMatch() as { body: unknown }).body, { status: 201 }),
+  );
+  await screen.findByRole("button", { name: "Keep this hand" });
+  expect(screen.getByRole("button", { name: "Log out" })).toBeEnabled();
+});
+
+test("going back while a match is asked for, to play on, doesn't open it", async () => {
+  const match = later();
+  renderApp({
+    ...RUI,
+    "GET /api/stats": stats([]),
+    "GET /api/matches": page([summary()]),
+    "GET /api/matches/a-match": match.response,
+  });
+  await openMatches();
+  fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+  match.answer(
+    Response.json({
+      id: "a-match",
+      version: 1,
+      view: view(),
+      rounds: [],
+    } satisfies Match),
+  );
+  await settle();
+
+  expect(
+    screen.getByRole("heading", { name: "Choose your deck" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Keep this hand" }),
+  ).not.toBeInTheDocument();
+});
+
+test("the end of a match puts the top of the page out of reach too", async () => {
+  renderApp({
+    ...RUI,
+    "POST /api/matches": newMatch(
+      view({ match_over: true, winner: 0, legal_actions: [] }),
+    ),
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
+  await screen.findByRole("button", { name: "Play again" });
+
+  // The dialog is modal: Tab must not reach "Log out" behind it.
+  expect(
+    screen
+      .getByRole("button", { name: "Log out", hidden: true })
+      .closest("[inert]"),
+  ).not.toBeNull();
+
+  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  expect(
+    screen.getByRole("button", { name: "Log out" }).closest("[inert]"),
+  ).toBeNull();
+});
+
+test("stats that didn't come can be asked for again", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/matches": page([WON]),
+  };
+  renderApp(answers);
+  await openMatches();
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Could not reach the server.",
+  );
+
+  answers["GET /api/stats"] = stats([
+    { deck: "humans", won: 1, lost: 0, drawn: 0 },
+  ]);
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+  expect(
+    await screen.findByRole("table", { name: "Matches won, lost and drawn" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+test("a match the player comes back to says how its last round went", async () => {
+  renderApp({
+    ...RUI,
+    "GET /api/stats": stats([]),
+    "GET /api/matches": page([summary()]),
+    "GET /api/matches/a-match": {
+      status: 200,
+      body: {
+        id: "a-match",
+        version: 9,
+        view: view({ round: 2, legal_actions: [{ type: "pass" }] }),
+        rounds: [{ type: "round_ended", scores: [5, 3], winner: 0 }],
+      } satisfies Match,
+    },
+  });
+  await openMatches();
+  fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+
+  expect(
+    await screen.findByText("Round 1: you won, 5 to 3."),
+  ).toBeInTheDocument();
 });
