@@ -122,7 +122,8 @@ def build_deck(
             continue
         count = copies[card.id]
         most = max_copies(card, faction)
-        if not 1 <= count <= most:
+        # bool is a kind of int in Python, so True would count as 1 copy.
+        if type(count) is not int or not 1 <= count <= most:
             raise ValueError(
                 f"{id}: {card.id} can have 1 to {most} copies, got {count}"
             )

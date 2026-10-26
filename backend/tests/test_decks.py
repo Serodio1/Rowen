@@ -176,6 +176,11 @@ def test_no_copies_are_turned_down() -> None:
         build({**ENOUGH, "legend": 0})
 
 
+def test_true_is_not_a_number_of_copies() -> None:
+    with pytest.raises(ValueError, match="legend can have 1 to 1 copies, got True"):
+        build({**ENOUGH, "legend": True})
+
+
 def test_a_built_deck_keeps_to_the_deck_limits() -> None:
     with pytest.raises(ValueError, match="at least 22 units, got 21"):
         build({**ENOUGH, "bond": 3})
