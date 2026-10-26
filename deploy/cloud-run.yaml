@@ -1,8 +1,11 @@
 # The game on Google Cloud Run: one service, "rowen", with two containers that
 # run side by side on the same instance and share its network (ADR 0010).
 # docs/deploy.md says how to deploy it: PROJECT_ID and IMAGE_TAG are replaced
-# by the project's ID and the commit the images were built from, then
+# by the project's ID and the commit the images were built from,
+# SERVING_REVISION by the revision that gets the requests now, then
 #   gcloud run services replace <the file> --region europe-west1
+# The new revision gets no requests until it is checked at its own address
+# and the traffic is moved to it (ADR 0016).
 # Field reference: https://cloud.google.com/run/docs/reference/yaml/v1
 apiVersion: serving.knative.dev/v1
 kind: Service
@@ -11,6 +14,9 @@ metadata:
 spec:
   template:
     metadata:
+      # The revision is named after the commit, so the traffic below can
+      # point at it. (A name must start with the service's.)
+      name: rowen-IMAGE_TAG
       annotations:
         # At most one instance: it caps what the service can cost, and one
         # is plenty for this game. (The matches are in the database, so a
@@ -18,8 +24,8 @@ spec:
         autoscaling.knative.dev/maxScale: "1"
         # CPU only while a request is being answered (request-based billing),
         # so idle time is not billed. Between requests the instance gets no
-        # CPU, and after up to 15 idle minutes it is stopped: its matches are
-        # then lost.
+        # CPU, and after up to 15 idle minutes it is stopped (the matches are
+        # in the database, so none is lost).
         run.googleapis.com/cpu-throttling: "true"
         # nginx starts only after the API's startup probe passes, so it never
         # passes on requests to an API that is not listening yet.
@@ -72,8 +78,12 @@ spec:
               port: 8000
             periodSeconds: 1
             failureThreshold: 30
-  # Every deployment sends all requests to its new revision, also after a
-  # rollback to an older one (docs/deploy.md).
+  # The revision that answers now keeps all the requests. The new one gets
+  # none, and the tag "candidate" gives it an address of its own,
+  # https://candidate---<the service's address>, to be checked at.
   traffic:
-    - latestRevision: true
+    - revisionName: SERVING_REVISION
       percent: 100
+    - revisionName: rowen-IMAGE_TAG
+      tag: candidate
+      percent: 0

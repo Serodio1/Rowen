@@ -7,9 +7,11 @@ side by side in each instance ([ADR 0010](adr/0010-deploy-on-cloud-run.md),
 Artifact Registry, Google's store for images.
 
 **Every merge to `main` deploys itself**: once CI passes on `main`, the
-*Deploy* job builds the images, pushes them, updates the service and checks
-that the game answers ([`ci.yml`](../.github/workflows/ci.yml),
-[ADR 0012](adr/0012-deploy-from-ci.md)). To deploy `main` again, open
+*Deploy* job builds the images, pushes them, starts a new revision of the
+service, checks it at its own address and only then sends it the visitors'
+requests ([`ci.yml`](../.github/workflows/ci.yml),
+[ADR 0012](adr/0012-deploy-from-ci.md),
+[ADR 0016](adr/0016-check-a-revision-before-it-gets-the-requests.md)). To deploy `main` again, open
 *Actions* → *CI* → *Run workflow* on GitHub and run it on `main`. Deploying
 by hand, below, is the fallback.
 
@@ -223,9 +225,23 @@ docker build --platform=linux/amd64 --provenance=false --tag "$registry/web:$tag
 docker push "$registry/api:$tag"
 docker push "$registry/web:$tag"
 
-(Get-Content deploy/cloud-run.yaml) -replace 'PROJECT_ID', $project -replace 'IMAGE_TAG', $tag |
+# The revision that gets the requests now
+$serving = gcloud run services describe rowen --region=europe-west1 --format=json |
+    ConvertFrom-Json | ForEach-Object { $_.status.traffic } | Where-Object { $_.percent -eq 100 } |
+    ForEach-Object { $_.revisionName }
+$serving                       # such as rowen-00012-abc or rowen-7335d05
+
+(Get-Content deploy/cloud-run.yaml) -replace 'PROJECT_ID', $project -replace 'IMAGE_TAG', $tag -replace 'SERVING_REVISION', $serving |
     Set-Content "$env:TEMP\rowen-run.yaml"
 gcloud run services replace "$env:TEMP\rowen-run.yaml" --region=europe-west1
+
+# Try the new revision at its own address, then send it the requests
+$candidate = gcloud run services describe rowen --region=europe-west1 --format=json |
+    ConvertFrom-Json | ForEach-Object { $_.status.traffic } | Where-Object { $_.tag -eq "candidate" } |
+    ForEach-Object { $_.url }
+curl.exe -sI "$candidate/"
+curl.exe -s "$candidate/api/decks"
+gcloud run services update-traffic rowen --region=europe-west1 --to-revisions="rowen-$tag=100"
 ```
 
 Cloud Run runs only `linux/amd64` images, whatever the computer is.
@@ -233,10 +249,12 @@ Cloud Run runs only `linux/amd64` images, whatever the computer is.
 otherwise pushes beside each image, which Artifact Registry could count as
 versions of its own.
 
-`services replace` creates a new revision of the service, starts it, and
-sends it all the requests once its containers' startup probes pass. Adding
-`--dry-run` to it checks the file without deploying. CI runs the same
-commands. If the deployment brings a migration, run it first, in `backend`,
+`services replace` creates a new revision of the service, named after the
+commit, and starts it beside the one that answers now, which keeps all the
+requests ([ADR 0016](adr/0016-check-a-revision-before-it-gets-the-requests.md)).
+The new one gets the tag `candidate`, an address of its own; `update-traffic`
+then sends it the requests. Adding `--dry-run` to `services replace` checks
+the file without deploying. CI runs the same commands. If the deployment brings a migration, run it first, in `backend`,
 with the address for the migrations:
 
 ```powershell
@@ -246,6 +264,10 @@ Remove-Item Env:DATABASE_URL
 ```
 
 ## The first time only: open it to everyone
+
+The very first deployment has no revision to keep the requests: for that one,
+the `traffic` part of `deploy/cloud-run.yaml` must be only
+`- latestRevision: true` with `percent: 100`.
 
 A new service only answers callers with a Google account that may call it.
 This lets anyone call it, as a public website:
@@ -295,9 +317,10 @@ work from a computer far from the server:
 
 ## When something goes wrong
 
-When the *Deploy* job fails, GitHub sends an email. If it failed in *Check
-the game online*, the new revision already gets the requests: look at the
-logs, and go back to the earlier revision (below) until a fix is merged.
+When the *Deploy* job fails, GitHub sends an email. If it failed before
+*Move the traffic*, the visitors still meet the earlier revision: look at the
+logs, and merge a fix. If the game breaks later, go back to an earlier
+revision (below) until a fix is merged.
 
 What the containers printed (each request, and any error):
 
@@ -306,8 +329,8 @@ gcloud run services logs read rowen --region=europe-west1 --limit=50
 ```
 
 Go back to an earlier revision (its name comes from the list, such as
-`rowen-00002-abc`); the next deployment sends the requests to its new revision
-again:
+`rowen-cbb8e7b`); the next deployment keeps it until its own new revision
+passes the check:
 
 ```powershell
 gcloud run revisions list --service=rowen --region=europe-west1
