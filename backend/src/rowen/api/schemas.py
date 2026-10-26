@@ -427,16 +427,19 @@ class NewMatch(Schema):
 
 
 class Match(Schema):
-    """A match as the player may see it: its id, its version and the view.
+    """A match as the player may see it: its id, its version, the view and the rounds.
 
     The id is all it takes to see and play the match, so only its player gets
     it. The version goes up each time the match changes: a move sends back the
-    version of the view it was chosen from.
+    version of the view it was chosen from. ``rounds`` holds the end of each
+    round that ended, in order, so a page that comes back to a match knows how
+    those went.
     """
 
     id: UUID
     version: int
     view: PlayerView
+    rounds: tuple[RoundEnded, ...]
 
 
 class MovePlayed(Schema):

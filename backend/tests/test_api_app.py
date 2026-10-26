@@ -98,9 +98,11 @@ def play(client: TestClient, response: httpx2.Response, action: Any) -> httpx2.R
 
 
 def match_text(response: httpx2.Response) -> str:
-    """Return the match in a response, its id, version and view, as GET sends it."""
+    """Return the match in a response, without its moves, as GET sends it."""
     played = schemas.Played.model_validate_json(response.text)
-    match = schemas.Match(id=played.id, version=played.version, view=played.view)
+    match = schemas.Match(
+        id=played.id, version=played.version, view=played.view, rounds=played.rounds
+    )
     return match.model_dump_json()
 
 
@@ -219,6 +221,8 @@ def test_the_player_gets_their_view_and_the_ais_first_moves(
         id=UUID(response.json()["id"]),
         version=FIRST_VERSION,
         view=schemas.from_view(player_view(state, HUMAN)),
+        # The AI's first moves never end a round: the player hasn't passed.
+        rounds=(),
         moves=moves,
     )
     # The same JSON, as text: in Python, False == 0. Nothing more.
@@ -593,12 +597,19 @@ def test_the_moves_are_the_players_action_and_then_the_ais_answer(
     state, _ = ai_answers(state)
     response = start(client, seed=AI_DRAWS_AND_REDRAWS)
     version = FIRST_VERSION
+    rounds: tuple[schemas.RoundEnded, ...] = ()
 
     while not response.json()["view"]["match_over"]:
         action = first_action(response)
         state, events = apply(state, player_view(state, HUMAN).legal_actions[0])
         move = move_of(state, events)
         state, answer = ai_answers(state)
+        rounds += tuple(
+            event
+            for played in (move, *answer)
+            for event in played.events
+            if isinstance(event, schemas.RoundEnded)
+        )
 
         response = play(client, response, action)
         version += 1
@@ -607,6 +618,7 @@ def test_the_moves_are_the_players_action_and_then_the_ais_answer(
             id=UUID(response.json()["id"]),
             version=version,
             view=schemas.from_view(player_view(state, HUMAN)),
+            rounds=rounds,
             moves=(move, *answer),
         )
         assert response.text == sent.model_dump_json()
@@ -817,6 +829,22 @@ def test_each_move_takes_the_match_to_the_next_version(client: TestClient) -> No
         assert response.json()["version"] == version
         seen = client.get(f"/matches/{response.json()['id']}")
         assert seen.text == match_text(response)
+
+
+def test_getting_a_match_again_gives_the_rounds_that_ended(
+    client: TestClient,
+) -> None:
+    # A page that comes back to a match, as from the list of the player's
+    # matches, gets the rounds the moves it never saw ended.
+    response = start(client, seed=PLAYER_STARTS)
+    while not response.json()["view"]["match_over"]:
+        response = play(client, response, first_action(response))
+        seen = client.get(f"/matches/{response.json()['id']}")
+        assert seen.text == match_text(response)
+
+    # At least two rounds end a match.
+    assert len(seen.json()["rounds"]) >= 2
+    assert seen.json()["rounds"][0]["type"] == "round_ended"
 
 
 def test_a_move_that_comes_late_is_not_played_again(
