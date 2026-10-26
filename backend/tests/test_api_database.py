@@ -268,6 +268,35 @@ def test_a_row_that_breaks_a_check_never_shows_the_seed(
     assert "Failing row" not in log
 
 
+def test_stats_come_in_the_order_of_the_decks_ids_whatever_the_collation(
+    postgres_store: PostgresMatchStore, database_url: str
+) -> None:
+    # Under a language's collation (ICU's here), "a_b" comes before "a-b";
+    # in the order of the characters' codes, as in Python, after.
+    engine = create_engine(database_url)
+    collate = "ALTER TABLE matches ALTER COLUMN player_deck TYPE varchar COLLATE {}"
+    try:
+        with engine.begin() as connection:
+            connection.execute(text(collate.format('"und-x-icu"')))
+        owner = PostgresAccountStore(engine).create_account("rui", "hash")
+        assert owner is not None
+        won = MatchResult(outcome="won", rounds=((1, 0), (1, 0)), ended_at=NOW)
+        for deck in ["a_b", "a-b"]:
+            match = postgres_store.create(
+                (deck, "robots"), 1, (), owner=owner.id, now=NOW
+            )
+            postgres_store.add_actions(match.id, match.version, (), won)
+
+        decks = [stats.deck for stats in postgres_store.stats(owner.id)]
+    finally:
+        with engine.begin() as connection:
+            connection.execute(text(collate.format('"default"')))
+            connection.execute(text("TRUNCATE matches, accounts CASCADE"))
+        engine.dispose()
+
+    assert decks == sorted(decks) == ["a-b", "a_b"]
+
+
 def test_a_move_says_when_the_match_was_last_played(
     postgres_store: PostgresMatchStore, database_url: str
 ) -> None:

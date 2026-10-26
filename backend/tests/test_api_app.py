@@ -26,7 +26,7 @@ from rowen.api.app import (
     AI,
     HUMAN,
     _ai_plays,
-    _replay,
+    _play_again,
     app,
     get_store,
     make_stores,
@@ -134,6 +134,12 @@ def ai_answers(
     return state, moves
 
 
+def replay(match: StoredMatch) -> GameState:
+    """Return the state of a stored match: its actions played again."""
+    state, _ = _play_again(match.decks, match.seed, match.actions)
+    return state
+
+
 def stored(store: MatchStore, response: httpx2.Response) -> StoredMatch:
     """Return what the store keeps for the match in a response."""
     match = store.get(UUID(response.json()["id"]))
@@ -143,7 +149,7 @@ def stored(store: MatchStore, response: httpx2.Response) -> StoredMatch:
 
 def state_of(store: MatchStore, response: httpx2.Response) -> GameState:
     """Return the state of the match in a response, as the API plays it again."""
-    return _replay(stored(store, response))
+    return replay(stored(store, response))
 
 
 def test_the_decks_are_the_ones_in_the_data_files(client: TestClient) -> None:
@@ -291,7 +297,7 @@ def test_a_new_match_is_kept_as_its_decks_seed_and_the_ais_first_actions(
     assert match.seed == AI_STARTS
     assert match.actions == tuple(actions)
     assert actions
-    assert _replay(match) == state
+    assert replay(match) == state
 
 
 def test_a_move_adds_the_players_action_and_the_ais_answer(
@@ -300,7 +306,7 @@ def test_a_move_adds_the_players_action_and_the_ais_answer(
     response = start(client, seed=AI_DRAWS_AND_REDRAWS)
     while not response.json()["view"]["match_over"]:
         before = stored(store, response)
-        state = _replay(before)
+        state = replay(before)
         action = player_view(state, HUMAN).legal_actions[0]
         state, _ = apply(state, action)
         answer: list[Action] = []
@@ -313,7 +319,7 @@ def test_a_move_adds_the_players_action_and_the_ais_answer(
         after = stored(store, response)
         assert after.actions == (*before.actions, action, *answer)
         assert (after.decks, after.seed) == (before.decks, before.seed)
-        assert _replay(after) == state
+        assert replay(after) == state
 
 
 def test_the_ai_waits_when_the_player_wins_the_coin_flip(
@@ -782,6 +788,19 @@ def test_a_request_turned_down_says_where_its_first_mistake_is(
     }
 
 
+def test_a_field_too_many_isnt_sent_back(client: TestClient) -> None:
+    # Its name is the client's: the answer says where it is, not what.
+    response = client.post(
+        "/matches", json={"deck": "humans", "<script>alert(1)</script>": 1}
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "code": "invalid_request",
+        "message": "The request isn't valid at body: extra_forbidden.",
+    }
+
+
 def test_an_action_for_an_unknown_match_is_turned_down(client: TestClient) -> None:
     move = {"version": FIRST_VERSION, "action": {"type": "pass"}}
     response = client.post(f"/matches/{uuid4()}/actions", json=move)
@@ -802,7 +821,7 @@ def test_an_action_on_a_match_that_changed_meanwhile_is_turned_down(
     def get_then_the_other_request_wins(match_id: UUID) -> StoredMatch | None:
         match = get(match_id)
         assert match is not None
-        other = player_view(_replay(match), HUMAN).legal_actions[-1]
+        other = player_view(replay(match), HUMAN).legal_actions[-1]
         new = store.add_actions(match_id, match.version, (other,))
         assert new is not None
         kept.append(new)

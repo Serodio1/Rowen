@@ -351,7 +351,10 @@ class PostgresMatchStore:
             )
             .where(MatchRow.account_id == owner, MatchRow.outcome.is_not(None))
             .group_by(MatchRow.player_deck)
-            .order_by(MatchRow.player_deck)
+            # In the order of the characters' codes, as Python's sorted() and
+            # the memory store, whatever order the database's language
+            # setting (collation) would give: "a-b" before "a_b".
+            .order_by(MatchRow.player_deck.collate("C"))
         )
         with Session(self._engine) as session:
             return tuple(

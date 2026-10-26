@@ -24,7 +24,7 @@ them all again takes a few milliseconds.
 - **A match is kept as what it takes to play it again**: the ids of the two
   decks, the seed, every action played (the player's and the AI's, in order)
   and a version. The API plays the actions again on each request
-  (`_replay`). No `GameState` is ever stored.
+  (`_play_again`). No `GameState` is ever stored.
 - **PostgreSQL**, through SQLAlchemy 2 and psycopg 3, with the tables made by
   migrations (Alembic, `backend/migrations`). One table, `matches`: the actions
   are a JSONB list, each in the shape the API sends it.

@@ -653,20 +653,13 @@ def _match_changed() -> ApiError:
     )
 
 
-def _replay(match: StoredMatch) -> GameState:
-    """Return the state of a match: its actions played again from the start.
-
-    The engine is deterministic, so this is the state they made when they
-    were played (ADR 0003).
-    """
-    state, _ = _play_again(match.decks, match.seed, match.actions)
-    return state
-
-
 def _play_again(
     decks: tuple[str, str], seed: int, actions: tuple[Action, ...]
 ) -> tuple[GameState, tuple[RoundEndedJson, ...]]:
     """Return the state actions make from the start, and the end of each round.
+
+    The engine is deterministic, so this is the state they made when they were
+    played (ADR 0003).
 
     The rounds are those that ended, in order, as the API sends them. The
     state doesn't keep them: they come only in the event that ends a round.
@@ -762,9 +755,16 @@ def _invalid_request(request: Request, error: RequestValidationError) -> JSONRes
     FastAPI's own answer lists every mistake, each with its wrong value: it can
     be many times bigger than the request, and a value nested too deep makes it
     fail. Here only where the first mistake is and what kind it is are sent.
+
+    A field the request has and shouldn't is named by the request, not by the
+    API: only where it is goes back, not its name, so no value the client sent
+    is ever sent back.
     """
     first = error.errors()[0]
-    where = ".".join(str(part) for part in first["loc"])
+    location = first["loc"]
+    if first["type"] == "extra_forbidden":
+        location = location[:-1]
+    where = ".".join(str(part) for part in location)
     return _error(
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         Error(
