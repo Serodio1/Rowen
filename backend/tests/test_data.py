@@ -8,6 +8,8 @@ import pytest
 
 from rowen import data
 from rowen.data import deck_ids, load_deck
+from rowen.engine.cards import SpecialCard
+from rowen.engine.decks import build_deck
 
 # The copies of each card, as listed in docs/cards.md.
 HUMANS = {
@@ -95,3 +97,18 @@ def test_specials_errors_name_the_file(data_folder: Path) -> None:
 
     with pytest.raises(ValueError, match=re.escape("specials.json: Expecting value")):
         load_deck("humans")
+
+
+@pytest.mark.parametrize("deck_id", deck_ids())
+def test_every_factions_deck_keeps_to_the_rules_of_a_built_deck(deck_id: str) -> None:
+    # A player may build each faction's own deck again, card for card
+    # (rules, section 12): its copies are within what a built deck may have.
+    deck = load_deck(deck_id)
+    specials = {card.id: card for card in deck.cards if isinstance(card, SpecialCard)}
+    copies = Counter(card.id for card in deck.cards)
+
+    built = build_deck(
+        id=deck.id, name=deck.name, faction=deck, specials=specials, copies=copies
+    )
+
+    assert Counter(built.cards) == Counter(deck.cards)

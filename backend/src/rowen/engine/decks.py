@@ -123,6 +123,8 @@ def build_deck(
         count = copies[card.id]
         most = max_copies(card, faction)
         if not 1 <= count <= most:
-            raise ValueError(f"{id}: {card.id} can have 1 to {most} copies, got {count}")
+            raise ValueError(
+                f"{id}: {card.id} can have 1 to {most} copies, got {count}"
+            )
         cards += [card] * count
     return Deck(id=id, name=name, cards=tuple(cards))
