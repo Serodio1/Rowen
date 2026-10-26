@@ -11,6 +11,7 @@ import type {
 } from "./api/client.ts";
 import {
   decksQuery,
+  forgetMatches,
   matchQuery,
   playMove,
   startMatch,
@@ -31,6 +32,7 @@ import {
 } from "./stage.ts";
 import { onFirstClick } from "./clicks.ts";
 import { AccountBar, AccountDialog } from "./Account.tsx";
+import { MyMatches } from "./Matches.tsx";
 import { ALERT, BUTTON } from "./styles.ts";
 import {
   otherActions,
@@ -50,7 +52,8 @@ import {
 
 /**
  * The game's page: choose a deck to start a match against the AI, then play
- * it one move at a time, until it is over.
+ * it one move at a time, until it is over. A player who is logged in can
+ * also see their matches, and play on one that isn't over.
  *
  * The requests go through TanStack Query, so the page needs a
  * `QueryClientProvider` around it, as in `main.tsx`.
@@ -59,8 +62,11 @@ import {
  *   with a fake `fetch` in tests.
  */
 export function App({ api }: { api: Api }) {
-  // The match being played, as it started, or null while there is none.
+  // The match being played, as it started or as the player came back to it,
+  // or null while there is none.
   const [match, setMatch] = useState<Played | null>(null);
+  // Whether the player's matches are shown, while no match is played.
+  const [listing, setListing] = useState(false);
   // Whether the player left a match: the focus then goes to the decks.
   const [left, setLeft] = useState(false);
   // Whether the dialog to log in is open: the rest of the page is out of
@@ -94,10 +100,41 @@ export function App({ api }: { api: Api }) {
             onLogIn={() => {
               setLoggingIn(true);
             }}
+            // Not during a match: the button would leave it without a word,
+            // and a guest's match is in no list to come back to.
+            onShowMatches={
+              match === null && !listing
+                ? () => {
+                    setListing(true);
+                  }
+                : undefined
+            }
+            onLogOut={() => {
+              // The player's matches are theirs alone: the page can't play
+              // on one, or list them, once they are logged out. The match is
+              // kept, to play on once they log in again.
+              setMatch(null);
+              setListing(false);
+              setLeft(true);
+            }}
           />
         </div>
         {match === null ? (
-          <ChooseDeck api={api} onStart={setMatch} focus={left} />
+          listing ? (
+            <MyMatches
+              api={api}
+              onResume={(resumed) => {
+                setMatch({ ...resumed, moves: [] });
+                setListing(false);
+              }}
+              onBack={() => {
+                setListing(false);
+                setLeft(true);
+              }}
+            />
+          ) : (
+            <ChooseDeck api={api} onStart={setMatch} focus={left} />
+          )
         ) : (
           <PlayMatch
             api={api}
@@ -148,7 +185,11 @@ function ChooseDeck({
   const start = useMutation({
     mutationKey: ["start"],
     mutationFn: (deck: string) => startMatch(api, deck),
-    onSuccess: onStart,
+    onSuccess: (match) => {
+      // The match is in the player's list now.
+      forgetMatches(queryClient);
+      onStart(match);
+    },
   });
 
   return (
@@ -225,17 +266,12 @@ function namesOf(played: Played): [string, string][] {
   return played.moves.flatMap((move) => [...cardNames(move.view)]);
 }
 
-/** Return whether an event is the end of a round. */
-function isRoundEnded(event: Event): event is RoundEnded {
-  return event.type === "round_ended";
-}
-
 /**
  * The match being played: the round, the board and the moves the player can
  * make, or who won once it is over, and what happened so far.
  *
  * @param started - The match as it started, with what the AI did if it
- *   started.
+ *   started, or as the player came back to it, with no moves.
  * @param onLeave - Called when the player is done with the match.
  */
 function PlayMatch({
@@ -269,10 +305,6 @@ function PlayMatch({
             ),
           },
         ],
-  );
-  // How each round that ended went, for the end of the match.
-  const [rounds, setRounds] = useState<RoundEnded[]>(() =>
-    eventsOf(started).filter(isRoundEnded),
   );
   // The animation of the last move, or of the AI's first one: none with
   // reduced motion.
@@ -333,11 +365,11 @@ function PlayMatch({
       );
       setLog((log) => [{ number: log.length + 1, ...entry }, ...log]);
       setSteps(mayMove() ? stepsOfMoves(played.moves, before) : NO_STEPS);
-      setRounds((rounds) => [
-        ...rounds,
-        ...eventsOf(played).filter(isRoundEnded),
-      ]);
       queryClient.setQueryData(query.queryKey, matchOf(played));
+      if (played.view.match_over) {
+        // How it ended is in the player's list now.
+        forgetMatches(queryClient);
+      }
     },
     onError: (error) => {
       // Ask for the match as it is now, unless it is gone. When no answer
@@ -567,7 +599,7 @@ function PlayMatch({
                 >
                   {resultText(view)}
                 </h2>
-                <Rounds rounds={rounds} viewer={view.player} />
+                <Rounds rounds={match.data.rounds} viewer={view.player} />
                 <button
                   type="button"
                   className={BUTTON}
@@ -791,7 +823,12 @@ function outOfDate(error: RequestError): boolean {
 
 /** The match of an answer, without what happened, as the cache keeps it. */
 function matchOf(played: Played): Match {
-  return { id: played.id, version: played.version, view: played.view };
+  return {
+    id: played.id,
+    version: played.version,
+    view: played.view,
+    rounds: played.rounds,
+  };
 }
 
 /**

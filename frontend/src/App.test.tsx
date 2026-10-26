@@ -96,6 +96,7 @@ const A_MATCH = {
       id: "a-match",
       version: 1,
       view: view(),
+      rounds: [],
       moves: [],
     } satisfies Played,
   },
@@ -115,7 +116,7 @@ const ROUND_1 = view({
 
 /**
  * Return the API's answer to a move: the match after it, at `version`, and
- * its events, as one move.
+ * its events, as one move. The rounds that ended are those its events end.
  */
 function played(after: View, events: Event[] = [], version = 2) {
   return {
@@ -124,14 +125,22 @@ function played(after: View, events: Event[] = [], version = 2) {
       id: "a-match",
       version,
       view: after,
+      rounds: events.filter((event) => event.type === "round_ended"),
       moves: [{ events, view: after }],
     } satisfies Played,
   };
 }
 
-/** Return the match "a-match" as the API sends it when asked for it. */
-function aMatch(view: View, version: number): Match {
-  return { id: "a-match", version, view };
+/**
+ * Return the match "a-match" as the API sends it when asked for it, with the
+ * rounds that ended before.
+ */
+function aMatch(
+  view: View,
+  version: number,
+  rounds: Match["rounds"] = [],
+): Match {
+  return { id: "a-match", version, view, rounds };
 }
 
 /** Return an answer of the API that turns a request down. */
@@ -775,6 +784,7 @@ test("when the AI starts the match, the page says what it did", async () => {
             view: view(),
           },
         ],
+        rounds: [],
       } satisfies Played,
     },
   });
@@ -878,6 +888,7 @@ test("a card that left the view is still named, as the page saw it before", asyn
         id: "a-match",
         version: 1,
         view: before,
+        rounds: [],
         moves: [],
       } satisfies Played,
     },
@@ -1679,6 +1690,7 @@ test("while moves play out, the board shows the match as it was then, up to the 
             view: next,
           },
         ],
+        rounds: [{ type: "round_ended", scores: [0, 4], winner: 1 }],
       } satisfies Played,
     },
   });

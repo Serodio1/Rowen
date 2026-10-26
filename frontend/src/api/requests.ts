@@ -7,7 +7,11 @@
  * decks; a mutation changes something, such as playing a move, and is only
  * sent when the page says so.
  */
-import { QueryClient, queryOptions } from "@tanstack/react-query";
+import {
+  infiniteQueryOptions,
+  QueryClient,
+  queryOptions,
+} from "@tanstack/react-query";
 import type { Account, Api, Credentials, ErrorCode, Move } from "./client.ts";
 
 // What a request says when no answer came, or none from the API: the network
@@ -102,6 +106,48 @@ export function matchQuery(api: Api, matchId: string) {
         }),
       ),
   });
+}
+
+/**
+ * The matches of the player who is logged in, the newest first, one page at
+ * a time: each page after the first holds those before the last match of the
+ * page before it.
+ *
+ * The list changes when a match starts or ends, and the page then asks for
+ * it again (`forgetMatches`).
+ */
+export function matchesQuery(api: Api) {
+  return infiniteQueryOptions({
+    queryKey: ["matches"],
+    queryFn: ({ pageParam }) =>
+      send(
+        api.GET("/matches", {
+          params: { query: pageParam === null ? {} : { before: pageParam } },
+        }),
+      ),
+    initialPageParam: null as string | null,
+    // The id of the last match, while there are more; null says there aren't.
+    getNextPageParam: (page) =>
+      page.more ? (page.matches.at(-1)?.id ?? null) : null,
+  });
+}
+
+/** How the matches of the player who is logged in ended, deck by deck. */
+export function statsQuery(api: Api) {
+  return queryOptions({
+    queryKey: ["stats"],
+    queryFn: async () => (await send(api.GET("/stats"))).decks,
+  });
+}
+
+/**
+ * Forget the player's list of matches and their stats, so the page asks for
+ * them again: after a match starts or ends, or once the player logs out.
+ * The list starts again from its first page.
+ */
+export function forgetMatches(queryClient: QueryClient) {
+  void queryClient.resetQueries({ queryKey: ["matches"] });
+  void queryClient.resetQueries({ queryKey: ["stats"] });
 }
 
 /** Start a match against the AI with the deck `deck`. */

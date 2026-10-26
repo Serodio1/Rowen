@@ -985,6 +985,13 @@
           },
           "view": {
             "$ref": "#/components/schemas/PlayerView"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/RoundEnded"
+            },
+            "type": "array",
+            "title": "Rounds"
           }
         },
         "additionalProperties": false,
@@ -992,10 +999,11 @@
         "required": [
           "id",
           "version",
-          "view"
+          "view",
+          "rounds"
         ],
         "title": "Match",
-        "description": "A match as the player may see it: its id, its version and the view.\n\nThe id is all it takes to see and play the match, so only its player gets\nit. The version goes up each time the match changes: a move sends back the\nversion of the view it was chosen from."
+        "description": "A match as the player may see it: its id, its version, the view and the rounds.\n\nThe id is all it takes to see and play the match, so only its player gets\nit. The version goes up each time the match changes: a move sends back the\nversion of the view it was chosen from. ``rounds`` holds the end of each\nround that ended, in order, so a page that comes back to a match knows how\nthose went."
       },
       "MatchEnded": {
         "properties": {
@@ -1346,6 +1354,13 @@
           "view": {
             "$ref": "#/components/schemas/PlayerView"
           },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/RoundEnded"
+            },
+            "type": "array",
+            "title": "Rounds"
+          },
           "moves": {
             "items": {
               "$ref": "#/components/schemas/MovePlayed"
@@ -1360,6 +1375,7 @@
           "id",
           "version",
           "view",
+          "rounds",
           "moves"
         ],
         "title": "Played",

@@ -109,7 +109,9 @@ is logged in and `DELETE /session` logs out
 ([ADR 0014](docs/adr/0014-accounts-with-sessions-in-postgresql.md)). A match
 started while logged in is the player's alone: `GET /matches` lists theirs,
 newest first, 20 at a time (`?before=<id>` for the next page), and
-`GET /stats` counts their wins, losses and draws with each deck
+`GET /stats` counts their wins, losses and draws with each deck. On the page,
+"My matches" shows both, and "Resume" plays on a match that isn't over:
+`GET /matches/{id}` gives it with the `rounds` that ended so far
 ([ADR 0015](docs/adr/0015-players-own-their-matches.md)). When the API turns a request down, it answers with a
 `code` and a `message`, such as `illegal_action`. `--reload` restarts the
 server whenever the Python code in `src` changes.

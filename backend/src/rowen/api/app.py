@@ -37,7 +37,7 @@ To run the server on your computer, in ``backend``:
 import hashlib
 import os
 import secrets
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
 from typing import Annotated, Any
@@ -76,6 +76,7 @@ from rowen.api.schemas import (
     from_view,
     to_action,
 )
+from rowen.api.schemas import RoundEnded as RoundEndedJson
 from rowen.api.store import MatchResult, MatchStore, MemoryMatchStore, StoredMatch
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
@@ -307,6 +308,8 @@ def create_match(
         id=match.id,
         version=match.version,
         view=from_view(player_view(state, HUMAN)),
+        # The AI's first moves never end a round: the player hasn't passed.
+        rounds=(),
         moves=moves,
     )
 
@@ -320,10 +323,12 @@ def get_match(
 ) -> Match:
     """Return a match as the player may see it."""
     match = _match(store, match_id, _logged_in(accounts, token, now))
+    state, rounds = _play_again(match.decks, match.seed, match.actions)
     return Match(
         id=match.id,
         version=match.version,
-        view=from_view(player_view(_replay(match), HUMAN)),
+        view=from_view(player_view(state, HUMAN)),
+        rounds=rounds,
     )
 
 
@@ -360,7 +365,7 @@ def play(
     if move.version != old.version:
         raise _match_changed()
     played = to_action(move.action)
-    state = _replay(old)
+    state, rounds = _play_again(old.decks, old.seed, old.actions)
     # The engine works out the legal actions of the player's view. When it
     # isn't the player's turn there are none, so the player can never make a
     # move of the AI's.
@@ -375,7 +380,9 @@ def play(
     first = _move(state, events)
     state, answer, answer_moves = _ai_plays(state)
     actions = (played, *answer)
-    result = _result(old, actions, now) if _over(state) else None
+    moves = (first, *answer_moves)
+    rounds += _rounds(moves)
+    result = _result(state, rounds, now) if _over(state) else None
     new = store.add_actions(match_id, old.version, actions, result)
     if new is None:
         raise _match_changed()
@@ -383,7 +390,8 @@ def play(
         id=new.id,
         version=new.version,
         view=from_view(player_view(state, HUMAN)),
-        moves=(first, *answer_moves),
+        rounds=rounds,
+        moves=moves,
     )
 
 
@@ -638,20 +646,33 @@ def _replay(match: StoredMatch) -> GameState:
 
 def _play_again(
     decks: tuple[str, str], seed: int, actions: tuple[Action, ...]
-) -> tuple[GameState, tuple[tuple[int, int], ...]]:
-    """Return the state actions make from the start, and each round's totals.
+) -> tuple[GameState, tuple[RoundEndedJson, ...]]:
+    """Return the state actions make from the start, and the end of each round.
 
-    The totals are those of the rounds that ended, in order.
+    The rounds are those that ended, in order, as the API sends them. The
+    state doesn't keep them: they come only in the event that ends a round.
     """
     player_deck, ai_deck = decks
     state = start_match((load_deck(player_deck), load_deck(ai_deck)), seed=seed)
-    rounds: tuple[tuple[int, int], ...] = ()
+    rounds: tuple[RoundEndedJson, ...] = ()
     for action in actions:
         state, events = apply(state, action)
         rounds += tuple(
-            event.scores for event in events if isinstance(event, RoundEnded)
+            RoundEndedJson(type="round_ended", scores=event.scores, winner=event.winner)
+            for event in events
+            if isinstance(event, RoundEnded)
         )
     return state, rounds
+
+
+def _rounds(moves: Iterable[MovePlayed]) -> tuple[RoundEndedJson, ...]:
+    """Return the end of each round among the events of moves, in order."""
+    return tuple(
+        event
+        for move in moves
+        for event in move.events
+        if isinstance(event, RoundEndedJson)
+    )
 
 
 def _over(state: GameState) -> bool:
@@ -660,18 +681,13 @@ def _over(state: GameState) -> bool:
 
 
 def _result(
-    match: StoredMatch, actions: tuple[Action, ...], now: datetime
+    state: GameState, rounds: tuple[RoundEndedJson, ...], now: datetime
 ) -> MatchResult:
-    """Return how a match ended, once ``actions`` ended it.
-
-    Each round's totals come only in the event that ends it, and the store
-    keeps no events, so the match is played again to find them: once a match.
-    """
-    state, rounds = _play_again(match.decks, match.seed, (*match.actions, *actions))
+    """Return how a match ended: ``state`` is the end, ``rounds`` its rounds."""
     winner = player_view(state, HUMAN).winner
     return MatchResult(
         outcome="drawn" if winner is None else "won" if winner == HUMAN else "lost",
-        rounds=rounds,
+        rounds=tuple(round_.scores for round_ in rounds),
         ended_at=now,
     )
 
