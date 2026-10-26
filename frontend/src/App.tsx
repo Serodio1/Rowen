@@ -11,6 +11,7 @@ import type {
 } from "./api/client.ts";
 import {
   decksQuery,
+  forgetDecks,
   forgetMatches,
   matchQuery,
   playMove,
@@ -33,6 +34,7 @@ import {
 } from "./stage.ts";
 import { onFirstClick } from "./clicks.ts";
 import { AccountBar, AccountDialog } from "./Account.tsx";
+import { MyDecks } from "./Decks.tsx";
 import { MyMatches } from "./Matches.tsx";
 import { ALERT, BUTTON, PANEL } from "./styles.ts";
 import {
@@ -75,8 +77,9 @@ export function App({ api }: { api: Api }) {
   // Whether the end of the match is shown, over the whole page: the top of
   // the page is out of reach meanwhile too.
   const [ended, setEnded] = useState(false);
-  // Whether the player's matches are shown, while no match is played.
-  const [listing, setListing] = useState(false);
+  // What is shown in the decks' place while no match is played: the
+  // player's matches, the decks they built, or neither.
+  const [showing, setShowing] = useState<"matches" | "decks" | null>(null);
   // Whether the player left a match: the focus then goes to the decks.
   const [left, setLeft] = useState(false);
   // Whether the dialog to log in is open: the rest of the page is out of
@@ -102,9 +105,10 @@ export function App({ api }: { api: Api }) {
       return;
     }
     forgetMatches(queryClient);
+    forgetDecks(queryClient);
     if (before !== null) {
       setMatch((match) => (match?.owner === before ? null : match));
-      setListing(false);
+      setShowing(null);
       setLeft(true);
     }
   }, [username, queryClient]);
@@ -139,16 +143,31 @@ export function App({ api }: { api: Api }) {
             // Not during a match: the button would leave it without a word,
             // and a guest's match is in no list to come back to.
             onShowMatches={
-              match === null && !listing
+              match === null && showing !== "matches"
                 ? () => {
-                    setListing(true);
+                    setShowing("matches");
+                  }
+                : undefined
+            }
+            onShowDecks={
+              match === null && showing !== "decks"
+                ? () => {
+                    setShowing("decks");
                   }
                 : undefined
             }
           />
         </div>
         {match === null ? (
-          listing ? (
+          showing === "decks" ? (
+            <MyDecks
+              api={api}
+              onBack={() => {
+                setShowing(null);
+                setLeft(true);
+              }}
+            />
+          ) : showing === "matches" ? (
             <MyMatches
               api={api}
               onResume={(resumed) => {
@@ -156,10 +175,10 @@ export function App({ api }: { api: Api }) {
                   played: { ...resumed, moves: [] },
                   owner: username ?? null,
                 });
-                setListing(false);
+                setShowing(null);
               }}
               onBack={() => {
-                setListing(false);
+                setShowing(null);
                 setLeft(true);
               }}
             />

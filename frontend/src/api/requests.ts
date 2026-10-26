@@ -9,11 +9,19 @@
  */
 import {
   infiniteQueryOptions,
+  MutationCache,
   QueryCache,
   QueryClient,
   queryOptions,
 } from "@tanstack/react-query";
-import type { Account, Api, Credentials, ErrorCode, Move } from "./client.ts";
+import type {
+  Account,
+  Api,
+  Credentials,
+  DeckChoice,
+  ErrorCode,
+  Move,
+} from "./client.ts";
 
 // What a request says when no answer came, or none from the API: the network
 // is down, the API isn't running, or a proxy answered in its place.
@@ -62,10 +70,11 @@ export function createQueryClient(): QueryClient {
     }
   };
   const client: QueryClient = new QueryClient({
-    // Only queries: the list and the stats are what the API turns down so.
-    // (A move by someone no longer logged in gets a 404: the match isn't a
-    // guest's.)
+    // The list, the stats and the decks are what the API turns down so, and
+    // building, changing or deleting a deck. (A move by someone no longer
+    // logged in gets a 404: the match isn't a guest's.)
     queryCache: new QueryCache({ onError: notLoggedIn }),
+    mutationCache: new MutationCache({ onError: notLoggedIn }),
     defaultOptions: {
       queries: {
         // The decks don't change while the page is open, and a match only
@@ -167,6 +176,75 @@ export function statsQuery(api: Api) {
 export function forgetMatches(queryClient: QueryClient) {
   void queryClient.resetQueries({ queryKey: ["matches"] });
   void queryClient.resetQueries({ queryKey: ["stats"] });
+}
+
+/**
+ * What a deck built from the faction whose own deck is `deck` may hold. It
+ * doesn't change while the page is open.
+ */
+export function choicesQuery(api: Api, deck: string) {
+  return queryOptions({
+    queryKey: ["choices", deck],
+    queryFn: () =>
+      send(
+        api.GET("/decks/{deck_id}/choices", {
+          params: { path: { deck_id: deck } },
+        }),
+      ),
+    gcTime: Infinity,
+  });
+}
+
+/**
+ * The decks the player who is logged in built. Building, changing or
+ * deleting one asks for them again (`forgetDecks`).
+ */
+export function playerDecksQuery(api: Api) {
+  return queryOptions({
+    queryKey: ["my-decks"],
+    queryFn: () => send(api.GET("/my-decks")),
+  });
+}
+
+/**
+ * Forget the player's decks, so the page asks for them again: after one is
+ * built, changed or deleted, or once the player logs out.
+ */
+export function forgetDecks(queryClient: QueryClient) {
+  void queryClient.resetQueries({ queryKey: ["my-decks"] });
+}
+
+/**
+ * Build a deck (`id` null) or change the deck with the id `id`, all of it at
+ * once. The API checks it against the rules.
+ */
+export function saveDeck(api: Api, id: string | null, choice: DeckChoice) {
+  return id === null
+    ? send(api.POST("/my-decks", { body: choice }))
+    : send(
+        api.PUT("/my-decks/{deck_id}", {
+          params: { path: { deck_id: id } },
+          body: choice,
+        }),
+      );
+}
+
+/**
+ * Delete the deck with the id `id`. As with logging out, the API answers 204,
+ * with no body.
+ */
+export async function deleteDeck(api: Api, id: string): Promise<void> {
+  let answer;
+  try {
+    answer = await api.DELETE("/my-decks/{deck_id}", {
+      params: { path: { deck_id: id } },
+    });
+  } catch {
+    throw new RequestError(null, UNREACHABLE);
+  }
+  if (!answer.response.ok) {
+    throw turnedDown(answer.error);
+  }
 }
 
 /** Start a match against the AI with the deck `deck`. */
