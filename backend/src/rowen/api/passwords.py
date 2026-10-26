@@ -12,12 +12,17 @@ smallest OWASP recommends (19 MiB, 2 passes, 1 thread), and they are written in
 each hash, so a hash made with other settings can still be checked. A hash
 takes about 30 ms of CPU.
 
+A password is first put in one Unicode form (NFKC), as NIST advises: an "é"
+can be typed as one character or as "e" and an accent, depending on the
+keyboard or the device, and both must be the same password.
+
 At most ``AT_ONCE`` hashes are worked out at the same time: the server
 handles up to 40 requests at once, and 40 hashes would take 760 MiB, more than
 the API's 512 MiB (``deploy/cloud-run.yaml``). The others wait their turn.
 """
 
 import threading
+import unicodedata
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
@@ -36,7 +41,7 @@ _NO_ACCOUNT = _HASHER.hash("there is no account with this username")
 def hash_password(password: str) -> str:
     """Return the hash of a password, to keep in its place."""
     with _TURNS:
-        return _HASHER.hash(password)
+        return _HASHER.hash(_normalized(password))
 
 
 def check_password(password_hash: str | None, password: str) -> bool:
@@ -48,7 +53,12 @@ def check_password(password_hash: str | None, password: str) -> bool:
     """
     with _TURNS:
         try:
-            _HASHER.verify(password_hash or _NO_ACCOUNT, password)
+            _HASHER.verify(password_hash or _NO_ACCOUNT, _normalized(password))
         except VerifyMismatchError:
             return False
     return password_hash is not None
+
+
+def _normalized(password: str) -> str:
+    """Return a password in Unicode's NFKC form, the one its hash is made from."""
+    return unicodedata.normalize("NFKC", password)

@@ -203,9 +203,12 @@ def _without_detail(context: ExceptionContext) -> None:
     error = context.original_exception
     diag = getattr(error, "diag", None)
     wrapped = context.sqlalchemy_exception
-    if diag is None or diag.message_detail is None:
-        return
-    if not isinstance(wrapped, DBAPIError):
+    # A psycopg error has a diag, and SQLAlchemy wraps it in a DBAPIError.
+    if (
+        diag is None
+        or diag.message_detail is None
+        or not isinstance(wrapped, DBAPIError)
+    ):
         return
     error.args = (diag.message_primary,)
     raise type(wrapped)(
