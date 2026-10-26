@@ -10,8 +10,13 @@ import { expect, type Page } from "@playwright/test";
  * Each move adds one entry to what happened (the AI's answer comes with it),
  * so the next move waits until the page has the next view. (The log is out
  * of sight, but there all the same.) The page must play with reduced motion.
+ *
+ * It first waits for the board: the entries are counted from there. Counted
+ * before, the entry of the AI's first moves, when it starts, would come with
+ * the first move's.
  */
 export async function playOn(page: Page, moves = 100) {
+  await expect(page.getByRole("heading", { name: /^Round / })).toBeVisible();
   const cards = page.locator("[data-choosable]");
   const places = page.locator("[data-target]");
   const others = page.getByRole("group", { name: "Moves" }).getByRole("button");
