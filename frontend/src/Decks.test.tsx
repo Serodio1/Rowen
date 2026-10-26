@@ -18,8 +18,11 @@ import {
 import { createQueryClient } from "./api/requests.ts";
 import { CAPTAIN, DECKS, HOARFROST, SOLDIER, view } from "./test-data.ts";
 
-/** An answer of the fake API: a status and a JSON body. */
-type Answer = { status: number; body: unknown };
+/**
+ * An answer of the fake API: a status and a JSON body, or one that comes when
+ * the test says so.
+ */
+type Answer = { status: number; body: unknown } | Promise<Response>;
 
 /** A request the fake API got: its method and path, and its JSON body. */
 type Sent = { to: string; body: unknown };
@@ -38,6 +41,9 @@ function renderApp(answers: Record<string, Answer>) {
     const answer = answers[to];
     if (answer === undefined) {
       throw new TypeError("Failed to fetch");
+    }
+    if (answer instanceof Promise) {
+      return (await answer).clone();
     }
     return answer.status === 204
       ? new Response(null, { status: 204 })
@@ -71,8 +77,11 @@ const MINE = {
 } satisfies PlayerDeck;
 
 /** Return the answer with the player's decks. */
-function decks(list: PlayerDeck[], most = 10): Answer {
-  return { status: 200, body: { decks: list, most } satisfies PlayerDecks };
+function decks(
+  list: PlayerDeck[],
+  most = 10,
+): { status: number; body: PlayerDecks } {
+  return { status: 200, body: { decks: list, most } };
 }
 
 const RUI: Record<string, Answer> = {
@@ -481,4 +490,26 @@ test("a deck deleted in another tab says so, and its button goes", async () => {
       "No deck of your own yet: build one in My decks.",
     ),
   ).toBeInTheDocument();
+});
+
+test("while a match starts with one of the player's decks, no other can", async () => {
+  renderApp({
+    ...RUI,
+    "GET /api/my-decks": decks([MINE, { ...MINE, id: "d2", name: "Other" }]),
+    // No answer yet.
+    "POST /api/matches": new Promise<Response>(() => undefined),
+  });
+
+  const decksToPlay = await yourDecks();
+  fireEvent.click(
+    await decksToPlay.findByRole("button", { name: "Mine (Humans)" }),
+    { detail: 1 },
+  );
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Humans" })).toBeDisabled();
+  });
+  for (const name of ["Mine (Humans)", "Other (Humans)"]) {
+    expect(decksToPlay.getByRole("button", { name })).toBeDisabled();
+  }
 });
