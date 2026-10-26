@@ -5,6 +5,7 @@ They run only when TEST_DATABASE_URL is set (tests/conftest.py).
 
 import threading
 import time
+import traceback
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -18,7 +19,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from rowen.api.app import app, get_accounts, get_store, new_seed
 from rowen.api.database import PostgresAccountStore, PostgresMatchStore, create_engine
-from rowen.api.store import FIRST_VERSION, StoredMatch
+from rowen.api.store import FIRST_VERSION, MatchResult, StoredMatch
 from rowen.engine.public import (
     Action,
     EndRedraw,
@@ -246,6 +247,25 @@ def test_a_failed_statement_never_shows_the_seed(database_url: str) -> None:
 
     assert str(SECRET_SEED) not in str(error.value)
     assert "parameters hidden" in str(error.value)
+
+
+def test_a_row_that_breaks_a_check_never_shows_the_seed(
+    postgres_store: PostgresMatchStore,
+) -> None:
+    # PostgreSQL's detail lists the whole row, seed and all ("Failing row
+    # contains ..."): a bug that writes a result the table turns down must not
+    # put it in the server's log, in any error of the chain.
+    match = postgres_store.create(
+        ("humans", "robots"), SECRET_SEED, (), owner=None, now=NOW
+    )
+    weird = MatchResult(outcome="weird", rounds=(), ended_at=NOW)  # type: ignore[arg-type]
+
+    with pytest.raises(IntegrityError, match="outcome_is_known") as error:
+        postgres_store.add_actions(match.id, match.version, (), weird)
+
+    log = "".join(traceback.format_exception(error.value))
+    assert str(SECRET_SEED) not in log
+    assert "Failing row" not in log
 
 
 def test_a_move_says_when_the_match_was_last_played(
