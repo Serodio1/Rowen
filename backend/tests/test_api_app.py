@@ -28,6 +28,7 @@ from rowen.api.app import (
     _ai_plays,
     _play_again,
     app,
+    get_decks,
     get_store,
     make_stores,
     new_seed,
@@ -461,6 +462,13 @@ def test_without_a_database_the_matches_are_kept_in_memory(
     assert isinstance(store, MemoryMatchStore)
     assert isinstance(accounts, MemoryAccountStore)
     assert isinstance(decks, MemoryDeckStore)
+
+
+def test_the_server_keeps_the_players_decks_in_one_store() -> None:
+    # The tests run with no DATABASE_URL (tests/conftest.py): in memory, and
+    # every request gets the same store.
+    assert isinstance(get_decks(), MemoryDeckStore)
+    assert get_decks() is get_decks()
 
 
 def test_with_a_database_the_matches_are_kept_there() -> None:
