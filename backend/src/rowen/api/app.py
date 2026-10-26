@@ -11,21 +11,23 @@ makes it before the server answers, so the player always gets the match on
 their turn, unless the match is over.
 
 A player may also make an account and log in (ADR 0014), but needn't: a guest
-plays the same way. A match a player starts while logged in is theirs: only
-they may see it and play it, and it is in the list of their matches, with how
-it ended, and in their stats. To anybody else, it is a match that doesn't exist
-(404), so the answer doesn't even say that the id is right. A guest's match is
-anybody's who has its id, as before. Logging in sets a cookie with the
-session's token, which the browser sends back with each request. A request that
-would change something and comes from a page of another site is turned down
-(``Origin``, below), against cross-site request forgery.
+plays the same way. A player who is logged in may build decks of their own from
+a faction's cards, and keep up to 10. A match a player starts while logged in
+is theirs: only they may see it and play it, and it is in the list of their
+matches, with how it ended, and in their stats. To anybody else, it is a match
+that doesn't exist (404), so the answer doesn't even say that the id is right.
+A guest's match is anybody's who has its id, as before. Logging in sets a
+cookie with the session's token, which the browser sends back with each
+request. A request that would change something and comes from a page of another
+site is turned down (``Origin``, below), against cross-site request forgery.
 
 When the API turns a request down, it always answers with the same shape, an
 ``Error``: a ``code`` for the browser and a ``message`` for a person. It does
 the same when a bug on the server makes a request fail.
 
-Endpoints get the match store, the account store, the seed of a new match and
-the time from ``get_store``, ``get_accounts``, ``new_seed`` and ``get_now``,
+Endpoints get the match store, the account store, the deck store, the seed of
+a new match and the time from ``get_store``, ``get_accounts``, ``get_decks``,
+``new_seed`` and ``get_now``,
 through FastAPI's ``Depends``. The tests replace them with
 ``app.dependency_overrides``: new stores for each test, seeds they know, and
 a time they choose.
@@ -52,11 +54,19 @@ from starlette.exceptions import HTTPException
 
 from rowen.ai.baseline import choose_action
 from rowen.api.accounts import AccountStore, MemoryAccountStore, StoredAccount
-from rowen.api.database import PostgresAccountStore, PostgresMatchStore, create_engine
+from rowen.api.database import (
+    PostgresAccountStore,
+    PostgresDeckStore,
+    PostgresMatchStore,
+    create_engine,
+)
 from rowen.api.passwords import check_password, hash_password
+from rowen.api.player_decks import MAX_DECKS, DeckStore, MemoryDeckStore, StoredDeck
 from rowen.api.schemas import (
     Account,
+    Choices,
     Credentials,
+    DeckChoice,
     Decks,
     DeckStats,
     DeckSummary,
@@ -69,22 +79,26 @@ from rowen.api.schemas import (
     MovePlayed,
     NewMatch,
     Played,
+    PlayerDeck,
+    PlayerDecks,
     Result,
     RoundScores,
     Stats,
+    from_choices,
     from_events,
     from_view,
     to_action,
 )
 from rowen.api.schemas import RoundEnded as RoundEndedJson
 from rowen.api.store import MatchResult, MatchStore, MemoryMatchStore, StoredMatch
-from rowen.data import deck_ids, load_deck
+from rowen.data import deck_ids, load_deck, load_specials
 from rowen.engine.public import (
     Action,
     Event,
     GameState,
     RoundEnded,
     apply,
+    build_deck,
     player_view,
     start_match,
 )
@@ -136,11 +150,13 @@ app = FastAPI(
 )
 
 
-def make_stores(environ: Mapping[str, str]) -> tuple[MatchStore, AccountStore]:
-    """Return the stores the server keeps its matches and its accounts in.
+def make_stores(
+    environ: Mapping[str, str],
+) -> tuple[MatchStore, AccountStore, DeckStore]:
+    """Return the stores the server keeps its matches, accounts and decks in.
 
     In PostgreSQL if ``DATABASE_URL`` gives its address, so they survive a
-    restart, as in Docker Compose and online. Both share the same
+    restart, as in Docker Compose and online. All share the same
     connections. Otherwise in the memory of the server's process, as when it
     runs on a computer for development. Then the server must run as a single
     process, as uvicorn does unless told otherwise: with several workers,
@@ -150,13 +166,17 @@ def make_stores(environ: Mapping[str, str]) -> tuple[MatchStore, AccountStore]:
     url = environ.get("DATABASE_URL")
     if url:
         engine = create_engine(url)
-        return PostgresMatchStore(engine), PostgresAccountStore(engine)
-    return MemoryMatchStore(), MemoryAccountStore()
+        return (
+            PostgresMatchStore(engine),
+            PostgresAccountStore(engine),
+            PostgresDeckStore(engine),
+        )
+    return MemoryMatchStore(), MemoryAccountStore(), MemoryDeckStore()
 
 
-# All the server's matches and accounts. No connection to the database is made
-# until a request needs one.
-_store, _accounts = make_stores(os.environ)
+# All the server's matches, accounts and decks. No connection to the database
+# is made until a request needs one.
+_store, _accounts, _decks = make_stores(os.environ)
 
 
 def get_store() -> MatchStore:
@@ -167,6 +187,11 @@ def get_store() -> MatchStore:
 def get_accounts() -> AccountStore:
     """Return where the server keeps its accounts and their sessions."""
     return _accounts
+
+
+def get_decks() -> DeckStore:
+    """Return where the server keeps the decks players built."""
+    return _decks
 
 
 def new_seed() -> int:
@@ -183,6 +208,7 @@ def get_now() -> datetime:
 # the function in Depends and passes the endpoint what it returns.
 type Store = Annotated[MatchStore, Depends(get_store)]
 type Accounts = Annotated[AccountStore, Depends(get_accounts)]
+type PlayerDeckStore = Annotated[DeckStore, Depends(get_decks)]
 type Seed = Annotated[int, Depends(new_seed)]
 type Now = Annotated[datetime, Depends(get_now)]
 # The session's token, from its cookie. An endpoint gives it None as its
@@ -285,11 +311,7 @@ def create_match(
     """
     decks = deck_ids()
     if new_match.deck not in decks:
-        raise ApiError(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "unknown_deck",
-            f"There is no such deck. The decks are: {', '.join(decks)}.",
-        )
+        raise _unknown_deck(status.HTTP_422_UNPROCESSABLE_CONTENT)
     ai_deck = next(deck for deck in decks if deck != new_match.deck)
     state = start_match((load_deck(new_match.deck), load_deck(ai_deck)), seed=seed)
     state, actions, moves = _ai_plays(state)
@@ -452,6 +474,120 @@ def get_stats(accounts: Accounts, store: Store, now: Now, token: Token = None) -
     )
 
 
+@app.get(
+    "/decks/{deck_id}/choices",
+    responses=_errors(status.HTTP_404_NOT_FOUND),
+)
+def get_choices(deck_id: str) -> Choices:
+    """Return what a player may put in a deck they build from a faction's cards.
+
+    ``deck_id`` is the id of the faction's own deck, from ``GET /decks``.
+    """
+    if deck_id not in deck_ids():
+        raise _unknown_deck(status.HTTP_404_NOT_FOUND)
+    return from_choices(load_deck(deck_id), load_specials())
+
+
+@app.get("/my-decks", responses=_errors(status.HTTP_401_UNAUTHORIZED))
+def list_player_decks(
+    accounts: Accounts, decks: PlayerDeckStore, now: Now, token: Token = None
+) -> PlayerDecks:
+    """Return the decks of the player who is logged in, the oldest first.
+
+    If the player isn't logged in, the answer is a 401.
+    """
+    player = _player(accounts, token, now)
+    return PlayerDecks(
+        decks=tuple(_player_deck(deck) for deck in decks.list_decks(player.id)),
+        most=MAX_DECKS,
+    )
+
+
+@app.post(
+    "/my-decks",
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_409_CONFLICT,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ),
+)
+def create_player_deck(
+    choice: DeckChoice,
+    accounts: Accounts,
+    decks: PlayerDeckStore,
+    now: Now,
+    token: Token = None,
+) -> PlayerDeck:
+    """Build a deck and keep it for the player who is logged in.
+
+    The deck must keep to the rules (``GET /decks/{id}/choices``), and a
+    player may keep up to 10 decks (409 when they have 10).
+    """
+    player = _player(accounts, token, now)
+    _check_deck(choice)
+    deck = decks.create_deck(player.id, choice.name, choice.deck, choice.copies, now)
+    if deck is None:
+        raise ApiError(
+            status.HTTP_409_CONFLICT,
+            "too_many_decks",
+            f"A player may keep up to {MAX_DECKS} decks: delete one first.",
+        )
+    return _player_deck(deck)
+
+
+@app.put(
+    "/my-decks/{deck_id}",
+    responses=_errors(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ),
+)
+def replace_player_deck(
+    deck_id: UUID,
+    choice: DeckChoice,
+    accounts: Accounts,
+    decks: PlayerDeckStore,
+    now: Now,
+    token: Token = None,
+) -> PlayerDeck:
+    """Change a deck of the player's: its name, faction and copies, all at once.
+
+    As when it was built, the deck must keep to the rules.
+    """
+    player = _player(accounts, token, now)
+    _check_deck(choice)
+    deck = decks.replace_deck(
+        player.id, deck_id, choice.name, choice.deck, choice.copies
+    )
+    if deck is None:
+        raise _deck_not_found()
+    return _player_deck(deck)
+
+
+@app.delete(
+    "/my-decks/{deck_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=_errors(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ),
+)
+def delete_player_deck(
+    deck_id: UUID,
+    accounts: Accounts,
+    decks: PlayerDeckStore,
+    now: Now,
+    token: Token = None,
+) -> None:
+    """Delete a deck of the player's."""
+    player = _player(accounts, token, now)
+    if not decks.delete_deck(player.id, deck_id):
+        raise _deck_not_found()
+
+
 @app.post(
     "/accounts",
     status_code=status.HTTP_201_CREATED,
@@ -542,6 +678,62 @@ def log_out(response: Response, accounts: Accounts, token: Token = None) -> None
         accounts.delete_session(_hash_token(token))
     response.delete_cookie(
         SESSION_COOKIE, path="/", secure=True, httponly=True, samesite="lax"
+    )
+
+
+def _check_deck(choice: DeckChoice) -> None:
+    """Turn the request down unless the deck keeps to the rules.
+
+    The engine checks it (``build_deck``), as it would to play the deck. The
+    message is the same whatever is wrong, since the engine's would name the
+    request's cards and counts, and an error never holds a value from the
+    request (``Error``): the page knows the rules from ``GET
+    /decks/{id}/choices``, so this is only a last guard.
+    """
+    if choice.deck not in deck_ids():
+        raise _unknown_deck(status.HTTP_422_UNPROCESSABLE_CONTENT)
+    try:
+        build_deck(
+            id=choice.deck,
+            name=choice.name,
+            faction=load_deck(choice.deck),
+            specials=load_specials(),
+            copies=choice.copies,
+        )
+    except ValueError:
+        raise ApiError(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "invalid_deck",
+            "This deck breaks the rules: each card must be one the deck may hold, "
+            "with 1 copy up to the most it may have, and a deck needs enough units "
+            "and not too many special cards (GET /decks/{id}/choices).",
+        ) from None
+
+
+def _player_deck(deck: StoredDeck) -> PlayerDeck:
+    """Return a deck a player built as the API sends it."""
+    return PlayerDeck(
+        id=deck.id, name=deck.name, deck=deck.faction, copies=dict(deck.copies)
+    )
+
+
+def _deck_not_found() -> ApiError:
+    """Return the error for a deck the player doesn't have.
+
+    Also for a deck of another player's: the answer doesn't tell that its id
+    is right.
+    """
+    return ApiError(
+        status.HTTP_404_NOT_FOUND, "deck_not_found", "The player has no such deck."
+    )
+
+
+def _unknown_deck(status_code: int) -> ApiError:
+    """Return the error for a faction's deck that doesn't exist."""
+    return ApiError(
+        status_code,
+        "unknown_deck",
+        f"There is no such deck. The decks are: {', '.join(deck_ids())}.",
     )
 
 

@@ -22,11 +22,12 @@ Each kind of card, of action and of event carries a ``type``, such as
 ``EndRedraw`` have no other field.
 """
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StringConstraints
 
 from rowen.engine import public as engine
 
@@ -420,6 +421,72 @@ class Decks(Schema):
     decks: tuple[DeckSummary, ...]
 
 
+class Choice(Schema):
+    """A card a player may put in a deck they build, and how many copies at most."""
+
+    card: Card
+    most: int
+
+
+class Choices(Schema):
+    """What a player may put in a deck they build from a faction's cards.
+
+    ``cards`` holds each card once, in the order the deck would hold them: the
+    faction's units, then the special cards. Every deck needs at least
+    ``min_units`` units and may have at most ``max_specials`` special cards.
+    The rules decide all of it, so the API says it (ADR 0002).
+    """
+
+    deck: str
+    cards: tuple[Choice, ...]
+    min_units: int
+    max_specials: int
+
+
+# A deck's name: what the player calls it, 1 to 30 characters once the spaces
+# around it are taken away.
+type DeckName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)
+]
+
+# A card's id, as a key of ``copies``: no card has a longer one.
+type CardId = Annotated[str, StringConstraints(max_length=64)]
+
+
+class DeckChoice(Schema):
+    """What a player sends to build a deck or change one: all of it at once.
+
+    ``deck`` is the id of the faction's own deck, whose cards it holds, and
+    ``copies`` how many copies of each card the player chose, by the card's
+    id. A count is a whole number, never ``true`` (strict): JSON has no
+    integers of its own, and Python counts ``True`` as 1. There are far fewer
+    cards to choose than 64, the most ``copies`` may hold.
+    """
+
+    name: DeckName
+    deck: str
+    copies: Annotated[dict[CardId, StrictInt], Field(max_length=64)]
+
+
+class PlayerDeck(Schema):
+    """A deck a player built, with its id, as they chose it."""
+
+    id: UUID
+    name: str
+    deck: str
+    copies: dict[str, int]
+
+
+class PlayerDecks(Schema):
+    """The decks of the player who is logged in, the oldest first.
+
+    ``most`` is how many decks a player may keep.
+    """
+
+    decks: tuple[PlayerDeck, ...]
+    most: int
+
+
 class NewMatch(Schema):
     """What the player sends to start a match: the id of their deck."""
 
@@ -580,6 +647,9 @@ type ErrorCode = Literal[
     "wrong_credentials",
     "not_logged_in",
     "forbidden_origin",
+    "invalid_deck",
+    "too_many_decks",
+    "deck_not_found",
 ]
 
 
@@ -643,6 +713,21 @@ def _row(row: engine.RowView) -> RowView:
         scarecrows=tuple(_special(card) for card in row.scarecrows),
         weathered=row.weathered,
         score=row.score,
+    )
+
+
+def from_choices(
+    faction: engine.Deck, specials: Mapping[str, engine.SpecialCard]
+) -> Choices:
+    """Return what a player may put in a deck built from a faction's cards."""
+    return Choices(
+        deck=faction.id,
+        cards=tuple(
+            Choice(card=_card(card), most=engine.max_copies(card, faction))
+            for card in engine.choices(faction, specials)
+        ),
+        min_units=engine.MIN_UNITS,
+        max_specials=engine.MAX_SPECIALS,
     )
 
 

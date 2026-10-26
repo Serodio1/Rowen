@@ -114,7 +114,13 @@ newest first, 20 at a time (`?before=<id>` for the next page), and
 `GET /stats` counts their wins, losses and draws with each deck. On the page,
 "My matches" shows both, and "Resume" plays on a match that isn't over:
 `GET /matches/{id}` gives it with the `rounds` that ended so far
-([ADR 0015](docs/adr/0015-players-own-their-matches.md)). When the API turns a request down, it answers with a
+([ADR 0015](docs/adr/0015-players-own-their-matches.md)). A player who is
+logged in may also build decks of their own: `GET /decks/{id}/choices` says
+which cards a deck of that faction may hold and how many copies of each, and
+`/my-decks` lists their decks (`GET`), builds one (`POST`, with
+`{"name": "Mine", "deck": "humans", "copies": {"human": 5, ...}}`), changes
+one (`PUT /my-decks/{id}`) or deletes one (`DELETE /my-decks/{id}`), up to
+10. When the API turns a request down, it answers with a
 `code` and a `message`, such as `illegal_action`. `--reload` restarts the
 server whenever the Python code in `src` changes.
 Run like this, the API keeps its matches in memory, so they are lost when it

@@ -10,6 +10,7 @@ To add a faction, add its deck to ``decks/``; ``deck_ids`` finds it by itself.
 import json
 from importlib.resources import files
 
+from rowen.engine.cards import SpecialCard
 from rowen.engine.decks import Deck
 from rowen.engine.parsing import parse_deck, parse_specials
 
@@ -27,6 +28,19 @@ def deck_ids() -> list[str]:
     )
 
 
+def load_specials() -> dict[str, SpecialCard]:
+    """Read every special card from the data files, by id.
+
+    Raises:
+        ValueError: If the file is not valid JSON or has invalid data. The
+            message starts with the file's name.
+    """
+    try:
+        return parse_specials(_read_json("specials.json"))
+    except ValueError as error:
+        raise ValueError(f"specials.json: {error}") from error
+
+
 def load_deck(deck_id: str) -> Deck:
     """Read a deck and the special cards from the data files.
 
@@ -38,10 +52,7 @@ def load_deck(deck_id: str) -> Deck:
     if deck_id not in deck_ids():
         raise ValueError(f"unknown deck {deck_id}")
 
-    try:
-        specials = parse_specials(_read_json("specials.json"))
-    except ValueError as error:
-        raise ValueError(f"specials.json: {error}") from error
+    specials = load_specials()
     try:
         return parse_deck(_read_json("decks", f"{deck_id}.json"), specials)
     except ValueError as error:

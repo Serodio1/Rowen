@@ -5,6 +5,9 @@ passes their moves on to the engine. For that it needs four functions:
 ``start_match`` and ``apply`` to play, and ``player_view`` and
 ``player_events`` to see what one player may see. It also needs the types
 they work with: actions, events, cards, the player view and the match state.
+For a deck a player builds, ``build_deck`` checks the player's choice and makes
+the deck, and ``choices``, ``max_copies`` and the deck limits say what may be
+chosen, for the client to show.
 
 The rest of the engine holds the rules, such as ``legal_actions``, which a
 client must not work out for itself (ADR 0002): the legal actions, the scores
@@ -44,6 +47,14 @@ from rowen.engine.cards import (
     SpecialKind,
     UnitCard,
 )
+from rowen.engine.decks import (
+    MAX_SPECIALS,
+    MIN_UNITS,
+    Deck,
+    build_deck,
+    choices,
+    max_copies,
+)
 from rowen.engine.events import (
     CardRedrawn,
     CardsDrawn,
@@ -79,12 +90,15 @@ from rowen.engine.view import (
 )
 
 __all__ = [
+    "MAX_SPECIALS",
+    "MIN_UNITS",
     "WEATHER_ROWS",
     "Ability",
     "Action",
     "Card",
     "CardRedrawn",
     "CardsDrawn",
+    "Deck",
     "EndRedraw",
     "Event",
     "EventView",
@@ -122,7 +136,10 @@ __all__ = [
     "WeatherPlayed",
     "WildfirePlayed",
     "apply",
+    "build_deck",
+    "choices",
     "describe",
+    "max_copies",
     "on_opponent_side",
     "player_events",
     "player_view",

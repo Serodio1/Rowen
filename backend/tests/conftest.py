@@ -15,7 +15,13 @@ from alembic.config import Config
 from sqlalchemy import text
 
 from rowen.api.accounts import AccountStore, MemoryAccountStore
-from rowen.api.database import PostgresAccountStore, PostgresMatchStore, create_engine
+from rowen.api.database import (
+    PostgresAccountStore,
+    PostgresDeckStore,
+    PostgresMatchStore,
+    create_engine,
+)
+from rowen.api.player_decks import DeckStore, MemoryDeckStore
 from rowen.api.store import MatchStore, MemoryMatchStore
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
@@ -90,8 +96,9 @@ def postgres_accounts(database_url: str) -> Iterator[PostgresAccountStore]:
     """Return a store of accounts in the test database, with none in it."""
     engine = create_engine(database_url)
     with engine.begin() as connection:
-        # The matches too, since they can have an account as their owner.
-        connection.execute(text("TRUNCATE accounts, sessions, matches"))
+        # The matches and decks too, since they can have an account as their
+        # owner.
+        connection.execute(text("TRUNCATE accounts, sessions, matches, player_decks"))
     yield PostgresAccountStore(engine)
     engine.dispose()
 
@@ -103,3 +110,15 @@ def any_accounts(request: pytest.FixtureRequest) -> AccountStore:
         return MemoryAccountStore()
     store: AccountStore = request.getfixturevalue("postgres_accounts")
     return store
+
+
+@pytest.fixture(params=["memory", "postgres"])
+def any_decks(request: pytest.FixtureRequest) -> tuple[DeckStore, AccountStore]:
+    """Return each pair of stores in turn, of decks and of accounts, empty.
+
+    In PostgreSQL, a deck's owner must be an account in the same database.
+    """
+    if request.param == "memory":
+        return MemoryDeckStore(), MemoryAccountStore()
+    accounts: PostgresAccountStore = request.getfixturevalue("postgres_accounts")
+    return PostgresDeckStore(accounts._engine), accounts
