@@ -8,7 +8,8 @@ version, its owner and, once it is over, its result. The actions are a JSON
 list, each one in the shape the API sends it (``schemas.Action``), so the
 database holds no Python objects. Each account is a row of the ``accounts``
 table and each session one of ``sessions``, as ``rowen.api.accounts`` describes
-them.
+them, and each deck a player built one of ``player_decks``
+(``rowen.api.player_decks``).
 
 The tables are made by the migrations in ``backend/migrations`` (Alembic), never
 by this module: the rows' classes only say what the tables look like, and a
@@ -23,6 +24,7 @@ database closed meanwhile, as a database that sleeps when idle does, is found
 before it is lent (``pool_pre_ping``).
 """
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -58,6 +60,7 @@ from sqlalchemy.orm import (
 )
 
 from rowen.api.accounts import StoredAccount, StoredSession
+from rowen.api.player_decks import MAX_DECKS, StoredDeck
 from rowen.api.schemas import Action as ActionJson
 from rowen.api.schemas import from_action, to_action
 from rowen.api.store import (
@@ -156,6 +159,34 @@ class SessionRow(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     account: Mapped[AccountRow] = relationship()
+
+
+class PlayerDeckRow(Base):
+    """A deck a player built, as a row of the ``player_decks`` table.
+
+    Deleting an account deletes its decks (``ondelete``).
+    """
+
+    __tablename__ = "player_decks"
+    __table_args__ = (
+        # An owner's decks, oldest first, as list_decks reads them.
+        Index("ix_player_decks_owner", "account_id", "created_at", "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE")
+    )
+    name: Mapped[str] = mapped_column(String)
+    faction: Mapped[str] = mapped_column(String)
+    # How many copies of each card, by the card's id: {"human": 5, ...}.
+    copies: Mapped[dict[str, int]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 # How long a request waits to connect to the database, and then for a free
@@ -498,4 +529,116 @@ def _account(row: AccountRow) -> StoredAccount:
     """Return a row as the store gives an account."""
     return StoredAccount(
         id=row.id, username=row.username, password_hash=row.password_hash
+    )
+
+
+class PostgresDeckStore:
+    """The decks players built, in PostgreSQL."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Make a store that keeps its decks in a database.
+
+        Args:
+            engine: The connections to the database, from ``create_engine``.
+        """
+        self._engine = engine
+
+    def create_deck(
+        self,
+        owner: UUID,
+        name: str,
+        faction: str,
+        copies: Mapping[str, int],
+        now: datetime,
+    ) -> StoredDeck | None:
+        """Keep a new deck of an owner's, unless they have ``MAX_DECKS``.
+
+        Counting the owner's decks and adding one are two statements, so two
+        requests could both count nine and both add a deck. The first
+        statement locks the owner's account (``FOR UPDATE``) until the end of
+        the transaction: a second request for the same owner waits there, and
+        then counts the deck the first one added.
+        """
+        lock = select(AccountRow.id).where(AccountRow.id == owner).with_for_update()
+        count = (
+            select(func.count())
+            .select_from(PlayerDeckRow)
+            .where(PlayerDeckRow.account_id == owner)
+        )
+        row = PlayerDeckRow(
+            id=uuid4(),
+            account_id=owner,
+            name=name,
+            faction=faction,
+            copies=dict(copies),
+            created_at=now,
+        )
+        with Session(self._engine) as session, session.begin():
+            session.execute(lock)
+            if session.scalars(count).one() >= MAX_DECKS:
+                return None
+            session.add(row)
+            session.flush()
+            return _deck(row)
+
+    def list_decks(self, owner: UUID) -> tuple[StoredDeck, ...]:
+        """Return an owner's decks, the oldest first."""
+        statement = (
+            select(PlayerDeckRow)
+            .where(PlayerDeckRow.account_id == owner)
+            .order_by(PlayerDeckRow.created_at, PlayerDeckRow.id)
+        )
+        with Session(self._engine) as session:
+            return tuple(_deck(row) for row in session.scalars(statement))
+
+    def get_deck(self, owner: UUID, deck_id: UUID) -> StoredDeck | None:
+        """Return a deck of an owner's, or None if they have no such deck."""
+        statement = select(PlayerDeckRow).where(
+            PlayerDeckRow.id == deck_id, PlayerDeckRow.account_id == owner
+        )
+        with Session(self._engine) as session:
+            row = session.scalars(statement).one_or_none()
+            return None if row is None else _deck(row)
+
+    def replace_deck(
+        self,
+        owner: UUID,
+        deck_id: UUID,
+        name: str,
+        faction: str,
+        copies: Mapping[str, int],
+    ) -> StoredDeck | None:
+        """Give a deck of an owner's a new name, faction and copies."""
+        statement = (
+            update(PlayerDeckRow)
+            .where(PlayerDeckRow.id == deck_id, PlayerDeckRow.account_id == owner)
+            .values(
+                name=name, faction=faction, copies=dict(copies), updated_at=func.now()
+            )
+            .returning(PlayerDeckRow)
+        )
+        with Session(self._engine) as session, session.begin():
+            row = session.scalars(statement).one_or_none()
+            return None if row is None else _deck(row)
+
+    def delete_deck(self, owner: UUID, deck_id: UUID) -> bool:
+        """Delete a deck of an owner's; return whether there was one."""
+        statement = (
+            delete(PlayerDeckRow)
+            .where(PlayerDeckRow.id == deck_id, PlayerDeckRow.account_id == owner)
+            .returning(PlayerDeckRow.id)
+        )
+        with Session(self._engine) as session, session.begin():
+            return session.scalars(statement).one_or_none() is not None
+
+
+def _deck(row: PlayerDeckRow) -> StoredDeck:
+    """Return a row as the store gives a deck."""
+    return StoredDeck(
+        id=row.id,
+        owner=row.account_id,
+        name=row.name,
+        faction=row.faction,
+        copies=dict(row.copies),
+        created_at=row.created_at,
     )

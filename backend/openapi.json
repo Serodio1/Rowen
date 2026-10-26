@@ -364,6 +364,343 @@
         }
       }
     },
+    "/decks/{deck_id}/choices": {
+      "get": {
+        "summary": "Get Choices",
+        "description": "Return what a player may put in a deck they build from a faction's cards.\n\n``deck_id`` is the id of the faction's own deck, from ``GET /decks``.",
+        "operationId": "get_choices",
+        "parameters": [
+          {
+            "name": "deck_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Deck Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Choices"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/my-decks": {
+      "get": {
+        "summary": "List Player Decks",
+        "description": "Return the decks of the player who is logged in, the oldest first.\n\nIf the player isn't logged in, the answer is a 401.",
+        "operationId": "list_player_decks",
+        "parameters": [
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerDecks"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Player Deck",
+        "description": "Build a deck and keep it for the player who is logged in.\n\nThe deck must keep to the rules (``GET /decks/{id}/choices``), and a\nplayer may keep up to 10 decks (409 when they have 10).",
+        "operationId": "create_player_deck",
+        "parameters": [
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeckChoice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerDeck"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/my-decks/{deck_id}": {
+      "put": {
+        "summary": "Replace Player Deck",
+        "description": "Change a deck of the player's: its name, faction and copies, all at once.\n\nAs when it was built, the deck must keep to the rules.",
+        "operationId": "replace_player_deck",
+        "parameters": [
+          {
+            "name": "deck_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deck Id"
+            }
+          },
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeckChoice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerDeck"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Player Deck",
+        "description": "Delete a deck of the player's.",
+        "operationId": "delete_player_deck",
+        "parameters": [
+          {
+            "name": "deck_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deck Id"
+            }
+          },
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/accounts": {
       "post": {
         "summary": "Register",
@@ -680,6 +1017,10 @@
           }
         }
       },
+      "CardId": {
+        "type": "string",
+        "maxLength": 64
+      },
       "CardRedrawn": {
         "properties": {
           "type": {
@@ -740,6 +1081,58 @@
         "title": "CardsDrawn",
         "description": "The player drew cards: ``engine.CardsDrawn``.\n\nThe player only gets this for their own cards. For the opponent's, they get\n``OpponentDrew``."
       },
+      "Choice": {
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/Card"
+          },
+          "most": {
+            "type": "integer",
+            "title": "Most"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "card",
+          "most"
+        ],
+        "title": "Choice",
+        "description": "A card a player may put in a deck they build, and how many copies at most."
+      },
+      "Choices": {
+        "properties": {
+          "deck": {
+            "type": "string",
+            "title": "Deck"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/Choice"
+            },
+            "type": "array",
+            "title": "Cards"
+          },
+          "min_units": {
+            "type": "integer",
+            "title": "Min Units"
+          },
+          "max_specials": {
+            "type": "integer",
+            "title": "Max Specials"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "deck",
+          "cards",
+          "min_units",
+          "max_specials"
+        ],
+        "title": "Choices",
+        "description": "What a player may put in a deck they build from a faction's cards.\n\n``cards`` holds each card once, in the order the deck would hold them: the\nfaction's units, then the special cards. Every deck needs at least\n``min_units`` units and may have at most ``max_specials`` special cards.\nThe rules decide all of it, so the API says it (ADR 0002)."
+      },
       "Credentials": {
         "properties": {
           "username": {
@@ -762,6 +1155,42 @@
         ],
         "title": "Credentials",
         "description": "What a player sends to make an account or to log in.\n\nA username is 3 to 20 lower-case letters, digits, ``_`` or ``-``, so two\nusernames that look the same are the same. A password is 8 to 128\ncharacters, any of them: at least 8, as NIST asks (SP 800-63B), and at\nmost 128, so a hash never has to be worked out from a huge one."
+      },
+      "DeckChoice": {
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/DeckName"
+          },
+          "deck": {
+            "type": "string",
+            "title": "Deck"
+          },
+          "copies": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/CardId"
+            },
+            "type": "object",
+            "maxProperties": 64,
+            "title": "Copies"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "deck",
+          "copies"
+        ],
+        "title": "DeckChoice",
+        "description": "What a player sends to build a deck or change one: all of it at once.\n\n``deck`` is the id of the faction's own deck, whose cards it holds, and\n``copies`` how many copies of each card the player chose, by the card's\nid. A count is a whole number, never ``true`` (strict): JSON has no\nintegers of its own, and Python counts ``True`` as 1. There are far fewer\ncards to choose than 64, the most ``copies`` may hold."
+      },
+      "DeckName": {
+        "type": "string",
+        "maxLength": 30,
+        "minLength": 1
       },
       "DeckStats": {
         "properties": {
@@ -881,7 +1310,10 @@
           "username_taken",
           "wrong_credentials",
           "not_logged_in",
-          "forbidden_origin"
+          "forbidden_origin",
+          "invalid_deck",
+          "too_many_decks",
+          "deck_not_found"
         ]
       },
       "EventView": {
@@ -1416,6 +1848,63 @@
         ],
         "title": "Played",
         "description": "A match after actions were played in it, and what happened.\n\n``moves`` holds those actions, in order: in a new match, the AI's first\nones, if it starts (none if the player does); after the player's action,\nthat action and then the AI's answer, one move for each of its actions.\nThe ``view`` of the match is that of the last move, if there is one."
+      },
+      "PlayerDeck": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "deck": {
+            "type": "string",
+            "title": "Deck"
+          },
+          "copies": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Copies"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "deck",
+          "copies"
+        ],
+        "title": "PlayerDeck",
+        "description": "A deck a player built, with its id, as they chose it."
+      },
+      "PlayerDecks": {
+        "properties": {
+          "decks": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerDeck"
+            },
+            "type": "array",
+            "title": "Decks"
+          },
+          "most": {
+            "type": "integer",
+            "title": "Most"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decks",
+          "most"
+        ],
+        "title": "PlayerDecks",
+        "description": "The decks of the player who is logged in, the oldest first.\n\n``most`` is how many decks a player may keep."
       },
       "PlayerPassed": {
         "properties": {

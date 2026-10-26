@@ -129,6 +129,83 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/decks/{deck_id}/choices": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Choices
+     * @description Return what a player may put in a deck they build from a faction's cards.
+     *
+     *     ``deck_id`` is the id of the faction's own deck, from ``GET /decks``.
+     */
+    get: operations["get_choices"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/my-decks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Player Decks
+     * @description Return the decks of the player who is logged in, the oldest first.
+     *
+     *     If the player isn't logged in, the answer is a 401.
+     */
+    get: operations["list_player_decks"];
+    put?: never;
+    /**
+     * Create Player Deck
+     * @description Build a deck and keep it for the player who is logged in.
+     *
+     *     The deck must keep to the rules (``GET /decks/{id}/choices``), and a
+     *     player may keep up to 10 decks (409 when they have 10).
+     */
+    post: operations["create_player_deck"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/my-decks/{deck_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Replace Player Deck
+     * @description Change a deck of the player's: its name, faction and copies, all at once.
+     *
+     *     As when it was built, the deck must keep to the rules.
+     */
+    put: operations["replace_player_deck"];
+    post?: never;
+    /**
+     * Delete Player Deck
+     * @description Delete a deck of the player's.
+     */
+    delete: operations["delete_player_deck"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/accounts": {
     parameters: {
       query?: never;
@@ -217,6 +294,7 @@ export interface components {
       | components["schemas"]["EndRedraw"];
     Card:
       components["schemas"]["UnitCard"] | components["schemas"]["SpecialCard"];
+    CardId: string;
     /**
      * CardRedrawn
      * @description The player swapped a card before round 1: ``engine.CardRedrawn``.
@@ -256,6 +334,34 @@ export interface components {
       cards: string[];
     };
     /**
+     * Choice
+     * @description A card a player may put in a deck they build, and how many copies at most.
+     */
+    Choice: {
+      card: components["schemas"]["Card"];
+      /** Most */
+      most: number;
+    };
+    /**
+     * Choices
+     * @description What a player may put in a deck they build from a faction's cards.
+     *
+     *     ``cards`` holds each card once, in the order the deck would hold them: the
+     *     faction's units, then the special cards. Every deck needs at least
+     *     ``min_units`` units and may have at most ``max_specials`` special cards.
+     *     The rules decide all of it, so the API says it (ADR 0002).
+     */
+    Choices: {
+      /** Deck */
+      deck: string;
+      /** Cards */
+      cards: components["schemas"]["Choice"][];
+      /** Min Units */
+      min_units: number;
+      /** Max Specials */
+      max_specials: number;
+    };
+    /**
      * Credentials
      * @description What a player sends to make an account or to log in.
      *
@@ -270,6 +376,26 @@ export interface components {
       /** Password */
       password: string;
     };
+    /**
+     * DeckChoice
+     * @description What a player sends to build a deck or change one: all of it at once.
+     *
+     *     ``deck`` is the id of the faction's own deck, whose cards it holds, and
+     *     ``copies`` how many copies of each card the player chose, by the card's
+     *     id. A count is a whole number, never ``true`` (strict): JSON has no
+     *     integers of its own, and Python counts ``True`` as 1. There are far fewer
+     *     cards to choose than 64, the most ``copies`` may hold.
+     */
+    DeckChoice: {
+      name: components["schemas"]["DeckName"];
+      /** Deck */
+      deck: string;
+      /** Copies */
+      copies: {
+        [key: string]: number;
+      };
+    };
+    DeckName: string;
     /**
      * DeckStats
      * @description How the player's matches with one deck ended: how many of each.
@@ -346,7 +472,10 @@ export interface components {
       | "username_taken"
       | "wrong_credentials"
       | "not_logged_in"
-      | "forbidden_origin";
+      | "forbidden_origin"
+      | "invalid_deck"
+      | "too_many_decks"
+      | "deck_not_found";
     EventView:
       | components["schemas"]["UnitPlayed"]
       | components["schemas"]["UnitRevived"]
@@ -625,6 +754,37 @@ export interface components {
       rounds: components["schemas"]["RoundEnded"][];
       /** Moves */
       moves: components["schemas"]["MovePlayed"][];
+    };
+    /**
+     * PlayerDeck
+     * @description A deck a player built, with its id, as they chose it.
+     */
+    PlayerDeck: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Name */
+      name: string;
+      /** Deck */
+      deck: string;
+      /** Copies */
+      copies: {
+        [key: string]: number;
+      };
+    };
+    /**
+     * PlayerDecks
+     * @description The decks of the player who is logged in, the oldest first.
+     *
+     *     ``most`` is how many decks a player may keep.
+     */
+    PlayerDecks: {
+      /** Decks */
+      decks: components["schemas"]["PlayerDeck"][];
+      /** Most */
+      most: number;
     };
     /**
      * PlayerPassed
@@ -1272,6 +1432,243 @@ export interface operations {
       };
       /** @description Unauthorized */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  get_choices: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        deck_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Choices"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_player_decks: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlayerDecks"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_player_deck: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DeckChoice"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlayerDeck"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  replace_player_deck: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        deck_id: string;
+      };
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DeckChoice"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlayerDeck"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  delete_player_deck: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        deck_id: string;
+      };
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

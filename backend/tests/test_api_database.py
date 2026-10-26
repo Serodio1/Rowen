@@ -18,7 +18,13 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from rowen.api.app import app, get_accounts, get_store, new_seed
-from rowen.api.database import PostgresAccountStore, PostgresMatchStore, create_engine
+from rowen.api.database import (
+    PostgresAccountStore,
+    PostgresDeckStore,
+    PostgresMatchStore,
+    create_engine,
+)
+from rowen.api.player_decks import MAX_DECKS, StoredDeck
 from rowen.api.store import FIRST_VERSION, MatchResult, StoredMatch
 from rowen.engine.public import (
     Action,
@@ -374,11 +380,11 @@ def test_a_match_survives_a_restart_of_the_api(
     assert UUID(again.json()["id"]) == UUID(started.json()["id"])
 
 
-def test_the_apis_role_may_delete_sessions_and_nothing_else(
+def test_the_apis_role_may_delete_sessions_and_decks_and_nothing_else(
     migrations: Config, database_url: str
 ) -> None:
     # As online: rowen_app reads, adds and changes rows (docs/deploy.md), and
-    # the migration lets it delete sessions, to log out. Roles belong to the
+    # the migrations let it delete sessions, to log out, and decks. Roles belong to the
     # whole server, not to one database, so the test makes it only if it
     # isn't there.
     engine = create_engine(database_url)
@@ -399,12 +405,17 @@ def test_the_apis_role_may_delete_sessions_and_nothing_else(
                     text("SELECT has_table_privilege('rowen_app', :table, 'DELETE')"),
                     {"table": table},
                 ).scalar_one()
-                for table in ("matches", "accounts", "sessions")
+                for table in ("matches", "accounts", "sessions", "player_decks")
             }
     finally:
         engine.dispose()
 
-    assert may_delete == {"matches": False, "accounts": False, "sessions": True}
+    assert may_delete == {
+        "matches": False,
+        "accounts": False,
+        "sessions": True,
+        "player_decks": True,
+    }
 
 
 def test_deleting_an_account_deletes_its_sessions(
@@ -450,3 +461,64 @@ def test_a_session_survives_a_restart_of_the_api(
     assert seen.json() == {"username": "rui"}
     assert logged_out.status_code == 204
     assert after.status_code == 401
+
+
+def test_deleting_an_account_deletes_its_decks(
+    postgres_accounts: PostgresAccountStore, database_url: str
+) -> None:
+    account = postgres_accounts.create_account("rui", "a hash")
+    assert account is not None
+    decks = PostgresDeckStore(postgres_accounts._engine)
+    decks.create_deck(account.id, "Mine", "humans", {"human": 5}, NOW)
+
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM accounts WHERE id = :id"), {"id": account.id}
+            )
+            left = connection.execute(text("SELECT count(*) FROM player_decks"))
+            assert left.scalar_one() == 0
+    finally:
+        engine.dispose()
+
+
+def test_of_two_requests_at_once_for_the_last_deck_only_one_keeps_it(
+    postgres_accounts: PostgresAccountStore, database_url: str
+) -> None:
+    # A player with nine decks builds a tenth twice at once. As with two
+    # moves at once, the test holds the account's row (FOR UPDATE) until both
+    # requests wait for it, then lets them go. A store that only counted the
+    # decks would let both count nine and keep eleven.
+    account = postgres_accounts.create_account("rui", "a hash")
+    assert account is not None
+    decks = PostgresDeckStore(postgres_accounts._engine)
+    for n in range(MAX_DECKS - 1):
+        decks.create_deck(account.id, str(n), "humans", {"human": 5}, NOW)
+    results: list[StoredDeck | None] = []
+
+    def build() -> None:
+        results.append(
+            decks.create_deck(account.id, "Last", "humans", {"human": 5}, NOW)
+        )
+
+    threads = [threading.Thread(target=build) for _ in range(2)]
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as holder:
+            holder.execute(
+                text("SELECT 1 FROM accounts WHERE id = :id FOR UPDATE"),
+                {"id": account.id},
+            )
+            for thread in threads:
+                thread.start()
+            wait_until_waiting_for_a_lock(engine, 2)
+            holder.rollback()
+        for thread in threads:
+            thread.join()
+    finally:
+        engine.dispose()
+
+    assert len(results) == 2
+    assert len([deck for deck in results if deck is not None]) == 1
+    assert len(decks.list_decks(account.id)) == MAX_DECKS

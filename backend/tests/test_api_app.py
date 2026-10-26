@@ -32,7 +32,12 @@ from rowen.api.app import (
     make_stores,
     new_seed,
 )
-from rowen.api.database import PostgresAccountStore, PostgresMatchStore
+from rowen.api.database import (
+    PostgresAccountStore,
+    PostgresDeckStore,
+    PostgresMatchStore,
+)
+from rowen.api.player_decks import MemoryDeckStore
 from rowen.api.store import FIRST_VERSION, MatchStore, MemoryMatchStore, StoredMatch
 from rowen.data import deck_ids, load_deck
 from rowen.engine.public import (
@@ -451,22 +456,24 @@ def test_seeds_are_big_and_random() -> None:
 def test_without_a_database_the_matches_are_kept_in_memory(
     environ: dict[str, str],
 ) -> None:
-    store, accounts = make_stores(environ)
+    store, accounts, decks = make_stores(environ)
 
     assert isinstance(store, MemoryMatchStore)
     assert isinstance(accounts, MemoryAccountStore)
+    assert isinstance(decks, MemoryDeckStore)
 
 
 def test_with_a_database_the_matches_are_kept_there() -> None:
     # No connection is made until a match is asked for, so none here.
     url = "postgresql+psycopg://rowen:secret@db.example/rowen"
 
-    store, accounts = make_stores({"DATABASE_URL": url})
+    store, accounts, decks = make_stores({"DATABASE_URL": url})
 
     assert isinstance(store, PostgresMatchStore)
     assert isinstance(accounts, PostgresAccountStore)
+    assert isinstance(decks, PostgresDeckStore)
     # On the same connections.
-    assert store._engine is accounts._engine
+    assert store._engine is accounts._engine is decks._engine
 
 
 def test_the_app_keeps_its_matches_in_a_store_of_its_own() -> None:
