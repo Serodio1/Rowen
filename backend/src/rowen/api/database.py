@@ -408,11 +408,9 @@ class PostgresAccountStore:
     ) -> None:
         """Keep a new session of an account, until ``expires_at``.
 
-        The account's sessions that expired before ``now`` are deleted.
+        Every session that expired before ``now``, any account's, is deleted.
         """
-        expired = delete(SessionRow).where(
-            SessionRow.account_id == account.id, SessionRow.expires_at <= now
-        )
+        expired = delete(SessionRow).where(SessionRow.expires_at <= now)
         with Session(self._engine) as session, session.begin():
             session.execute(expired)
             session.add(

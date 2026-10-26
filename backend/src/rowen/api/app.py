@@ -105,8 +105,9 @@ SEED_BITS = 63
 # address alone, not for others under the same domain (no Domain).
 SESSION_COOKIE = "__Host-session"
 
-# How long a session lasts after the player was last seen, and how often it is
-# renewed: at most once a day, so that not every request writes to the
+# How long a session lasts after it was last renewed, and how often it is
+# renewed: when the page asks who is logged in (GET /session, each time it
+# opens), at most once a day, so that not every request writes to the
 # database.
 SESSION_LENGTH = timedelta(days=30)
 RENEW_AFTER = timedelta(days=1)
@@ -457,7 +458,11 @@ def get_stats(accounts: Accounts, store: Store, now: Now, token: Token = None) -
     responses=_errors(status.HTTP_409_CONFLICT, status.HTTP_422_UNPROCESSABLE_CONTENT),
 )
 def register(
-    credentials: Credentials, response: Response, accounts: Accounts, now: Now
+    credentials: Credentials,
+    response: Response,
+    accounts: Accounts,
+    now: Now,
+    token: Token = None,
 ) -> Account:
     """Make an account, and log in with it.
 
@@ -472,7 +477,7 @@ def register(
             "username_taken",
             "There is already an account with this username. Choose another.",
         )
-    _start_session(account, response, accounts, now)
+    _start_session(account, response, accounts, now, token)
     return Account(username=account.username)
 
 
@@ -483,7 +488,11 @@ def register(
     ),
 )
 def log_in(
-    credentials: Credentials, response: Response, accounts: Accounts, now: Now
+    credentials: Credentials,
+    response: Response,
+    accounts: Accounts,
+    now: Now,
+    token: Token = None,
 ) -> Account:
     """Log in with an account's username and password.
 
@@ -500,7 +509,7 @@ def log_in(
             "wrong_credentials",
             "The username or the password is wrong.",
         )
-    _start_session(account, response, accounts, now)
+    _start_session(account, response, accounts, now, token)
     return Account(username=account.username)
 
 
@@ -562,13 +571,23 @@ def _not_logged_in() -> ApiError:
 
 
 def _start_session(
-    account: StoredAccount, response: Response, accounts: AccountStore, now: datetime
+    account: StoredAccount,
+    response: Response,
+    accounts: AccountStore,
+    now: datetime,
+    old_token: str | None,
 ) -> None:
     """Start a session of an account, and set its cookie in the response.
 
     The token is 32 random bytes from the operating system (256 bits), so
     nobody can guess one. The store keeps only its hash.
+
+    ``old_token`` is the token of the cookie the browser sent, if any: its
+    session ends, since the new cookie takes its place in the browser and
+    nobody could use it any more.
     """
+    if old_token is not None:
+        accounts.delete_session(_hash_token(old_token))
     token = secrets.token_urlsafe(32)
     accounts.create_session(account, _hash_token(token), now + SESSION_LENGTH, now)
     _set_cookie(response, token)
