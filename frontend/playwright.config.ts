@@ -16,6 +16,11 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   // A test that fails once has failed: no second try that could hide a bug.
   retries: 0,
+  // One test at a time. nginx limits how many requests each visitor may send
+  // (frontend/nginx.conf, ADR 0011), and every test is the same visitor:
+  // side by side, they went over the limit, and a request was turned down
+  // (429).
+  workers: 1,
   // In CI, each step is printed, and the report is written for the job to
   // keep when a test fails (with a trace: the page at each step).
   reporter: process.env.CI
