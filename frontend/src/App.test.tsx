@@ -577,7 +577,7 @@ test.each<[string, Record<string, Answer>, number]>([
       await screen.findByRole("heading", { name: "Match not found" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "This match is no longer on the server.",
+      "The server has no such match, or it is another account's.",
     );
     expect(
       screen.queryByRole("heading", { name: "Round 1" }),

@@ -13,10 +13,7 @@ import {
   statsQuery,
 } from "./api/requests.ts";
 import { onFirstClick } from "./clicks.ts";
-import { ALERT, BUTTON } from "./styles.ts";
-
-const PANEL =
-  "wood mx-auto flex max-w-xl flex-col items-center gap-4 rounded-xl border-2 border-wood-600 p-6 shadow-2xl shadow-black/60";
+import { ALERT, BUTTON, PANEL } from "./styles.ts";
 
 /**
  * The matches of the player who is logged in: how many they won, lost and
@@ -55,7 +52,6 @@ export function MyMatches({
     // in another tab since.
     mutationFn: (id: string) =>
       queryClient.query({ ...matchQuery(api, id), staleTime: 0 }),
-    onSuccess: onResume,
   });
 
   return (
@@ -107,22 +103,28 @@ export function MyMatches({
       )}
       {matches.isPending && <p className="italic">Loading your matches…</p>}
       {matches.isError && (
-        <>
-          <p role="alert" className={ALERT}>
-            {matches.error.message}
-          </p>
-          {!matches.isFetchNextPageError && (
-            <button
-              type="button"
-              className={BUTTON}
-              onClick={() => {
-                void matches.refetch();
-              }}
-            >
-              Try again
-            </button>
-          )}
-        </>
+        <p role="alert" className={ALERT}>
+          {matches.error.message}
+        </p>
+      )}
+      {/* One button asks again for whatever didn't come: the stats, the
+          list, or both. (A next page that didn't come has Show more.) */}
+      {(stats.isError ||
+        (matches.isError && !matches.isFetchNextPageError)) && (
+        <button
+          type="button"
+          className={BUTTON}
+          onClick={() => {
+            if (stats.isError) {
+              void stats.refetch();
+            }
+            if (matches.isError && !matches.isFetchNextPageError) {
+              void matches.refetch();
+            }
+          }}
+        >
+          Try again
+        </button>
       )}
       {/* Not only on success: when the next page didn't come, the pages
           that came are still there. */}
@@ -147,7 +149,10 @@ export function MyMatches({
                     ) {
                       return;
                     }
-                    resume.mutate(match.id);
+                    // Given here, and not to useMutation, so it isn't
+                    // called once the list is gone, as when the player went
+                    // back meanwhile.
+                    resume.mutate(match.id, { onSuccess: onResume });
                   }}
                 />
               ))}
