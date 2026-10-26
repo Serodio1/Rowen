@@ -19,7 +19,8 @@ export default defineConfig({
   // One test at a time. nginx limits how many requests each visitor may send
   // (frontend/nginx.conf, ADR 0011), and every test is the same visitor:
   // side by side, they went over the limit, and a request was turned down
-  // (429).
+  // (429). One after the other, quickly, they went over it too: each test
+  // first waits for the limit on all requests to refill (e2e/test.ts).
   //
   // The tests together start 5 matches and log in 4 times (an account made
   // counts as a login), and nginx lets one visitor start 6 matches and log in

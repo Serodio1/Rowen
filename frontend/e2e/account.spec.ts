@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 
 // An account, as a player makes and uses one, through nginx, the API and the
 // database: the session's cookie is real, so this is where it is seen to
