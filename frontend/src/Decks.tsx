@@ -186,6 +186,12 @@ function DeckRow({
       forgetDecks(queryClient);
       onDeleted();
     },
+    onError: (error) => {
+      // Deleted in another tab already: the list is out of date.
+      if (error.code === "deck_not_found") {
+        forgetDecks(queryClient);
+      }
+    },
   });
   const cards = Object.values(deck.copies).reduce((sum, n) => sum + n, 0);
   return (
@@ -319,6 +325,12 @@ function DeckEditor({
     onSuccess: () => {
       forgetDecks(queryClient);
       onDone();
+    },
+    onError: (error) => {
+      // Decks built or deleted in another tab: the list is out of date.
+      if (error.code === "too_many_decks" || error.code === "deck_not_found") {
+        forgetDecks(queryClient);
+      }
     },
   });
 

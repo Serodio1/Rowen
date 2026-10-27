@@ -884,3 +884,130 @@ test("opening the list while a match starts doesn't open the match over it", asy
     screen.queryByRole("button", { name: "Keep this hand" }),
   ).not.toBeInTheDocument();
 });
+
+test("a match gone because the player logged out in another tab is left, saying why", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "POST /api/matches": newMatch(),
+  };
+  const requests = renderApp(answers);
+  fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
+  const keep = await screen.findByRole("button", { name: "Keep this hand" });
+
+  // The API gives a guest a 404 for the account's match.
+  answers["GET /api/session"] = GUEST_ANSWER;
+  answers["POST /api/matches/a-match/actions"] = {
+    status: 404,
+    body: { code: "match_not_found", message: "The match doesn't exist." },
+  };
+  fireEvent.click(keep, { detail: 1 });
+
+  expect(
+    await screen.findByText(
+      "You were logged out, so the match was left: log in to play on.",
+    ),
+  ).toBeInTheDocument();
+  await waitFor(() => {
+    expect(
+      screen.getByRole("heading", { name: "Choose your deck" }),
+    ).toHaveFocus();
+  });
+  expect(screen.getByRole("button", { name: "Log in" })).toBeInTheDocument();
+  expect(requests.filter((to) => to === "GET /api/session")).toHaveLength(2);
+
+  // Gone once another match starts.
+  fireEvent.click(screen.getByRole("button", { name: "Humans" }));
+  await screen.findByRole("button", { name: "Keep this hand" });
+  expect(screen.queryByText(/You were logged out/)).not.toBeInTheDocument();
+});
+
+test("a match the server doesn't know says so, with the focus", async () => {
+  renderApp({
+    ...RUI,
+    "POST /api/matches": newMatch(),
+    "POST /api/matches/a-match/actions": {
+      status: 404,
+      body: { code: "match_not_found", message: "The match doesn't exist." },
+    },
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Keep this hand" }),
+    { detail: 1 },
+  );
+
+  // Still logged in: the page stays, and says the match is gone.
+  await waitFor(() => {
+    expect(
+      screen.getByRole("heading", { name: "Match not found" }),
+    ).toHaveFocus();
+  });
+  await settle();
+  expect(screen.getByText(/Logged in as/)).toBeInTheDocument();
+  expect(screen.queryByText(/You were logged out/)).not.toBeInTheDocument();
+});
+
+test("who is logged in stays when asking again doesn't work", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/stats": stats([]),
+    "GET /api/matches": page([summary()]),
+  };
+  const requests = renderApp(answers);
+  await openMatches();
+  await screen.findByRole("listitem");
+  onTestFinished(() => {
+    focusManager.setFocused(undefined);
+  });
+  const backToTab = () => {
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+  };
+
+  // No answer: the page still shows rui, and their list.
+  delete answers["GET /api/session"];
+  backToTab();
+  await settle();
+  expect(screen.getByText("rui")).toBeInTheDocument();
+  expect(screen.getByRole("listitem")).toBeInTheDocument();
+
+  // Then ana: the page knows it changed, and forgets rui's list.
+  answers["GET /api/session"] = { status: 200, body: { username: "ana" } };
+  answers["GET /api/matches"] = page([]);
+  backToTab();
+  expect(await screen.findByText("ana")).toBeInTheDocument();
+  await openMatches();
+  expect(
+    await screen.findByText("No match yet: choose a deck to play one."),
+  ).toBeInTheDocument();
+  expect(requests.filter((to) => to === "GET /api/matches")).toHaveLength(2);
+});
+
+test("resuming a match that ended in another tab asks for the list again", async () => {
+  const over = view({ match_over: true, winner: 0, legal_actions: [] });
+  const requests = renderApp({
+    ...NO_MATCHES,
+    // The list says it isn't over: it came before it ended.
+    "GET /api/matches": page([summary()]),
+    "GET /api/matches/a-match": {
+      status: 200,
+      body: {
+        id: "a-match",
+        version: 9,
+        view: over,
+        rounds: [],
+      } satisfies Match,
+    },
+  });
+  await openMatches();
+  fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Play again" }), {
+    detail: 1,
+  });
+  await openMatches();
+  await screen.findByRole("listitem");
+
+  expect(asked(requests)).toEqual([2, 2]);
+});

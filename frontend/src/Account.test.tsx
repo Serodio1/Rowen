@@ -288,8 +288,25 @@ test("the fields ask the browser for the API's rules", async () => {
   expect(username).toHaveAttribute("autocomplete", "username");
   expect(password).toBeRequired();
   expect(password).toHaveAttribute("type", "password");
-  expect(password).toHaveAttribute("minlength", "8");
-  expect(password).toHaveAttribute("maxlength", "128");
+});
+
+test("a password is counted in characters, as the API counts them", async () => {
+  renderApp(GUEST);
+  fireEvent.click(await screen.findByRole("button", { name: "Log in" }));
+  const password = screen.getByLabelText<HTMLInputElement>("Password");
+  const type = (value: string) => {
+    fireEvent.change(password, { target: { value } });
+    return password.validationMessage;
+  };
+
+  // 4 characters, though 8 UTF-16 units.
+  expect(type("🐉🐉🐉🐉")).toBe("Use at least 8 characters.");
+  expect(type("phoenix")).toBe("Use at least 8 characters.");
+  expect(type("phoenix4")).toBe("");
+  expect(type("a".repeat(129))).toBe("Use at most 128 characters.");
+  // 100 characters, though 200 UTF-16 units.
+  expect(type("🐉".repeat(100))).toBe("");
+  expect(password).toBeValid();
 });
 
 test("logging out ends the session, and the page shows Log in", async () => {
