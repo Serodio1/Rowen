@@ -362,17 +362,18 @@ class PostgresMatchStore:
             .limit(limit)
         )
         if before is not None:
-            cursor = (
-                select(MatchRow.created_at, MatchRow.id)
+            # The start of the match ``before``, as one value: the database
+            # works it out once, then reads the index from there. (A join
+            # with it read every newer match of the owner's, and threw them
+            # away.) If ``before`` is no match of the owner's, the value is
+            # NULL, nothing compares as older than it, and the page is empty.
+            started = (
+                select(MatchRow.created_at)
                 .where(MatchRow.id == before, MatchRow.account_id == owner)
-                .subquery()
+                .scalar_subquery()
             )
-            # If ``before`` is no match of the owner's, the subquery is empty,
-            # and no match is older than nothing.
-            statement = statement.join(
-                cursor,
-                tuple_(MatchRow.created_at, MatchRow.id)
-                < tuple_(cursor.c.created_at, cursor.c.id),
+            statement = statement.where(
+                tuple_(MatchRow.created_at, MatchRow.id) < tuple_(started, before)
             )
         with Session(self._engine) as session:
             return tuple(

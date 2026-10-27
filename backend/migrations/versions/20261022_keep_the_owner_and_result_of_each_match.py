@@ -57,6 +57,19 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Without these columns, a player's match would be anyone's, and a
+    # finished one would lose its result. Going down only while no match
+    # has an owner or a result.
+    if op.get_bind().scalar(
+        sa.text(
+            "SELECT EXISTS (SELECT FROM matches"
+            " WHERE account_id IS NOT NULL OR outcome IS NOT NULL)"
+        )
+    ):
+        raise RuntimeError(
+            "Some matches have an owner or a result, which only this migration"
+            " keeps: not going down."
+        )
     op.drop_constraint("result_is_whole", "matches", type_="check")
     op.drop_constraint("outcome_is_known", "matches", type_="check")
     op.drop_constraint("matches_account_id_fkey", "matches", type_="foreignkey")

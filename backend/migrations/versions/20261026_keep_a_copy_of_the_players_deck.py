@@ -39,6 +39,16 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Without the copy, a match played with a built deck would play again
+    # from the faction's own deck: other cards, so a 500, or moves that never
+    # happened. Going down only while no such match is kept.
+    if op.get_bind().scalar(
+        sa.text("SELECT EXISTS (SELECT FROM matches WHERE player_copies IS NOT NULL)")
+    ):
+        raise RuntimeError(
+            "Some matches were played with a built deck, and only this migration"
+            " keeps their copy of it: not going down."
+        )
     op.drop_constraint("player_deck_copy_is_whole", "matches", type_="check")
     op.drop_column("matches", "player_copies")
     op.drop_column("matches", "player_deck_name")
