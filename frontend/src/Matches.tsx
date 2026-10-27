@@ -4,7 +4,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { Api, Match, MatchSummary } from "./api/client.ts";
 import {
   decksQuery,
@@ -20,7 +20,9 @@ import { ALERT, BUTTON, PANEL } from "./styles.ts";
  * drew with each deck, and then the matches, the newest first, a page at a
  * time. A match that isn't over can be played on.
  *
- * It takes the focus when it opens: the button that opened it is gone.
+ * It takes the focus when it opens: the button that opened it is gone. After
+ * Show more, which is disabled meanwhile and may go, the focus goes to the
+ * first match of the new page, or back to Show more if the page didn't come.
  *
  * @param onResume - Called with a match the player chose to play on, once
  *   the page has it as it is now.
@@ -53,6 +55,23 @@ export function MyMatches({
     mutationFn: (id: string) =>
       queryClient.query({ ...matchQuery(api, id), staleTime: 0 }),
   });
+  const list = useRef<HTMLOListElement>(null);
+  const more = useRef<HTMLButtonElement>(null);
+  // How many matches showed before the last Show more: the focus moves to
+  // the first one after them. A new object each time, so it moves again
+  // after each Show more.
+  const [shown, setShown] = useState<{ before: number } | null>(null);
+  useEffect(() => {
+    if (shown === null) {
+      return;
+    }
+    const first = list.current?.children[shown.before];
+    if (first instanceof HTMLElement) {
+      first.focus();
+    } else {
+      more.current?.focus();
+    }
+  }, [shown]);
 
   return (
     <section className={PANEL}>
@@ -132,7 +151,7 @@ export function MyMatches({
         (matches.data.pages[0]?.matches.length === 0 ? (
           <p className="italic">No match yet: choose a deck to play one.</p>
         ) : (
-          <ol className="flex w-full flex-col gap-2">
+          <ol ref={list} className="flex w-full flex-col gap-2">
             {matches.data.pages
               .flatMap((page) => page.matches)
               .map((match) => (
@@ -160,11 +179,15 @@ export function MyMatches({
         ))}
       {matches.hasNextPage && (
         <button
+          ref={more}
           type="button"
           className={BUTTON}
           disabled={matches.isFetchingNextPage}
           onClick={() => {
-            void matches.fetchNextPage();
+            const before = list.current?.children.length ?? 0;
+            void matches.fetchNextPage().then(() => {
+              setShown({ before });
+            });
           }}
         >
           Show more
@@ -200,8 +223,12 @@ function Summary({
   const id = useId();
   const result = match.result;
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gold-600/60 px-3 py-2">
-      <div id={id}>
+    // It can take the focus from the code, after Show more.
+    <li
+      tabIndex={-1}
+      className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gold-600/60 px-3 py-2 focus-visible:outline-2 focus-visible:outline-gold-300"
+    >
+      <div id={id} className="min-w-0 wrap-anywhere">
         <p>
           <strong className="text-gold-200">
             {match.deck_name === null

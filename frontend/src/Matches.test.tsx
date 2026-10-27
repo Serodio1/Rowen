@@ -237,9 +237,17 @@ test("the older matches come a page at a time, from the last one shown", async (
   await waitFor(() => {
     expect(screen.getAllByRole("listitem")).toHaveLength(4);
   });
+  // The focus goes to the first match of the new page.
+  await waitFor(() => {
+    expect(screen.getAllByRole("listitem")[2]).toHaveFocus();
+  });
   fireEvent.click(screen.getByRole("button", { name: "Show more" }));
   await waitFor(() => {
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
+  });
+  // Show more is gone, and the focus didn't go with it.
+  await waitFor(() => {
+    expect(screen.getAllByRole("listitem")[4]).toHaveFocus();
   });
 
   // The last page says there are no more.
@@ -292,6 +300,10 @@ test("a next page that didn't come says why, and Show more asks again", async ()
   expect(
     screen.queryByRole("button", { name: "Try again" }),
   ).not.toBeInTheDocument();
+  // Disabled meanwhile, Show more gets the focus back, to ask again.
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Show more" })).toHaveFocus();
+  });
   answers["GET /api/matches?before=a-match"] = page([WON]);
   fireEvent.click(screen.getByRole("button", { name: "Show more" }));
 

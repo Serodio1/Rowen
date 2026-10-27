@@ -167,9 +167,14 @@ test("a deck is built by adding cards from one column to the other", async () =>
   for (let n = 0; n < 3; n++) {
     fireEvent.click(card("Cards", /^Add Soldier/));
   }
-  // At the most a card may have, it can't be added again.
-  expect(card("Cards", /^Add Soldier/)).toBeDisabled();
-  expect(card("Cards", /^Add Soldier/)).toHaveAccessibleName(/3 of 3$/);
+  // At the most a card may have, it can't be added again, but keeps the
+  // focus.
+  const soldier = card("Cards", /^Add Soldier/);
+  soldier.focus();
+  expect(soldier).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(soldier);
+  expect(soldier).toHaveAccessibleName(/3 of 3$/);
+  expect(soldier).toHaveFocus();
   expect(card("Your deck", /^Take out Soldier/)).toHaveAccessibleName(
     /3 in the deck$/,
   );
@@ -225,6 +230,37 @@ test("a card taken out to none is left out of the deck", async () => {
       copies: { soldier: 3, captain: 1 },
     });
   });
+});
+
+test("taking out a card's last copy moves the focus to the next card, the one before, or the deck", async () => {
+  renderApp({
+    ...RUI,
+    "GET /api/my-decks": decks([
+      { ...MINE, copies: { soldier: 1, captain: 1, hoarfrost: 1 } },
+    ]),
+  });
+  await openDecks();
+  fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
+  await screen.findByRole("list", { name: "Cards" });
+
+  fireEvent.click(card("Your deck", /^Take out Soldier/));
+  expect(card("Your deck", /^Take out Captain/)).toHaveFocus();
+  fireEvent.click(card("Your deck", /^Take out Hoarfrost/));
+  expect(card("Your deck", /^Take out Captain/)).toHaveFocus();
+  fireEvent.click(card("Your deck", /^Take out Captain/));
+  expect(screen.getByRole("heading", { name: "Your deck" })).toHaveFocus();
+});
+
+test("taking out a copy that isn't the last leaves the focus on the card", async () => {
+  renderApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
+  await openDecks();
+  fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
+  await screen.findByRole("list", { name: "Cards" });
+
+  const soldier = card("Your deck", /^Take out Soldier/);
+  soldier.focus();
+  fireEvent.click(soldier);
+  expect(card("Your deck", /^Take out Soldier/)).toHaveFocus();
 });
 
 test("a deck is changed in place, with its copies to start from", async () => {
@@ -290,10 +326,41 @@ test("a deck the API turns down says why, and stays to be changed", async () => 
 
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "This deck breaks the rules.",
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("This deck breaks the rules.");
+  // Next to Save, where a phone shows it.
+  expect(alert.closest("form")).toContainElement(
+    screen.getByRole("button", { name: "Save" }),
   );
   expect(screen.getByRole("heading", { name: "Change Mine" })).toBeVisible();
+});
+
+test("a deck is saved once, however fast Save is pressed", async () => {
+  const sent = renderApp({
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+    // No answer yet.
+    "PUT /api/my-decks/d1": new Promise<Response>(() => undefined),
+  });
+  await openDecks();
+  fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
+  await screen.findByRole("list", { name: "Cards" });
+
+  // Two presses of Enter in the same instant, before the page shows Save
+  // disabled.
+  const form = screen.getByRole("button", { name: "Save" }).closest("form");
+  if (form === null) {
+    throw new Error("Save isn't in a form.");
+  }
+  fireEvent.submit(form);
+  fireEvent.submit(form);
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+  expect(sent.filter((request) => request.to.startsWith("PUT"))).toHaveLength(
+    1,
+  );
 });
 
 test("deleting a deck asks first", async () => {
@@ -304,10 +371,16 @@ test("deleting a deck asks first", async () => {
   const sent = renderApp(answers);
   await openDecks();
 
-  fireEvent.click(await screen.findByRole("button", { name: "Delete Mine" }));
-  expect(screen.getByText("Delete Mine?")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Keep" }));
+  const ask = await screen.findByRole("button", { name: "Delete Mine" });
+  fireEvent.click(ask);
+  // The question names the buttons, and the focus is on Keep: a second
+  // Enter keeps the deck.
+  const question = screen.getByRole("group", { name: "Delete Mine?" });
+  expect(within(question).getByRole("button", { name: "Keep" })).toHaveFocus();
+  expect(ask).not.toBeInTheDocument();
+  fireEvent.click(within(question).getByRole("button", { name: "Keep" }));
   expect(sent.some((request) => request.to.startsWith("DELETE"))).toBe(false);
+  expect(screen.getByRole("button", { name: "Delete Mine" })).toHaveFocus();
 
   fireEvent.click(screen.getByRole("button", { name: "Delete Mine" }));
   answers["DELETE /api/my-decks/d1"] = { status: 204, body: null };
@@ -315,9 +388,34 @@ test("deleting a deck asks first", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
   expect(await screen.findByText("No deck built yet.")).toBeInTheDocument();
+  // The row went with the focus: it goes to the list's heading.
+  expect(screen.getByRole("heading", { name: "My decks" })).toHaveFocus();
   expect(sent.map((request) => request.to)).toContain(
     "DELETE /api/my-decks/d1",
   );
+});
+
+test("a deck is deleted once, however fast Delete is clicked", async () => {
+  const sent = renderApp({
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+    // No answer yet.
+    "DELETE /api/my-decks/d1": new Promise<Response>(() => undefined),
+  });
+  await openDecks();
+  fireEvent.click(await screen.findByRole("button", { name: "Delete Mine" }));
+
+  // Two clicks in the same instant, before the page shows Delete disabled.
+  const remove = screen.getByRole("button", { name: "Delete" });
+  fireEvent.click(remove);
+  fireEvent.click(remove);
+
+  await waitFor(() => {
+    expect(remove).toBeDisabled();
+  });
+  expect(
+    sent.filter((request) => request.to.startsWith("DELETE")),
+  ).toHaveLength(1);
 });
 
 test("a player with as many decks as they may keep can build no other", async () => {

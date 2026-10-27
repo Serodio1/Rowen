@@ -407,7 +407,7 @@ function YourDecks({
               <button
                 key={deck.id}
                 type="button"
-                className={BUTTON}
+                className={`${BUTTON} max-w-full wrap-anywhere`}
                 disabled={starting}
                 onClick={onStart(deck)}
               >
