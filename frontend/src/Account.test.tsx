@@ -323,6 +323,8 @@ test("logging out ends the session, and the page shows Log in", async () => {
   ).toBeInTheDocument();
   expect(screen.queryByText("rui")).toBeNull();
   expect(sent(requests, "DELETE /api/session")).toHaveLength(1);
+  // No match was left: nothing to say about one.
+  expect(screen.queryByText(/You were logged out/)).not.toBeInTheDocument();
 });
 
 test("a log out that didn't work says so, and the player stays in", async () => {

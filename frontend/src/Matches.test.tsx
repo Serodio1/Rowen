@@ -915,9 +915,27 @@ test("a match gone because the player logged out in another tab is left, saying 
   expect(screen.getByRole("button", { name: "Log in" })).toBeInTheDocument();
   expect(requests.filter((to) => to === "GET /api/session")).toHaveLength(2);
 
-  // Gone once another match starts.
+  // Gone once another match starts, and so after it too.
+  const over = view({ match_over: true, winner: 0, legal_actions: [] });
+  answers["POST /api/matches/a-match/actions"] = {
+    status: 200,
+    body: {
+      id: "a-match",
+      version: 2,
+      view: over,
+      rounds: [],
+      moves: [{ events: [], view: over }],
+    } satisfies Played,
+  };
   fireEvent.click(screen.getByRole("button", { name: "Humans" }));
-  await screen.findByRole("button", { name: "Keep this hand" });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Keep this hand" }),
+    { detail: 1 },
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Play again" }), {
+    detail: 1,
+  });
+  await screen.findByRole("heading", { name: "Choose your deck" });
   expect(screen.queryByText(/You were logged out/)).not.toBeInTheDocument();
 });
 
@@ -966,10 +984,15 @@ test("who is logged in stays when asking again doesn't work", async () => {
     });
   };
 
-  // No answer: the page still shows rui, and their list.
+  // No answer: the page still shows rui, and their list. (Nothing on the
+  // page says the request failed: the test waits for it to be sent, then
+  // long enough for its answer to come.)
   delete answers["GET /api/session"];
   backToTab();
-  await settle();
+  await waitFor(() => {
+    expect(requests.filter((to) => to === "GET /api/session")).toHaveLength(2);
+  });
+  await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
   expect(screen.getByText("rui")).toBeInTheDocument();
   expect(screen.getByRole("listitem")).toBeInTheDocument();
 
