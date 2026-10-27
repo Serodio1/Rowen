@@ -202,13 +202,16 @@ export function AccountDialog({
             className={FIELD}
             type="password"
             required
-            minLength={8}
-            maxLength={128}
             autoComplete={making ? "new-password" : "current-password"}
             aria-describedby={making ? `${id}-password` : undefined}
             value={password}
             onChange={(event) => {
               setPassword(event.target.value);
+              // The API counts characters, and minLength and maxLength count
+              // UTF-16 units: an emoji is 2 of them.
+              event.target.setCustomValidity(
+                tooShortOrLong(event.target.value),
+              );
             }}
           />
         </label>
@@ -236,4 +239,21 @@ export function AccountDialog({
       </form>
     </div>
   );
+}
+
+/**
+ * Return why a password the API would turn down is too short or too long,
+ * counted in characters, as the API counts them, or "" when it isn't.
+ */
+function tooShortOrLong(password: string): string {
+  // Code points, as Python's len counts them: an emoji made of several,
+  // such as a family, counts as several here too.
+  const length = Array.from(password).length;
+  if (length < 8) {
+    return "Use at least 8 characters.";
+  }
+  if (length > 128) {
+    return "Use at most 128 characters.";
+  }
+  return "";
 }

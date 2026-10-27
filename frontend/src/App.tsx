@@ -97,11 +97,16 @@ export function App({ api }: { api: Api }) {
   const [loggingIn, setLoggingIn] = useState(false);
   // Who is logged in: a username, null for a guest, or undefined while the
   // page doesn't know yet.
+  // From the last answer that came: a request that didn't work after it
+  // leaves the page as it was, and doesn't make it forget who it was.
   const session = useQuery(sessionQuery(api));
-  const username = session.isSuccess
-    ? (session.data?.username ?? null)
-    : undefined;
+  const username =
+    session.data === undefined ? undefined : (session.data?.username ?? null);
+  // Whether the page left a match because its account logged out, here or
+  // in another tab: the decks then say why.
+  const [loggedOut, setLoggedOut] = useState(false);
   const lastUsername = useRef(username);
+  const owner = match?.owner;
   useEffect(() => {
     // Someone else is logged in now: the player logged out, here or in
     // another tab, or logged in with another account. Their matches are
@@ -115,12 +120,13 @@ export function App({ api }: { api: Api }) {
     }
     forgetMatches(queryClient);
     forgetDecks(queryClient);
+    setLoggedOut(before !== null && owner === before);
     if (before !== null) {
       setMatch((match) => (match?.owner === before ? null : match));
       setShowing(null);
       setLeft(true);
     }
-  }, [username, queryClient]);
+  }, [username, queryClient, owner]);
   const top = useRef<HTMLDivElement>(null);
   const wasLoggingIn = useRef(false);
   useEffect(() => {
@@ -180,6 +186,11 @@ export function App({ api }: { api: Api }) {
             <MyMatches
               api={api}
               onResume={(resumed) => {
+                // It ended in another tab, and the list doesn't say so yet.
+                if (resumed.view.match_over) {
+                  forgetMatches(queryClient);
+                }
+                setLoggedOut(false);
                 setMatch({
                   played: { ...resumed, moves: [] },
                   owner: username ?? null,
@@ -195,9 +206,11 @@ export function App({ api }: { api: Api }) {
             <ChooseDeck
               api={api}
               onStart={(played) => {
+                setLoggedOut(false);
                 setMatch({ played, owner: username ?? null });
               }}
               focus={left}
+              loggedOut={loggedOut}
               loggedIn={username !== undefined && username !== null}
             />
           )
@@ -236,17 +249,21 @@ export function App({ api }: { api: Api }) {
  *   left a match: the button they pressed is gone.
  * @param loggedIn - Whether the player is logged in, and so has decks of
  *   their own.
+ * @param loggedOut - Whether the page left a match because its account
+ *   logged out: it says so.
  */
 function ChooseDeck({
   api,
   onStart,
   focus,
   loggedIn,
+  loggedOut,
 }: {
   api: Api;
   onStart: (match: Played) => void;
   focus: boolean;
   loggedIn: boolean;
+  loggedOut: boolean;
 }) {
   const queryClient = useQueryClient();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -301,6 +318,11 @@ function ChooseDeck({
       >
         Choose your deck
       </h2>
+      {loggedOut && (
+        <p role="status" className="italic">
+          You were logged out, so the match was left: log in to play on.
+        </p>
+      )}
       {start.isError && (
         <p role="alert" className={ALERT}>
           {start.error.message}
@@ -602,16 +624,36 @@ function PlayMatch({
       tryAgain.current?.focus();
     }
   }, [failed]);
-
-  if (
+  const notFound =
     play.error?.code === "match_not_found" ||
-    match.error?.code === "match_not_found"
-  ) {
+    match.error?.code === "match_not_found";
+  const notFoundHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (!notFound) {
+      return;
+    }
+    // The moves are gone, with the focus.
+    notFoundHeading.current?.focus();
+    // The match may be gone because the player logged out in another tab:
+    // the API gives another account's match, or a guest, a 404. Asking who
+    // is logged in then leaves the match (see App), and says why.
+    void queryClient.invalidateQueries({
+      queryKey: sessionQuery(api).queryKey,
+    });
+  }, [notFound, queryClient, api]);
+
+  if (notFound) {
     // The server doesn't know the match: it was kept in the memory of a
     // server that restarted, or the link is wrong.
     return (
       <section className={PANEL}>
-        <h2 className="font-display text-2xl text-gold-300">Match not found</h2>
+        <h2
+          ref={notFoundHeading}
+          tabIndex={-1}
+          className="font-display text-2xl text-gold-300 outline-none"
+        >
+          Match not found
+        </h2>
         <p role="alert" className={ALERT}>
           The server has no such match, or it is another account&apos;s.
         </p>

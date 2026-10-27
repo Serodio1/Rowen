@@ -1,12 +1,13 @@
-import { QueryClientProvider } from "@tanstack/react-query";
+import { focusManager, QueryClientProvider } from "@tanstack/react-query";
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test } from "vitest";
 import { App } from "./App.tsx";
 import {
   createApi,
@@ -610,4 +611,75 @@ test("while a match starts with one of the player's decks, no other can", async 
   for (const name of ["Mine (Humans)", "Other (Humans)"]) {
     expect(decksToPlay.getByRole("button", { name })).toBeDisabled();
   }
+});
+
+test("a deck the API turns down as too many asks for the decks again", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/my-decks": decks([]),
+    // Built in another tab meanwhile.
+    "POST /api/my-decks": {
+      status: 409,
+      body: { code: "too_many_decks", message: "The player has 10 decks." },
+    },
+  };
+  const sent = renderApp(answers);
+  await openDecks();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "New Humans deck" }),
+  );
+  await screen.findByRole("list", { name: "Cards" });
+  for (let n = 0; n < 3; n++) {
+    fireEvent.click(card("Cards", /^Add Soldier/));
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "The player has 10 decks.",
+  );
+  await waitFor(() => {
+    expect(
+      sent.filter((request) => request.to === "GET /api/my-decks"),
+    ).toHaveLength(2);
+  });
+});
+
+test("a deck already deleted in another tab asks for the decks again", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+    "DELETE /api/my-decks/d1": {
+      status: 404,
+      body: { code: "deck_not_found", message: "The player has no such deck." },
+    },
+  };
+  renderApp(answers);
+  await openDecks();
+  fireEvent.click(await screen.findByRole("button", { name: "Delete Mine" }));
+  answers["GET /api/my-decks"] = decks([]);
+  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+  expect(await screen.findByText("No deck built yet.")).toBeInTheDocument();
+});
+
+test("coming back to the tab asks for the decks again", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+  };
+  renderApp(answers);
+  await openDecks();
+  await screen.findByRole("list", { name: "Your decks" });
+
+  // Deleted in another tab, while this one was hidden.
+  answers["GET /api/my-decks"] = decks([]);
+  act(() => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+  onTestFinished(() => {
+    focusManager.setFocused(undefined);
+  });
+
+  expect(await screen.findByText("No deck built yet.")).toBeInTheDocument();
 });

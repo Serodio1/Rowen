@@ -198,12 +198,16 @@ export function choicesQuery(api: Api, deck: string) {
 
 /**
  * The decks the player who is logged in built. Building, changing or
- * deleting one asks for them again (`forgetDecks`).
+ * deleting one asks for them again (`forgetDecks`), and so does coming back
+ * to the tab, as they may have been changed in another one.
  */
 export function playerDecksQuery(api: Api) {
   return queryOptions({
     queryKey: ["my-decks"],
     queryFn: () => send(api.GET("/my-decks")),
+    // Even though they never go out of date on their own (staleTime): the
+    // list shows, once, as the other tab left it.
+    refetchOnWindowFocus: "always",
   });
 }
 
