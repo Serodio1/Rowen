@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type Ref,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type { Api, Choice, PlayerDeck } from "./api/client.ts";
 import {
   choicesQuery,
@@ -94,6 +101,10 @@ export function MyDecks({ api, onBack }: { api: Api; onBack: () => void }) {
                 onEdit={() => {
                   setEditing({ faction: deck.deck, deck });
                 }}
+                onDeleted={() => {
+                  // The row, and the button that had the focus, are going.
+                  heading.current?.focus();
+                }}
               />
             ))}
           </ul>
@@ -133,31 +144,53 @@ export function MyDecks({ api, onBack }: { api: Api; onBack: () => void }) {
 /**
  * One deck of the player's in the list: its name, its faction and how many
  * cards it has, with buttons to change it or delete it. Deleting asks first,
- * in the same place: "Delete" or "Keep".
+ * in the same place: "Delete" or "Keep". The focus goes to Keep when it
+ * asks, and back to the first Delete after Keep, so a second Enter never
+ * deletes.
+ *
+ * @param onDeleted - Called once the deck is deleted, as its row goes.
  */
 function DeckRow({
   api,
   deck,
   factionName,
   onEdit,
+  onDeleted,
 }: {
   api: Api;
   deck: PlayerDeck;
   factionName: string;
   onEdit: () => void;
+  onDeleted: () => void;
 }) {
   const queryClient = useQueryClient();
+  const questionId = useId();
   const [asking, setAsking] = useState(false);
+  const keep = useRef<HTMLButtonElement>(null);
+  const ask = useRef<HTMLButtonElement>(null);
+  // Whether Keep was chosen, so the focus goes back only then, and not
+  // when the row first shows.
+  const kept = useRef(false);
+  useEffect(() => {
+    if (asking) {
+      keep.current?.focus();
+    } else if (kept.current) {
+      kept.current = false;
+      ask.current?.focus();
+    }
+  }, [asking]);
   const remove = useMutation({
+    mutationKey: ["delete_deck"],
     mutationFn: () => deleteDeck(api, deck.id),
     onSuccess: () => {
       forgetDecks(queryClient);
+      onDeleted();
     },
   });
   const cards = Object.values(deck.copies).reduce((sum, n) => sum + n, 0);
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gold-600/60 px-3 py-2">
-      <span>
+      <span className="min-w-0 wrap-anywhere">
         <strong className="text-gold-200">{deck.name}</strong>{" "}
         <span className="text-sm opacity-80">
           {factionName}, {cards} cards
@@ -168,53 +201,70 @@ function DeckRow({
           {remove.error.message}
         </p>
       )}
-      <span className="flex gap-2">
-        {asking ? (
-          <>
-            <span className="self-center text-sm">Delete {deck.name}?</span>
-            <button
-              type="button"
-              className={BUTTON}
-              disabled={remove.isPending}
-              onClick={() => {
-                remove.mutate();
-              }}
-            >
-              Delete
-            </button>
-            <button
-              type="button"
-              className={BUTTON}
-              onClick={() => {
-                setAsking(false);
-              }}
-            >
-              Keep
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              className={BUTTON}
-              aria-label={`Change ${deck.name}`}
-              onClick={onEdit}
-            >
-              Change
-            </button>
-            <button
-              type="button"
-              className={BUTTON}
-              aria-label={`Delete ${deck.name}`}
-              onClick={() => {
-                setAsking(true);
-              }}
-            >
-              Delete
-            </button>
-          </>
-        )}
-      </span>
+      {/* The keys keep React from turning the first Delete, which has the
+          focus, into the second: one Enter would then ask and delete. */}
+      {asking ? (
+        <span
+          key="asking"
+          role="group"
+          aria-labelledby={questionId}
+          className="flex min-w-0 flex-wrap gap-2"
+        >
+          <span id={questionId} className="self-center text-sm wrap-anywhere">
+            Delete {deck.name}?
+          </span>
+          <button
+            type="button"
+            className={BUTTON}
+            disabled={remove.isPending}
+            onClick={() => {
+              // Two clicks in the same instant both come before the page
+              // shows the button disabled.
+              if (
+                queryClient.isMutating({ mutationKey: ["delete_deck"] }) > 0
+              ) {
+                return;
+              }
+              remove.mutate();
+            }}
+          >
+            Delete
+          </button>
+          <button
+            ref={keep}
+            type="button"
+            className={BUTTON}
+            onClick={() => {
+              kept.current = true;
+              setAsking(false);
+            }}
+          >
+            Keep
+          </button>
+        </span>
+      ) : (
+        <span key="buttons" className="flex gap-2">
+          <button
+            type="button"
+            className={BUTTON}
+            aria-label={`Change ${deck.name}`}
+            onClick={onEdit}
+          >
+            Change
+          </button>
+          <button
+            ref={ask}
+            type="button"
+            className={BUTTON}
+            aria-label={`Delete ${deck.name}`}
+            onClick={() => {
+              setAsking(true);
+            }}
+          >
+            Delete
+          </button>
+        </span>
+      )}
     </li>
   );
 }
@@ -259,6 +309,7 @@ function DeckEditor({
   );
   const choices = useQuery(choicesQuery(api, faction));
   const save = useMutation({
+    mutationKey: ["save_deck"],
     mutationFn: () =>
       saveDeck(api, deck?.id ?? null, {
         name: name.trim(),
@@ -291,7 +342,7 @@ function DeckEditor({
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-center font-display text-2xl text-gold-300 outline-none"
+        className="text-center font-display text-2xl text-gold-300 outline-none wrap-anywhere"
       >
         {deck === null ? `New ${factionName} deck` : `Change ${deck.name}`}
       </h2>
@@ -319,7 +370,10 @@ function DeckEditor({
           minUnits={choices.data.min_units}
           maxSpecials={choices.data.max_specials}
           onAdd={(choice) => {
-            change(choice, 1);
+            // The button stays to keep the focus, only marked as off.
+            if (count(choice) < choice.most) {
+              change(choice, 1);
+            }
           }}
           onRemove={(choice) => {
             change(choice, -1);
@@ -330,6 +384,13 @@ function DeckEditor({
               className="flex flex-wrap items-end justify-center gap-2"
               onSubmit={(event) => {
                 event.preventDefault();
+                // Two presses of Enter in the same instant both come before
+                // the page shows Save disabled.
+                if (
+                  queryClient.isMutating({ mutationKey: ["save_deck"] }) > 0
+                ) {
+                  return;
+                }
                 save.mutate();
               }}
             >
@@ -356,14 +417,16 @@ function DeckEditor({
               <button type="button" className={BUTTON} onClick={onDone}>
                 Cancel
               </button>
+              {/* Next to Save, and not under the columns, where a phone
+                  would show it out of sight. */}
+              {save.isError && (
+                <p role="alert" className={`${ALERT} basis-full text-center`}>
+                  {save.error.message}
+                </p>
+              )}
             </form>
           )}
         </Columns>
-      )}
-      {save.isError && (
-        <p role="alert" className={ALERT}>
-          {save.error.message}
-        </p>
       )}
     </section>
   );
@@ -373,6 +436,11 @@ function DeckEditor({
  * The editor's counts and its two columns: the cards the deck may hold, each
  * with how many copies it has of the most, and the cards in the deck. On a
  * narrow screen the deck comes under the cards.
+ *
+ * A card at the most it may have stays a button, marked as off and not
+ * disabled, so the focus stays on it. Taking out a card's last copy takes
+ * its button away: the focus goes to the card that comes in its place, or
+ * the one before, or the deck's heading when the deck is empty.
  *
  * @param children - What goes between the counts and the columns, given
  *   whether the deck keeps to the numbers: the name and the buttons.
@@ -401,6 +469,22 @@ function Columns({
   const units = sum("unit");
   const specials = sum("special");
   const inDeck = cards.filter((choice) => count(choice) > 0);
+  const deck = useRef<HTMLDivElement>(null);
+  // Where the button of the last card taken out of the deck was. A new
+  // object each time, so the focus moves after each one.
+  const [gone, setGone] = useState<{ index: number } | null>(null);
+  useEffect(() => {
+    if (gone === null || deck.current === null) {
+      return;
+    }
+    const buttons = deck.current.querySelectorAll("button");
+    const next = buttons[Math.min(gone.index, buttons.length - 1)];
+    if (next === undefined) {
+      deck.current.querySelector("h3")?.focus();
+    } else {
+      next.focus();
+    }
+  }, [gone]);
   return (
     <>
       <p className="text-center" aria-live="polite">
@@ -421,25 +505,28 @@ function Columns({
               choice={choice}
               label={`Add ${cardText(choice.card)}, ${String(count(choice))} of ${String(choice.most)}`}
               shown={`${String(count(choice))} / ${String(choice.most)}`}
-              disabled={count(choice) >= choice.most}
+              off={count(choice) >= choice.most}
               onClick={() => {
                 onAdd(choice);
               }}
             />
           ))}
         </CardColumn>
-        <CardColumn title="Your deck">
+        <CardColumn title="Your deck" ref={deck}>
           {inDeck.length === 0 ? (
             <li className="italic">Choose cards on the left to add them.</li>
           ) : (
-            inDeck.map((choice) => (
+            inDeck.map((choice, index) => (
               <ChoiceButton
                 key={choice.card.id}
                 choice={choice}
                 label={`Take out ${cardText(choice.card)}, ${String(count(choice))} in the deck`}
                 shown={`×${String(count(choice))}`}
-                disabled={false}
+                off={false}
                 onClick={() => {
+                  if (count(choice) === 1) {
+                    setGone({ index });
+                  }
                   onRemove(choice);
                 }}
               />
@@ -451,20 +538,29 @@ function Columns({
   );
 }
 
-/** One of the editor's columns: a heading and a list of cards. */
+/**
+ * One of the editor's columns: a heading and a list of cards. The heading
+ * can take the focus from the code, as when the last card in the deck goes.
+ */
 function CardColumn({
   title,
+  ref,
   children,
 }: {
   title: string;
+  ref?: Ref<HTMLDivElement>;
   children: ReactNode;
 }) {
   const id = useId();
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-gold-600/60 bg-wood-950/40 p-2">
+    <div
+      ref={ref}
+      className="flex flex-col gap-2 rounded-lg border border-gold-600/60 bg-wood-950/40 p-2"
+    >
       <h3
         id={id}
-        className="font-display text-sm tracking-widest text-gold-300 uppercase"
+        tabIndex={-1}
+        className="font-display text-sm tracking-widest text-gold-300 uppercase outline-none"
       >
         {title}
       </h3>
@@ -475,18 +571,23 @@ function CardColumn({
   );
 }
 
-/** A card in one of the editor's columns, as a button, with its count under it. */
+/**
+ * A card in one of the editor's columns, as a button, with its count under it.
+ *
+ * @param off - Whether choosing it does nothing: it says so, but isn't
+ *   disabled, which would drop the focus.
+ */
 function ChoiceButton({
   choice,
   label,
   shown,
-  disabled,
+  off,
   onClick,
 }: {
   choice: Choice;
   label: string;
   shown: string;
-  disabled: boolean;
+  off: boolean;
   onClick: () => void;
 }) {
   return (
@@ -494,9 +595,9 @@ function ChoiceButton({
       <button
         type="button"
         aria-label={label}
-        disabled={disabled}
+        aria-disabled={off}
         onClick={onClick}
-        className="flex flex-col items-center gap-0.5 rounded-md p-0.5 hover:bg-wood-700 focus-visible:outline-2 focus-visible:outline-gold-300 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex flex-col items-center gap-0.5 rounded-md p-0.5 hover:bg-wood-700 focus-visible:outline-2 focus-visible:outline-gold-300 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent"
       >
         <CardFace card={choice.card} name={cardText(choice.card)} />
         <span aria-hidden="true" className="text-xs">
