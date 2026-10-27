@@ -343,6 +343,7 @@ jobs:
       # Starts the new revision beside the one that answers now, which keeps
       # all the requests (ADR 0016). Fails if its containers do not start.
       - name: Deploy
+        id: deploy
         run: |
           serving=$(gcloud run services describe rowen --region=europe-west1 --format=json \
             | jq --raw-output --exit-status '.status.traffic[] | select(.percent == 100) | .revisionName')
@@ -352,7 +353,9 @@ jobs:
 
       # The new revision answers at its own address: the page with its
       # security header, the decks through nginx, then a new match, read back
-      # from the database (one new match of the runner's own limit). The first
+      # from the database (one new match of the runner's own limit), and a
+      # session that does not exist, which the API looks for in the tables of
+      # the sessions and the accounts (401: it may read them). The first
       # request tries again for a while, in case the instance is still
       # starting. If any of this fails, the visitors never meet the revision.
       - name: Check the new revision
@@ -366,6 +369,9 @@ jobs:
             --data '{"deck": "humans"}' "$url/api/matches")
           id=$(jq --raw-output .id <<< "$match")
           curl --fail --silent --show-error "$url/api/matches/$id" | jq --exit-status '.version == 1'
+          code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --cookie '__Host-session=not-a-session' "$url/api/my-decks")
+          test "$code" = 401
 
       # Only now do the visitors' requests go to the new revision, and the
       # game's own address must still answer with the page.
@@ -376,3 +382,10 @@ jobs:
           url=$(gcloud run services describe rowen --region=europe-west1 --format='value(status.url)')
           echo "url=$url" >> "$GITHUB_OUTPUT"
           curl --fail --silent --show-error --head "$url/" > /dev/null
+
+      # A revision that failed the check would still answer at the tag's
+      # address, with its own instance, against the database: the tag comes
+      # off it. The next deployment gives the tag to its own new revision.
+      - name: Take the tag off a failed revision
+        if: failure() && steps.deploy.outcome == 'success'
+        run: gcloud run services update-traffic rowen --region=europe-west1 --remove-tags=candidate
