@@ -92,3 +92,12 @@ behind Vite in development ([ADR 0009](0009-docker-images-behind-nginx.md)).
 - A setup that rewrote the `Host` header between the browser and the API,
   such as a proxy in front of Cloud Run, would turn every page's request
   down: `Host` would have to be passed on there too.
+
+## Update (2026-10-27)
+
+At 5 a minute, one address could make about 7,000 accounts a day, and each
+may keep 10 decks: enough to fill the free database within weeks. Making an
+account now has a limit of its own too, in nginx: 1 a minute per address
+(nginx counts no slower), plus 10 at once, on top of the logins' limit. That
+is about 1,400 a day, as much room as the new matches already allow. A
+player makes an account once; CI makes 4 in a run.

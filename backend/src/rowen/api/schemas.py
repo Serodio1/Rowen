@@ -451,9 +451,19 @@ class Choices(Schema):
 
 
 # A deck's name: what the player calls it, 1 to 30 characters once the spaces
-# around it are taken away.
+# around it are taken away. No control or invisible characters (the Unicode
+# categories Cc, Cf, Zl and Zp: NUL, a new line, a zero-width space, a
+# right-to-left override...): PostgreSQL can't keep a NUL, and a name made of
+# the others shows as nothing, or as other text, on the page and to a screen
+# reader.
 type DeckName = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=30,
+        pattern=r"^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]*$",
+    ),
 ]
 
 # A card's id, as a key of ``copies``: no card has a longer one.

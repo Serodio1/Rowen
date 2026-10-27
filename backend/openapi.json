@@ -1210,7 +1210,8 @@
       "DeckName": {
         "type": "string",
         "maxLength": 30,
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]*$"
       },
       "DeckStats": {
         "properties": {

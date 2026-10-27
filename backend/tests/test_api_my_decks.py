@@ -134,6 +134,34 @@ def test_a_name_has_1_to_30_characters(client: TestClient, name: str) -> None:
     assert response.json()["code"] == "invalid_request"
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "a\u0000b",  # NUL, which PostgreSQL can't keep
+        "a\u001fb",  # a control character
+        "a\nb",  # a new line inside the name
+        "a\u200bb",  # a zero-width space
+        "\u202ebad",  # a right-to-left override
+        "a\u2028b",  # a line separator
+    ],
+)
+def test_a_name_has_no_control_or_invisible_characters(
+    client: TestClient, name: str
+) -> None:
+    as_(client, RUI)
+
+    response = client.post("/my-decks", json=choice(name=name))
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "invalid_request"
+
+
+def test_a_name_may_have_accents_and_symbols(client: TestClient) -> None:
+    as_(client, RUI)
+
+    assert build(client, name="Ação ✨ 2")["name"] == "Ação ✨ 2"
+
+
 def test_a_name_may_have_30_characters(client: TestClient) -> None:
     as_(client, RUI)
 

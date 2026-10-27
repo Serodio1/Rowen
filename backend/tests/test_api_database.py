@@ -25,7 +25,7 @@ from rowen.api.database import (
     create_engine,
 )
 from rowen.api.player_decks import MAX_DECKS, StoredDeck
-from rowen.api.store import FIRST_VERSION, MatchResult, StoredMatch
+from rowen.api.store import FIRST_VERSION, DeckCopy, MatchResult, StoredMatch
 from rowen.engine.public import (
     Action,
     EndRedraw,
@@ -340,6 +340,53 @@ def test_the_migrations_can_be_undone_and_done_again(migrations: Config) -> None
     command.upgrade(migrations, "head")
 
     command.check(migrations)
+
+
+def test_going_down_stops_before_it_loses_a_built_decks_copy(
+    migrations: Config,
+    postgres_store: PostgresMatchStore,
+) -> None:
+    # Without its copy, the match would play again from the faction's deck.
+    built = DeckCopy(name="Mine", copies={"soldier": 3})
+    kept = postgres_store.create(
+        ("humans", "robots"), 1, (), owner=None, now=NOW, built=built
+    )
+
+    with pytest.raises(RuntimeError, match="built deck"):
+        command.downgrade(migrations, "-1")
+
+    assert postgres_store.get(kept.id) == kept
+
+
+def test_going_down_stops_before_it_loses_a_matchs_owner(
+    migrations: Config,
+    postgres_store: PostgresMatchStore,
+    postgres_accounts: PostgresAccountStore,
+) -> None:
+    # Without its owner, a player's match would be anyone's.
+    account = postgres_accounts.create_account("rui", "a hash")
+    assert account is not None
+    kept = postgres_store.create(("humans", "robots"), 1, (), owner=account.id, now=NOW)
+
+    with pytest.raises(RuntimeError, match="owner"):
+        command.downgrade(migrations, "517136ed7eac")
+
+    assert postgres_store.get(kept.id) == kept
+
+
+def test_going_down_stops_before_it_loses_a_matchs_result(
+    migrations: Config,
+    postgres_store: PostgresMatchStore,
+) -> None:
+    # A guest's match keeps its result too.
+    started = postgres_store.create(("humans", "robots"), 1, (), owner=None, now=NOW)
+    won = MatchResult(outcome="won", rounds=((1, 0), (1, 0)), ended_at=NOW)
+    kept = postgres_store.add_actions(started.id, started.version, (Pass(),), won)
+
+    with pytest.raises(RuntimeError, match="result"):
+        command.downgrade(migrations, "517136ed7eac")
+
+    assert postgres_store.get(started.id) == kept
 
 
 @pytest.fixture
