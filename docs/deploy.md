@@ -322,7 +322,8 @@ work from a computer far from the server:
 When the *Deploy* job fails, GitHub sends an email. If it failed before
 *Move the traffic*, the visitors still meet the earlier revision: look at the
 logs, and merge a fix. If the game breaks later, go back to an earlier
-revision (below) until a fix is merged.
+revision (below) until a fix is merged, but only to one that knows the
+database as it is now.
 
 What the containers printed (each request, and any error):
 
@@ -331,13 +332,28 @@ gcloud run services logs read rowen --region=europe-west1 --limit=50
 ```
 
 Go back to an earlier revision (its name comes from the list, such as
-`rowen-cbb8e7b`); the next deployment keeps it until its own new revision
-passes the check:
+`rowen-7806113`); the next deployment keeps it until its own new revision
+passes the check. `--remove-tags` takes the `candidate` address off the
+broken revision:
 
 ```powershell
 gcloud run revisions list --service=rowen --region=europe-west1
-gcloud run services update-traffic rowen --region=europe-west1 --to-revisions=REVISION_NAME=100
+gcloud run services update-traffic rowen --region=europe-west1 --to-revisions=REVISION_NAME=100 --remove-tags=candidate
 ```
+
+Never go back to a revision older than the database's newest migration
+(`git log -- backend/migrations/versions` gives its commit). The migrations
+only add, so the older code still starts, but it does not know what they
+added, and it breaks the matches that use it. The newest one came with
+`rowen-3b8f05f` (a match keeps a copy of its built deck): a revision older
+than it replays such a match from the faction's own deck instead (an error,
+or, worse, new moves from the wrong cards, kept for good), and older ones
+also let anyone read a player's match and finish a match without keeping
+its result. A page left open keeps sending moves to whichever revision
+answers. If the newest revision that knows the database is the broken one,
+fix it forward: revert the change on `main` and let CI deploy the revert.
+Going down a migration (`alembic downgrade`) is no way back either: it
+throws away what the migration kept.
 
 Take the game offline (the images stay in the store):
 

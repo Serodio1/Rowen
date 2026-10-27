@@ -61,8 +61,9 @@ a new build, so the images online could start from a base no test had run on.
 
 - A revision that fails the check never gets a visitor's request. The check
   makes one match on the database per deployment, as before.
-- The `candidate` tag stays on the newest revision, so its address keeps
-  answering; it is the same game as the main address.
+- The `candidate` tag stays on the newest revision that passed the check, so
+  its address keeps answering; it is the same game as the main address. (See
+  the update below for a revision that fails it.)
 - `rowen-deploy` needs no new permission: Cloud Run Developer may already
   update the service's traffic.
 - The deployment has one more step, and the file has one more placeholder
@@ -74,3 +75,22 @@ a new build, so the images online could start from a base no test had run on.
 - The base images no longer take security fixes by themselves. Someone has
   to update the digests now and then; nothing in the repository reminds them
   yet.
+
+## Update (2026-10-27)
+
+- **A revision that fails the check loses the tag.** It used to keep it
+  until the next deployment: still answering at the tag's address, with an
+  instance of its own (beside the one that gets the requests, so up to two),
+  against the production database. When the check or the move of the traffic
+  fails, a last step runs `update-traffic --remove-tags=candidate`.
+- **The check reads the accounts' tables too**: a request with a session that
+  does not exist must get 401, so the API could read `sessions` and
+  `accounts`. A role missing a grant there (a database set up without the
+  default privileges of `docs/deploy.md`) failed no step before.
+- **Going back stops at the newest migration.** A revision older than the
+  database's newest migration breaks the matches that use what the migration
+  added (today, every revision before `rowen-3b8f05f`: built decks, and
+  before v0.4.0 owners and results too), and a page left open keeps sending
+  it moves. `docs/deploy.md`
+  says so where it explains going back; past that line, the way back is a
+  revert deployed forward.
