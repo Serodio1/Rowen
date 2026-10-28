@@ -7,10 +7,10 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from rowen.ai import baseline
-from rowen.ai.montecarlo import choose_action, guess
+from rowen.ai.montecarlo import _next, choose_action, guess
 from rowen.data import deck_ids, load_deck
-from rowen.engine.actions import EndRedraw, Pass, PlayUnit, Revive
-from rowen.engine.cards import Ability, Card, Row, UnitCard
+from rowen.engine.actions import Action, EndRedraw, Pass, PlayUnit, Revive
+from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.game import apply, legal_actions, match_over, start_match
 from rowen.engine.rng import Rng
 from rowen.engine.state import GameState, PlayerState, RowState
@@ -26,6 +26,10 @@ INFORMANT = UnitCard(
     strength=3,
     ability=Ability.SPY,
 )
+
+HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
+WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
+SCARECROW = SpecialCard(id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW)
 
 # Every deck in the data files, by id, as in test_properties.py.
 DECKS = {deck_id: load_deck(deck_id) for deck_id in deck_ids()}
@@ -81,6 +85,27 @@ def test_guess_draws_the_hidden_cards_from_the_cards_not_seen() -> None:
     assert guessed.players[0].deck == (KNIGHT, KNIGHT)
     assert guessed.players[1].hand == (KNIGHT, KNIGHT)
     assert guessed.players[1].deck == (KNIGHT,)
+
+
+def test_guess_takes_away_the_special_cards_seen() -> None:
+    # The opponent's War Horn, Scarecrow and Hoarfrost are in play, so of
+    # their list only the Knight can be in their hand.
+    opponent = PlayerState(
+        deck=(),
+        hand=(KNIGHT,),
+        rows={
+            Row.MELEE: RowState(horn=WAR_HORN, scarecrows=(SCARECROW,)),
+            Row.RANGED: RowState(),
+            Row.SIEGE: RowState(),
+        },
+        weather=(HOARFROST,),
+    )
+    state = match(player((SCOUT,)), opponent)
+    decks = ((SCOUT,), (WAR_HORN, SCARECROW, HOARFROST, KNIGHT))
+
+    guessed, _ = guess(player_view(state, 0), decks, Rng(seed=1))
+
+    assert guessed.players[1].hand == (KNIGHT,)
 
 
 def test_guess_counts_a_spy_for_the_player_who_played_it() -> None:
@@ -247,6 +272,70 @@ def test_passes_when_the_opponent_holds_too_little() -> None:
         view, decks=((KNIGHT,) * 2 + (wall(10),), (SCOUT,) * 3), samples=4, seed=0
     )
     assert action == Pass()
+
+
+@pytest.mark.parametrize(
+    ("opponent_passed", "reviving"), [(True, False), (False, True)]
+)
+def test_leaves_the_choice_to_the_baseline(
+    opponent_passed: bool, reviving: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Once the opponent has passed, or after a Medic, the hidden cards change
+    # nothing: whatever the baseline chooses is played, without a sample. The
+    # baseline is made to choose what the samples wouldn't: passing with a
+    # card left, or, after a Medic, an action that isn't even legal.
+    opponent = replace(player((SCOUT,)), passed=opponent_passed)
+    state = replace(
+        match(player((KNIGHT,), discard=(SCOUT,)), opponent), reviving=reviving
+    )
+    view = player_view(state, 0)
+    chosen = Pass() if reviving else view.legal_actions[-1]
+    monkeypatch.setattr(baseline, "choose_action", lambda _: chosen)
+
+    action = choose_action(view, decks=((KNIGHT, SCOUT), (SCOUT,)), samples=4, seed=0)
+
+    assert action == chosen
+
+
+def test_adds_up_every_sample() -> None:
+    # The AI leads by 10. The opponent holds three of a Knight and four
+    # Scouts: with the Knight, they catch up, and with three Scouts (9
+    # points) they don't. With seed 1, the first two samples give them the
+    # Knight and the last one doesn't: on their own, the last one would pass.
+    state = match(
+        player((KNIGHT, KNIGHT), siege=(wall(10),)),
+        player((SCOUT,) * 3),
+    )
+    decks = ((KNIGHT, KNIGHT, wall(10)), (KNIGHT, SCOUT, SCOUT, SCOUT, SCOUT))
+
+    action = choose_action(player_view(state, 0), decks=decks, samples=3, seed=1)
+
+    assert action == PlayUnit(card="knight", row=Row.MELEE)
+
+
+# _next: the play-out
+
+
+@pytest.mark.parametrize(
+    ("lead", "lives", "action"),
+    [
+        (10, 2, Pass()),
+        (9, 2, PlayUnit(card="knight", row=Row.MELEE)),
+        (10, 1, PlayUnit(card="knight", row=Row.MELEE)),
+    ],
+)
+def test_play_out_passes_ahead_by_10_but_not_on_the_last_life(
+    lead: int, lives: int, action: Action
+) -> None:
+    state = match(player((KNIGHT,), siege=(wall(lead),), lives=lives), player((SCOUT,)))
+    assert _next(state) == action
+
+
+def test_play_out_passes_once_ahead_after_the_opponent_passed() -> None:
+    # A lead of 1 is enough: the opponent plays no more cards this round.
+    opponent = replace(player((SCOUT,)), passed=True)
+    state = match(player((KNIGHT,), siege=(wall(1),)), opponent)
+    assert _next(state) == Pass()
 
 
 def test_the_same_seed_gives_the_same_action() -> None:
