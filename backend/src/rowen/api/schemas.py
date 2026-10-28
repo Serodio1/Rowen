@@ -505,15 +505,18 @@ class PlayerDecks(Schema):
 
 
 class NewMatch(Schema):
-    """What the player sends to start a match: the deck they play.
+    """What the player sends to start a match: the deck they play, and the AI's level.
 
     Either ``deck``, the id of a faction's own deck (``{"deck": "humans"}``),
     or ``my_deck``, the id of a deck they built, while they are logged in:
-    one of the two, never both.
+    one of the two, never both. ``level`` is how well the AI plays: ``easy``
+    is the baseline AI, ``normal`` and ``hard`` the Monte Carlo AI, which
+    guesses the cards it can't see (ADR 0018). Without it, ``easy``.
     """
 
     deck: str | None = None
     my_deck: UUID | None = None
+    level: Literal["easy", "normal", "hard"] = "easy"
 
     @model_validator(mode="after")
     def _one_deck(self) -> Self:
@@ -601,14 +604,15 @@ class MatchSummary(Schema):
     ``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.
     When the player played a deck they built, ``deck`` is its faction's and
     ``deck_name`` the name it had then; otherwise ``deck_name`` is None.
-    ``result`` is None while the match goes on: the player can get it by its
-    id and play on.
+    ``level`` is the level of the AI. ``result`` is None while the match goes
+    on: the player can get it by its id and play on.
     """
 
     id: UUID
     deck: str
     deck_name: str | None
     ai_deck: str
+    level: Literal["easy", "normal", "hard"]
     started_at: datetime
     result: Result | None
 

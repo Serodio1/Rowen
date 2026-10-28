@@ -50,8 +50,9 @@ export interface paths {
      *     they built (``my_deck``): the match keeps a copy of it, so changing or
      *     deleting the deck later doesn't change the match (ADR 0017).
      *
-     *     If the AI starts, it plays until it is the player's turn, and its moves
-     *     come with the match. The ``Location`` header of the response
+     *     ``level`` is how well the AI plays, ``easy`` when the request doesn't say
+     *     (ADR 0018). If the AI starts, it plays until it is the player's turn, and
+     *     its moves come with the match. The ``Location`` header of the response
      *     holds the address of the match. If the player is logged in, the match is
      *     theirs.
      */
@@ -93,7 +94,7 @@ export interface paths {
     put?: never;
     /**
      * Play
-     * @description Play the player's action, and then let the AI answer.
+     * @description Play the player's action, and then let the AI answer, at the match's level.
      *
      *     The action is one of the legal actions in the player's view, sent back as
      *     it is, with the version of the match that came with that view. If the
@@ -562,8 +563,8 @@ export interface components {
      *     ``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.
      *     When the player played a deck they built, ``deck`` is its faction's and
      *     ``deck_name`` the name it had then; otherwise ``deck_name`` is None.
-     *     ``result`` is None while the match goes on: the player can get it by its
-     *     id and play on.
+     *     ``level`` is the level of the AI. ``result`` is None while the match goes
+     *     on: the player can get it by its id and play on.
      */
     MatchSummary: {
       /**
@@ -577,6 +578,11 @@ export interface components {
       deck_name: string | null;
       /** Ai Deck */
       ai_deck: string;
+      /**
+       * Level
+       * @enum {string}
+       */
+      level: "easy" | "normal" | "hard";
       /**
        * Started At
        * Format: date-time
@@ -625,17 +631,25 @@ export interface components {
     };
     /**
      * NewMatch
-     * @description What the player sends to start a match: the deck they play.
+     * @description What the player sends to start a match: the deck they play, and the AI's level.
      *
      *     Either ``deck``, the id of a faction's own deck (``{"deck": "humans"}``),
      *     or ``my_deck``, the id of a deck they built, while they are logged in:
-     *     one of the two, never both.
+     *     one of the two, never both. ``level`` is how well the AI plays: ``easy``
+     *     is the baseline AI, ``normal`` and ``hard`` the Monte Carlo AI, which
+     *     guesses the cards it can't see (ADR 0018). Without it, ``easy``.
      */
     NewMatch: {
       /** Deck */
       deck?: string | null;
       /** My Deck */
       my_deck?: string | null;
+      /**
+       * Level
+       * @default easy
+       * @enum {string}
+       */
+      level: "easy" | "normal" | "hard";
     };
     /**
      * NothingToRevive

@@ -11,9 +11,11 @@ the seed, and every action played so far, the player's and the AI's, in
 order. When the player plays a deck they built, the match also keeps a copy
 of it, its name and how many copies of each card (``DeckCopy``): the deck
 itself may change or go, but the match must always play again the same way
-(ADR 0017). The engine is deterministic, so the same decks, seed and actions always
-make the same state (ADR 0003): the API plays the actions again to get it, in
-a millisecond or two. The store never sees a state.
+(ADR 0017). It also keeps the level of the AI the player chose, at which
+the AI plays its moves to come. The engine is deterministic, so the same
+decks, seed and actions always make the same state (ADR 0003): the API plays
+the actions again to get it, in a millisecond or two. The store never sees a
+state.
 
 A store maps the id of each match to that record and its version (below). The
 id is a random UUID (version 4): 122 random bits from the operating system, so
@@ -69,6 +71,10 @@ FIRST_VERSION = 1
 # How a match ended, for the player (not the AI).
 type Outcome = Literal["won", "lost", "drawn"]
 
+# How well the AI plays: easy is the baseline AI, normal and hard the Monte
+# Carlo AI, with more samples for hard (ADR 0018).
+type Level = Literal["easy", "normal", "hard"]
+
 
 @dataclass(frozen=True)
 class MatchResult:
@@ -114,6 +120,7 @@ class StoredMatch:
         result: How it ended, or None while it goes on.
         built: A copy of the deck the player built, or None if they play
             their faction's own.
+        level: The level of the AI.
     """
 
     id: UUID
@@ -125,6 +132,7 @@ class StoredMatch:
     created_at: datetime
     result: MatchResult | None
     built: DeckCopy | None = None
+    level: Level = "easy"
 
 
 @dataclass(frozen=True)
@@ -138,6 +146,7 @@ class MatchSummary:
         result: How it ended, or None while it goes on.
         deck_name: The name of the deck the player built, or None if they
             played their faction's own.
+        level: The level of the AI.
     """
 
     id: UUID
@@ -145,6 +154,7 @@ class MatchSummary:
     created_at: datetime
     result: MatchResult | None
     deck_name: str | None = None
+    level: Level = "easy"
 
 
 @dataclass(frozen=True)
@@ -178,13 +188,15 @@ class MatchStore(Protocol):
         owner: UUID | None,
         now: datetime,
         built: DeckCopy | None = None,
+        level: Level = "easy",
     ) -> StoredMatch:
         """Keep a new match, at its first version, and return it.
 
         ``actions`` are those played before the match is kept: the AI's
         first moves, if it starts. ``owner`` is the account of the player who
-        starts it, if they are logged in, ``now`` when it starts, and
-        ``built`` a copy of the deck the player built, if they play one.
+        starts it, if they are logged in, ``now`` when it starts,
+        ``built`` a copy of the deck the player built, if they play one, and
+        ``level`` the level of the AI.
         """
         ...
 
@@ -255,6 +267,7 @@ class MemoryMatchStore:
         owner: UUID | None,
         now: datetime,
         built: DeckCopy | None = None,
+        level: Level = "easy",
     ) -> StoredMatch:
         """Keep a new match, at its first version, and return it.
 
@@ -274,6 +287,7 @@ class MemoryMatchStore:
             built=None
             if built is None
             else DeckCopy(name=built.name, copies=dict(built.copies)),
+            level=level,
         )
         with self._lock:
             self._matches[match.id] = match
@@ -346,6 +360,7 @@ class MemoryMatchStore:
                 created_at=match.created_at,
                 result=match.result,
                 deck_name=None if match.built is None else match.built.name,
+                level=match.level,
             )
             for match in owned[:limit]
         )

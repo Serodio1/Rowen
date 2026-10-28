@@ -159,6 +159,7 @@ forbidden_modules = ["rowen.engine"]
 ignore_imports = [
     "rowen.api.** -> rowen.engine.public",
     "rowen.api.** -> rowen.ai.baseline",
+    "rowen.api.** -> rowen.ai.montecarlo",
     "rowen.api.** -> rowen.data",
 ]
 broken_contract_guidance = """

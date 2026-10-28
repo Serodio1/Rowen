@@ -67,6 +67,7 @@ from rowen.api.store import (
     FIRST_VERSION,
     DeckCopy,
     DeckStats,
+    Level,
     MatchResult,
     MatchSummary,
     Outcome,
@@ -105,6 +106,9 @@ class MatchRow(Base):
             "(player_copies IS NULL) = (player_deck_name IS NULL)",
             name="player_deck_copy_is_whole",
         ),
+        CheckConstraint(
+            "ai_level IN ('easy', 'normal', 'hard')", name="ai_level_is_known"
+        ),
         # An owner's matches, newest first, as list_matches reads them: the
         # database finds them in this index, already in order, without
         # reading every match.
@@ -139,6 +143,9 @@ class MatchRow(Base):
     player_copies: Mapped[dict[str, int] | None] = mapped_column(
         JSONB(none_as_null=True)
     )
+    # The level of the AI. The matches kept before there were levels were
+    # all played by the baseline AI: easy.
+    ai_level: Mapped[Level] = mapped_column(String, server_default="easy")
 
 
 class AccountRow(Base):
@@ -279,6 +286,7 @@ class PostgresMatchStore:
         owner: UUID | None,
         now: datetime,
         built: DeckCopy | None = None,
+        level: Level = "easy",
     ) -> StoredMatch:
         """Keep a new match, at its first version, and return it."""
         player_deck, ai_deck = decks
@@ -293,6 +301,7 @@ class PostgresMatchStore:
             created_at=now,
             player_deck_name=None if built is None else built.name,
             player_copies=None if built is None else dict(built.copies),
+            ai_level=level,
         )
         with Session(self._engine) as session, session.begin():
             session.add(row)
@@ -383,6 +392,7 @@ class PostgresMatchStore:
                     created_at=row.created_at,
                     result=_result(row),
                     deck_name=row.player_deck_name,
+                    level=row.ai_level,
                 )
                 for row in session.scalars(statement)
             )
@@ -436,6 +446,7 @@ def _stored(row: MatchRow) -> StoredMatch:
         created_at=row.created_at,
         result=_result(row),
         built=_built(row),
+        level=row.ai_level,
     )
 
 
