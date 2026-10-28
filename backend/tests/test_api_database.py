@@ -353,7 +353,7 @@ def test_going_down_stops_before_it_loses_a_built_decks_copy(
     )
 
     with pytest.raises(RuntimeError, match="built deck"):
-        command.downgrade(migrations, "-1")
+        command.downgrade(migrations, "35aff864c3d9")
 
     assert postgres_store.get(kept.id) == kept
 

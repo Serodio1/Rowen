@@ -20,6 +20,7 @@ from rowen.api.store import (
     MAX_MATCHES,
     DeckCopy,
     DeckStats,
+    Level,
     MatchResult,
     MatchStore,
     MatchSummary,
@@ -331,6 +332,33 @@ def test_a_match_with_the_factions_own_deck_has_no_copy(
     assert kept is not None
     assert kept.built is None
     assert store.list_matches(owner, 10)[0].deck_name is None
+
+
+@pytest.mark.parametrize("level", ["normal", "hard"])
+def test_a_match_keeps_the_level_of_the_ai(
+    any_stores: tuple[MatchStore, AccountStore], level: Level
+) -> None:
+    store, _ = any_stores
+    owner = owner_of(any_stores)
+
+    match = store.create(DECKS, 0, SOME_ACTIONS, owner=owner, now=NOW, level=level)
+
+    assert match.level == level
+    assert store.get(match.id) == match
+    (listed,) = store.list_matches(owner, 10)
+    assert listed.level == level
+
+
+def test_a_match_is_easy_unless_it_says_otherwise(
+    any_stores: tuple[MatchStore, AccountStore],
+) -> None:
+    store, _ = any_stores
+    owner = owner_of(any_stores)
+
+    match = start(store, owner)
+
+    assert match.level == "easy"
+    assert store.list_matches(owner, 10)[0].level == "easy"
 
 
 def test_the_actions_that_end_a_match_keep_its_result(

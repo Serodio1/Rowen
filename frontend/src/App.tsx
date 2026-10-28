@@ -9,6 +9,7 @@ import type {
   Api,
   Card,
   Event,
+  Level,
   Match,
   Move,
   NewMatch,
@@ -91,6 +92,9 @@ export function App({ api }: { api: Api }) {
   const [showing, setShowing] = useState<"matches" | "decks" | null>(null);
   // Whether the player left a match: the focus then goes to the decks.
   const [left, setLeft] = useState(false);
+  // The level of the AI for the next match. It is kept here, so the player
+  // finds it as they chose it when they play again.
+  const [level, setLevel] = useState<Level>("normal");
   // Whether the dialog to log in is open: the rest of the page is out of
   // reach meanwhile (inert), and the focus goes back to the top once it
   // closes, since the button that opened it may be gone.
@@ -212,6 +216,8 @@ export function App({ api }: { api: Api }) {
               focus={left}
               loggedOut={loggedOut}
               loggedIn={username !== undefined && username !== null}
+              level={level}
+              onLevel={setLevel}
             />
           )
         ) : (
@@ -251,6 +257,8 @@ export function App({ api }: { api: Api }) {
  *   their own.
  * @param loggedOut - Whether the page left a match because its account
  *   logged out: it says so.
+ * @param level - The level of the AI the match starts with.
+ * @param onLevel - Called with the level the player chooses.
  */
 function ChooseDeck({
   api,
@@ -258,12 +266,16 @@ function ChooseDeck({
   focus,
   loggedIn,
   loggedOut,
+  level,
+  onLevel,
 }: {
   api: Api;
   onStart: (match: Played) => void;
   focus: boolean;
   loggedIn: boolean;
   loggedOut: boolean;
+  level: Level;
+  onLevel: (level: Level) => void;
 }) {
   const queryClient = useQueryClient();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -328,6 +340,7 @@ function ChooseDeck({
           {start.error.message}
         </p>
       )}
+      <LevelChoice level={level} onLevel={onLevel} disabled={start.isPending} />
       {decks.isPending && <p className="italic">Loading the decks…</p>}
       {decks.isError && (
         <>
@@ -353,7 +366,7 @@ function ChooseDeck({
               type="button"
               className={`${BUTTON} px-8 py-4 text-xl`}
               disabled={start.isPending}
-              onClick={startWith({ deck: deck.id })}
+              onClick={startWith({ deck: deck.id, level })}
             >
               {deck.name}
             </button>
@@ -365,10 +378,75 @@ function ChooseDeck({
           decks={playerDecks}
           factionName={factionName}
           starting={start.isPending}
-          onStart={(deck) => startWith({ my_deck: deck.id })}
+          onStart={(deck) => startWith({ my_deck: deck.id, level })}
         />
       )}
     </section>
+  );
+}
+
+// The levels of the AI, from the weakest, with what the player sees of each.
+const LEVELS: readonly { level: Level; name: string }[] = [
+  { level: "easy", name: "Easy" },
+  { level: "normal", name: "Normal" },
+  { level: "hard", name: "Hard" },
+];
+
+/**
+ * The level of the AI, chosen before the deck: a click on a deck starts the
+ * match at once. A group of radio buttons, so the arrow keys move between
+ * the levels and a screen reader says which one is chosen.
+ *
+ * @param level - The level chosen.
+ * @param onLevel - Called with the level the player chooses.
+ * @param disabled - Whether a match is starting: the level can't change
+ *   meanwhile.
+ */
+function LevelChoice({
+  level,
+  onLevel,
+  disabled,
+}: {
+  level: Level;
+  onLevel: (level: Level) => void;
+  disabled: boolean;
+}) {
+  const name = useId();
+  const about = useId();
+  return (
+    <fieldset
+      disabled={disabled}
+      aria-describedby={about}
+      className="flex flex-col items-center gap-2 disabled:opacity-50"
+    >
+      <legend className="mb-2 text-center font-display text-xl text-gold-300">
+        AI level
+      </legend>
+      <div className="flex flex-wrap justify-center gap-2">
+        {LEVELS.map((choice) => (
+          <label
+            key={choice.level}
+            className="flex cursor-pointer items-center gap-2 rounded-md border border-gold-600 px-3 py-1.5 font-display text-gold-200 has-checked:bg-wood-600 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-gold-300"
+          >
+            <input
+              type="radio"
+              name={name}
+              value={choice.level}
+              checked={level === choice.level}
+              onChange={() => {
+                onLevel(choice.level);
+              }}
+              className="accent-gold-400"
+            />
+            {choice.name}
+          </label>
+        ))}
+      </div>
+      <p id={about} className="text-center text-sm opacity-80">
+        Easy plays at once. Normal and Hard guess the cards you hold, and think
+        a little longer.
+      </p>
+    </fieldset>
   );
 }
 

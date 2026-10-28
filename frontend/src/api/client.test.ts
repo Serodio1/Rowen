@@ -23,14 +23,14 @@ test("a request goes to /api on the page's own server, with a JSON body", async 
   const { fetch, requests } = fakeFetch(201, { id: "a-match" });
   const api = createApi(fetch);
 
-  await api.POST("/matches", { body: { deck: "humans" } });
+  await api.POST("/matches", { body: { deck: "humans", level: "easy" } });
 
   expect(requests).toHaveLength(1);
   const [request] = requests;
   expect(request?.method).toBe("POST");
   expect(request?.url).toBe(`${window.location.origin}/api/matches`);
   expect(request?.headers.get("Content-Type")).toBe("application/json");
-  expect(await request?.json()).toEqual({ deck: "humans" });
+  expect(await request?.json()).toEqual({ deck: "humans", level: "easy" });
 });
 
 test("the API's answer comes back as data", async () => {
@@ -38,7 +38,7 @@ test("the API's answer comes back as data", async () => {
   const api = createApi(fakeFetch(201, match).fetch);
 
   const { data, error } = await api.POST("/matches", {
-    body: { deck: "humans" },
+    body: { deck: "humans", level: "easy" },
   });
 
   expect(data).toEqual(match);
@@ -53,7 +53,7 @@ test("a request the API turns down comes back as an error, with its code", async
   const api = createApi(fakeFetch(422, turnedDown).fetch);
 
   const { data, error, response } = await api.POST("/matches", {
-    body: { deck: "elves" },
+    body: { deck: "elves", level: "easy" },
   });
 
   expect(data).toBeUndefined();

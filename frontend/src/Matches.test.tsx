@@ -72,6 +72,7 @@ function summary(changes: Partial<MatchSummary> = {}): MatchSummary {
     deck: "humans",
     deck_name: null,
     ai_deck: "robots",
+    level: "easy",
     started_at: STARTED_AT,
     result: null,
     ...changes,
@@ -183,6 +184,19 @@ test("a match played with a deck the player built shows its name and faction", a
 
   expect(await screen.findByRole("listitem")).toHaveTextContent(
     "Mine (Humans) against Robots",
+  );
+});
+
+test("each match says the level of the AI it was played against", async () => {
+  renderApp({
+    ...RUI,
+    "GET /api/stats": stats([]),
+    "GET /api/matches": page([summary({ level: "hard" })]),
+  });
+  await openMatches();
+
+  expect(await screen.findByRole("listitem")).toHaveTextContent(
+    "Humans against Robots (Hard)",
   );
 });
 

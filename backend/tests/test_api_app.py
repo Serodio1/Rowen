@@ -505,8 +505,9 @@ def test_the_ai_doesnt_play_once_the_match_is_over() -> None:
         view = player_view(state, HUMAN)
     assert view.current == AI
 
-    assert _ai_plays(state) == (state, (), ())
-    assert _ai_plays(state)[0] is state
+    decks = ("humans", "robots")
+    assert _ai_plays(state, "easy", decks, 0) == (state, (), ())
+    assert _ai_plays(state, "easy", decks, 0)[0] is state
 
 
 def test_the_ai_finishes_its_turn_after_a_medic() -> None:
@@ -520,7 +521,7 @@ def test_the_ai_finishes_its_turn_after_a_medic() -> None:
     assert view.current == AI
 
     # The AI chooses a unit to revive, and only then does its turn end.
-    view = player_view(_ai_plays(state)[0], HUMAN)
+    view = player_view(_ai_plays(state, "easy", ("humans", "robots"), 0)[0], HUMAN)
 
     assert view.current == HUMAN
     assert not view.reviving
@@ -982,7 +983,7 @@ def test_a_bug_on_the_server_is_answered_with_an_error_too(
     def choose_action(view: PlayerView) -> Action:
         raise RuntimeError("SECRET")
 
-    monkeypatch.setattr("rowen.api.app.choose_action", choose_action)
+    monkeypatch.setattr("rowen.ai.baseline.choose_action", choose_action)
     # Unless told not to, the test client raises the errors of the server.
     server = TestClient(app, raise_server_exceptions=False)
 
@@ -1005,7 +1006,7 @@ def test_an_illegal_move_of_the_ai_is_a_bug_on_the_server(
     def choose_action(view: PlayerView) -> Action:
         return Pass()
 
-    monkeypatch.setattr("rowen.api.app.choose_action", choose_action)
+    monkeypatch.setattr("rowen.ai.baseline.choose_action", choose_action)
     server = TestClient(app, raise_server_exceptions=False)
 
     failed = play(server, response, {"type": "end_redraw"})

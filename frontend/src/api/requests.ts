@@ -254,7 +254,8 @@ export async function deleteDeck(api: Api, id: string): Promise<void> {
 
 /**
  * Start a match against the AI with a faction's own deck,
- * `{ deck: "humans" }`, or with a deck the player built, `{ my_deck: id }`.
+ * `{ deck: "humans" }`, or with a deck the player built, `{ my_deck: id }`,
+ * and the level of the AI, `level`.
  */
 export function startMatch(api: Api, deck: NewMatch) {
   return send(api.POST("/matches", { body: deck }));

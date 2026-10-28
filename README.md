@@ -19,8 +19,9 @@ melee rows, and a Plane shown large with what it does](docs/screenshot.webp)
 
 ## Play online
 
-**<https://rowen-806785616593.europe-west1.run.app>**: choose a deck and play
-against the AI, with nothing to install, as a guest or with an account. After
+**<https://rowen-806785616593.europe-west1.run.app>**: choose the AI's level
+(Easy, Normal or Hard) and a deck, and play against the AI, with nothing to
+install, as a guest or with an account. After
 a quiet while the server is stopped, so the first visit can take a few seconds
 more while it starts (about 6 when measured). Matches are kept in a database,
 so a match goes on after the server sleeps, and when a new version goes

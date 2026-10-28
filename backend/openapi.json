@@ -27,7 +27,7 @@
     "/matches": {
       "post": {
         "summary": "Create Match",
-        "description": "Start a match against the AI, which plays another faction's own deck.\n\nThe player plays a faction's own deck (``deck``) or, while logged in, one\nthey built (``my_deck``): the match keeps a copy of it, so changing or\ndeleting the deck later doesn't change the match (ADR 0017).\n\nIf the AI starts, it plays until it is the player's turn, and its moves\ncome with the match. The ``Location`` header of the response\nholds the address of the match. If the player is logged in, the match is\ntheirs.",
+        "description": "Start a match against the AI, which plays another faction's own deck.\n\nThe player plays a faction's own deck (``deck``) or, while logged in, one\nthey built (``my_deck``): the match keeps a copy of it, so changing or\ndeleting the deck later doesn't change the match (ADR 0017).\n\n``level`` is how well the AI plays, ``easy`` when the request doesn't say\n(ADR 0018). If the AI starts, it plays until it is the player's turn, and\nits moves come with the match. The ``Location`` header of the response\nholds the address of the match. If the player is logged in, the match is\ntheirs.",
         "operationId": "create_match",
         "parameters": [
           {
@@ -243,7 +243,7 @@
     "/matches/{match_id}/actions": {
       "post": {
         "summary": "Play",
-        "description": "Play the player's action, and then let the AI answer.\n\nThe action is one of the legal actions in the player's view, sent back as\nit is, with the version of the match that came with that view. If the\nmatch is at another version, the answer is a 409 and the match doesn't\nchange: get it again to see where it is. That is so also when another\nrequest for the same match is played first, while this one is. If the\naction isn't legal now, the answer is a 409 too.\n\nIf the match ends, the store keeps how it ended with the last actions.",
+        "description": "Play the player's action, and then let the AI answer, at the match's level.\n\nThe action is one of the legal actions in the player's view, sent back as\nit is, with the version of the match that came with that view. If the\nmatch is at another version, the answer is a 409 and the match doesn't\nchange: get it again to see where it is. That is so also when another\nrequest for the same match is played first, while this one is. If the\naction isn't legal now, the answer is a 409 too.\n\nIf the match ends, the store keeps how it ended with the last actions.",
         "operationId": "play",
         "parameters": [
           {
@@ -1548,6 +1548,15 @@
             "type": "string",
             "title": "Ai Deck"
           },
+          "level": {
+            "type": "string",
+            "enum": [
+              "easy",
+              "normal",
+              "hard"
+            ],
+            "title": "Level"
+          },
           "started_at": {
             "type": "string",
             "format": "date-time",
@@ -1571,11 +1580,12 @@
           "deck",
           "deck_name",
           "ai_deck",
+          "level",
           "started_at",
           "result"
         ],
         "title": "MatchSummary",
-        "description": "A match in the list of the player's matches.\n\n``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.\nWhen the player played a deck they built, ``deck`` is its faction's and\n``deck_name`` the name it had then; otherwise ``deck_name`` is None.\n``result`` is None while the match goes on: the player can get it by its\nid and play on."
+        "description": "A match in the list of the player's matches.\n\n``deck`` is the id of the player's deck and ``ai_deck`` that of the AI's.\nWhen the player played a deck they built, ``deck`` is its faction's and\n``deck_name`` the name it had then; otherwise ``deck_name`` is None.\n``level`` is the level of the AI. ``result`` is None while the match goes\non: the player can get it by its id and play on."
       },
       "Matches": {
         "properties": {
@@ -1665,12 +1675,22 @@
               }
             ],
             "title": "My Deck"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "easy",
+              "normal",
+              "hard"
+            ],
+            "title": "Level",
+            "default": "easy"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "NewMatch",
-        "description": "What the player sends to start a match: the deck they play.\n\nEither ``deck``, the id of a faction's own deck (``{\"deck\": \"humans\"}``),\nor ``my_deck``, the id of a deck they built, while they are logged in:\none of the two, never both."
+        "description": "What the player sends to start a match: the deck they play, and the AI's level.\n\nEither ``deck``, the id of a faction's own deck (``{\"deck\": \"humans\"}``),\nor ``my_deck``, the id of a deck they built, while they are logged in:\none of the two, never both. ``level`` is how well the AI plays: ``easy``\nis the baseline AI, ``normal`` and ``hard`` the Monte Carlo AI, which\nguesses the cards it can't see (ADR 0018). Without it, ``easy``."
       },
       "NothingToRevive": {
         "properties": {

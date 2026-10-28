@@ -26,9 +26,9 @@ When the API turns a request down, it always answers with the same shape, an
 the same when a bug on the server makes a request fail.
 
 Endpoints get the match store, the account store, the deck store, the seed of
-a new match and the time from ``get_store``, ``get_accounts``, ``get_decks``,
-``new_seed`` and ``get_now``,
-through FastAPI's ``Depends``. The tests replace them with
+a new match, the seed of the AI's guesses and the time from ``get_store``,
+``get_accounts``, ``get_decks``, ``new_seed``, ``new_ai_seed`` and
+``get_now``, through FastAPI's ``Depends``. The tests replace them with
 ``app.dependency_overrides``: new stores for each test, seeds they know, and
 a time they choose.
 
@@ -52,7 +52,7 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException
 
-from rowen.ai.baseline import choose_action
+from rowen.ai import baseline, montecarlo
 from rowen.api.accounts import AccountStore, MemoryAccountStore, StoredAccount
 from rowen.api.database import (
     PostgresAccountStore,
@@ -92,6 +92,7 @@ from rowen.api.schemas import (
 from rowen.api.schemas import RoundEnded as RoundEndedJson
 from rowen.api.store import (
     DeckCopy,
+    Level,
     MatchResult,
     MatchStore,
     MemoryMatchStore,
@@ -100,9 +101,11 @@ from rowen.api.store import (
 from rowen.data import deck_ids, load_deck, load_specials
 from rowen.engine.public import (
     Action,
+    Card,
     Deck,
     Event,
     GameState,
+    PlayerView,
     RoundEnded,
     apply,
     build_deck,
@@ -206,6 +209,16 @@ def new_seed() -> int:
     return secrets.randbits(SEED_BITS)
 
 
+def new_ai_seed() -> int:
+    """Return the seed of the AI's guesses in a request: random, as for a match.
+
+    The AI's moves are kept with the match, so a match plays again the same
+    without it. It is not the match's seed: from that, the AI would know the
+    player's hand.
+    """
+    return secrets.randbits(SEED_BITS)
+
+
 def get_now() -> datetime:
     """Return the time now, to know when a session expires."""
     return datetime.now(UTC)
@@ -217,6 +230,7 @@ type Store = Annotated[MatchStore, Depends(get_store)]
 type Accounts = Annotated[AccountStore, Depends(get_accounts)]
 type PlayerDeckStore = Annotated[DeckStore, Depends(get_decks)]
 type Seed = Annotated[int, Depends(new_seed)]
+type AiSeed = Annotated[int, Depends(new_ai_seed)]
 type Now = Annotated[datetime, Depends(get_now)]
 # The session's token, from its cookie. An endpoint gives it None as its
 # default, for when the browser sends none.
@@ -309,6 +323,7 @@ def create_match(
     response: Response,
     store: Store,
     seed: Seed,
+    ai_seed: AiSeed,
     accounts: Accounts,
     decks: PlayerDeckStore,
     now: Now,
@@ -320,8 +335,9 @@ def create_match(
     they built (``my_deck``): the match keeps a copy of it, so changing or
     deleting the deck later doesn't change the match (ADR 0017).
 
-    If the AI starts, it plays until it is the player's turn, and its moves
-    come with the match. The ``Location`` header of the response
+    ``level`` is how well the AI plays, ``easy`` when the request doesn't say
+    (ADR 0018). If the AI starts, it plays until it is the player's turn, and
+    its moves come with the match. The ``Location`` header of the response
     holds the address of the match. If the player is logged in, the match is
     theirs.
     """
@@ -346,7 +362,9 @@ def create_match(
         raise _invalid_deck() from None
     ai_deck = next(deck for deck in deck_ids() if deck != faction)
     state = start_match((player_deck, load_deck(ai_deck)), seed=seed)
-    state, actions, moves = _ai_plays(state)
+    state, actions, moves = _ai_plays(
+        state, new_match.level, (faction, ai_deck), ai_seed
+    )
     match = store.create(
         (faction, ai_deck),
         seed,
@@ -354,6 +372,7 @@ def create_match(
         owner=None if player is None else player.id,
         now=now,
         built=built,
+        level=new_match.level,
     )
     # url_path_for leaves out root_path, which behind nginx is /api (uvicorn's
     # --root-path in backend/Dockerfile), so it is added here.
@@ -399,11 +418,12 @@ def play(
     match_id: UUID,
     move: Move,
     store: Store,
+    ai_seed: AiSeed,
     accounts: Accounts,
     now: Now,
     token: Token = None,
 ) -> Played:
-    """Play the player's action, and then let the AI answer.
+    """Play the player's action, and then let the AI answer, at the match's level.
 
     The action is one of the legal actions in the player's view, sent back as
     it is, with the version of the match that came with that view. If the
@@ -433,7 +453,7 @@ def play(
         )
     state, events = apply(state, played)
     first = _move(state, events)
-    state, answer, answer_moves = _ai_plays(state)
+    state, answer, answer_moves = _ai_plays(state, old.level, old.decks, ai_seed)
     actions = (played, *answer)
     moves = (first, *answer_moves)
     rounds += _rounds(moves)
@@ -478,6 +498,7 @@ def list_matches(
                 deck=match.decks[0],
                 deck_name=match.deck_name,
                 ai_deck=match.decks[1],
+                level=match.level,
                 started_at=match.created_at,
                 result=None if match.result is None else _result_json(match.result),
             )
@@ -969,9 +990,12 @@ def _result_json(result: MatchResult) -> Result:
 
 
 def _ai_plays(
-    state: GameState,
+    state: GameState, level: Level, decks: tuple[str, str], seed: int
 ) -> tuple[GameState, tuple[Action, ...], tuple[MovePlayed, ...]]:
-    """Let the AI play until it is the player's turn or the match is over.
+    """Let the AI play at ``level`` until it is the player's turn or the match is over.
+
+    ``decks`` are the match's deck ids, the player's and then the AI's, and
+    ``seed`` the seed of the AI's guesses.
 
     Return the new state, the AI's actions and its moves as the player sees
     them, in order. The AI chooses from its own view, as the player does
@@ -981,12 +1005,34 @@ def _ai_plays(
     moves: tuple[MovePlayed, ...] = ()
     view = player_view(state, AI)
     while view.current == AI and not view.match_over:
-        action = choose_action(view)
+        # Each decision guesses with a seed of its own.
+        action = _ai_choice(view, level, decks, seed + len(actions))
         state, events = apply(state, action)
         actions += (action,)
         moves += (_move(state, events),)
         view = player_view(state, AI)
     return state, actions, moves
+
+
+def _ai_choice(
+    view: PlayerView, level: Level, decks: tuple[str, str], seed: int
+) -> Action:
+    """Return the AI's next action at ``level``: the baseline's, or the Monte Carlo's.
+
+    The Monte Carlo AI guesses the hidden cards from the AI's own deck and,
+    for the player, their faction's own deck, which anyone can look up, even
+    when they play one they built (ADR 0018). It gets them by player index.
+    """
+    if level == "easy":
+        return baseline.choose_action(view)
+    samples = (
+        montecarlo.NORMAL_SAMPLES if level == "normal" else montecarlo.HARD_SAMPLES
+    )
+    guess: tuple[tuple[Card, ...], tuple[Card, ...]] = (
+        load_deck(decks[HUMAN]).cards,
+        load_deck(decks[AI]).cards,
+    )
+    return montecarlo.choose_action(view, decks=guess, samples=samples, seed=seed)
 
 
 def _move(state: GameState, events: tuple[Event, ...]) -> MovePlayed:

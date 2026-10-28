@@ -227,7 +227,7 @@ test("choosing a deck starts a match with it, and shows the round, the hand and 
     await screen.findByRole("heading", { name: "Round 1" }),
   ).toBeInTheDocument();
   const [started] = sent(requests, "POST /api/matches");
-  expect(await started?.json()).toEqual({ deck: "robots" });
+  expect(await started?.json()).toEqual({ deck: "robots", level: "normal" });
   expect(hand()).toEqual([
     "Soldier (4 melee/ranged, agile)",
     "Soldier (4 melee/ranged, agile)",
@@ -592,6 +592,53 @@ test.each<[string, Record<string, Answer>, number]>([
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   },
 );
+
+test("the player chooses the AI's level before the deck, and finds it as chosen to play again", async () => {
+  const over = view({ match_over: true, winner: 0, legal_actions: [] });
+  const { api, requests } = fakeApi({ ...A_MATCH, [PLAY]: played(over) });
+  renderApp(api);
+  await screen.findByRole("button", { name: "Humans" });
+
+  const levels = screen.getByRole("group", { name: "AI level" });
+  expect(levels).toHaveAccessibleDescription(
+    "Easy plays at once. Normal and Hard guess the cards you hold, and think a little longer.",
+  );
+  expect(
+    within(levels)
+      .getAllByRole("radio")
+      .map((radio) => radio.getAttribute("value")),
+  ).toEqual(["easy", "normal", "hard"]);
+  expect(within(levels).getByRole("radio", { name: "Normal" })).toBeChecked();
+
+  fireEvent.click(within(levels).getByRole("radio", { name: "Hard" }));
+  await startMatch();
+
+  const [started] = sent(requests, "POST /api/matches");
+  expect(await started?.json()).toEqual({ deck: "humans", level: "hard" });
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Play again" }));
+
+  expect(screen.getByRole("radio", { name: "Hard" })).toBeChecked();
+});
+
+test("the level can't change while a match starts", async () => {
+  const answer = later();
+  const { api } = fakeApi({
+    ...THE_DECKS,
+    "POST /api/matches": answer.response,
+  });
+  renderApp(api);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
+
+  await waitFor(() => {
+    expect(screen.getByRole("group", { name: "AI level" })).toBeDisabled();
+  });
+  for (const radio of screen.getAllByRole("radio")) {
+    expect(radio).toBeDisabled();
+  }
+});
 
 test.each(["illegal_action", "match_changed"])(
   "when the API turns a move down with %s, the page asks for the match again and shows it",
@@ -1143,7 +1190,7 @@ test("two clicks on the decks in the same instant start one match", async () => 
   await settle();
   const [started, ...others] = sent(requests, "POST /api/matches");
   expect(others).toHaveLength(0);
-  expect(await started?.json()).toEqual({ deck: "humans" });
+  expect(await started?.json()).toEqual({ deck: "humans", level: "normal" });
 });
 
 test("after a move that didn't work, the focus goes to the first card once moves can be made", async () => {

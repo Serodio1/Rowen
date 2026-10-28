@@ -509,13 +509,15 @@ test("a player plays a deck they built from the decks to play", async () => {
   const mine = await (
     await yourDecks()
   ).findByRole("button", { name: "Mine (Humans)" });
+  // At the level the player chose, as with a faction's own deck.
+  fireEvent.click(screen.getByRole("radio", { name: "Easy" }));
   fireEvent.click(mine, { detail: 1 });
 
   expect(
     await screen.findByRole("button", { name: "Keep this hand" }),
   ).toBeEnabled();
   expect(sent.filter((request) => request.to === "POST /api/matches")).toEqual([
-    { to: "POST /api/matches", body: { my_deck: "d1" } },
+    { to: "POST /api/matches", body: { my_deck: "d1", level: "easy" } },
   ]);
 });
 
