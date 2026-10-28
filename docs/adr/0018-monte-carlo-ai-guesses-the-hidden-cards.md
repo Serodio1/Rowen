@@ -67,7 +67,8 @@ replay doesn't run the AI again: the AI may use randomness of its own.
   built, the AI expects their faction's own cards.
 - A decision takes longer. On the container, one match at a time, 8 samples
   took 114 ms on average and 0.7 s at most, and 16 took 203 ms and 1.4 s at
-  most. The baseline takes under 1 ms (ADR 0006). The server runs one decision for most requests,
-  since the AI plays as the baseline once the player has passed.
+  most. The baseline takes under 1 ms (ADR 0006). The server runs one
+  decision for most requests, since the AI plays as the baseline once the
+  player has passed.
 - The rules are still only in the engine: a new card needs no change to
   either AI.
