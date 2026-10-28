@@ -33,6 +33,13 @@ from rowen.engine.scoring import player_total
 from rowen.engine.state import GameState, PlayerState
 from rowen.engine.view import PlayerView, SideView
 
+# The samples for each level of the AI; Easy is the baseline AI. Against the
+# baseline, in 160 to 320 matches each, 8 samples won 52% of the decisive
+# matches, 16 won 57% and 32 won 55%: 32 took twice the time of 16 for no gain
+# (ADR 0018).
+NORMAL_SAMPLES = 8
+HARD_SAMPLES = 16
+
 
 def choose_action(
     view: PlayerView,
