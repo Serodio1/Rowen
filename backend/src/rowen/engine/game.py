@@ -123,7 +123,20 @@ def apply(state: GameState, action: Action) -> tuple[GameState, tuple[Event, ...
     """
     if action not in legal_actions(state):
         raise IllegalActionError(f"illegal action: {action}")
+    return apply_legal(state, action)
 
+
+def apply_legal(
+    state: GameState, action: Action
+) -> tuple[GameState, tuple[Event, ...]]:
+    """Carry out an action already taken from ``legal_actions(state)``.
+
+    The same as ``apply``, without checking the action again: the AI tries
+    thousands of actions a move in its imagined matches, each one taken from
+    ``legal_actions``, and the check was about a quarter of its time. An
+    illegal action here gives a wrong state, not an error, so anything that
+    comes from outside, such as a player's move, goes through ``apply``.
+    """
     # The redraw happens before round 1, so none of the round's steps below
     # apply to it.
     if isinstance(action, Redraw):
