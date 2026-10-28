@@ -6,14 +6,13 @@ A turn-based card game inspired by the Gwent minigame from *The Witcher 3*, buil
 as a full-stack web application: a pure Python rules engine behind a FastAPI API,
 PostgreSQL, and a React + TypeScript frontend.
 
-> **Status:** Phase 3 is done and released as
-> [`v0.3.0`](https://github.com/Serodio1/Rowen/releases): a match against the
+> **Status:** Phase 4 is done and released as
+> [`v0.4.0`](https://github.com/Serodio1/Rowen/releases): a match against the
 > AI can be played online, on a board with card art, animations and the
-> keyboard, through a web API, with the matches kept in PostgreSQL. Phase 4,
-> accounts and each player's matches, is under way: a player can already make
-> an account and log in (or play as a guest, as before), find their matches
-> under "My matches", resume an unfinished one, and see how many they won,
-> lost and drew with each deck.
+> keyboard, as a guest or with an account. A player with an account finds
+> their matches under "My matches", resumes an unfinished one, sees how many
+> they won, lost and drew with each deck, and builds decks of their own under
+> "My decks". Phase 5, a smarter AI and the rest of the rules, comes next.
 
 ![A match in Rowen: the AI's rows above, the player's below, Hoarfrost on both
 melee rows, and a Plane shown large with what it does](docs/screenshot.webp)
@@ -21,10 +20,11 @@ melee rows, and a Plane shown large with what it does](docs/screenshot.webp)
 ## Play online
 
 **<https://rowen-806785616593.europe-west1.run.app>**: choose a deck and play
-against the AI, with nothing to install. After a quiet while the server is
-stopped, so the first visit can take a few seconds more while it starts
-(about 6 when measured). Matches are kept in a database, so a match goes on
-after the server sleeps, and when a new version goes online.
+against the AI, with nothing to install, as a guest or with an account. After
+a quiet while the server is stopped, so the first visit can take a few seconds
+more while it starts (about 6 when measured). Matches are kept in a database,
+so a match goes on after the server sleeps, and when a new version goes
+online.
 
 ## Documentation
 
@@ -40,6 +40,8 @@ after the server sleeps, and when a new version goes online.
   version online built, and what it taught.
 - [Phase 3 retrospective](docs/retrospectives/phase-3.md): what the real
   interface built, and what it taught.
+- [Phase 4 retrospective](docs/retrospectives/phase-4.md): what accounts,
+  match history and the deck builder built, and what they taught.
 
 ## Play with Docker
 
@@ -216,15 +218,17 @@ npm test                # run the tests with Vitest
 npm run build           # build the production files into dist/
 ```
 
-The end-to-end test (`frontend/e2e`) plays a whole match in a real browser
-with [Playwright](https://playwright.dev/), against the game in Docker, as CI
-does. In PowerShell, from the repository's folder:
+The end-to-end tests (`frontend/e2e`) play the game in a real browser with
+[Playwright](https://playwright.dev/), against the game in Docker, as CI does:
+a whole match, the layout on a laptop and a phone, an account, a player's
+matches, and a deck built, played and deleted. In PowerShell, from the
+repository's folder:
 
 ```powershell
 docker compose up --build --detach --wait   # start the game, as in "Play with Docker"
 cd frontend
 npx playwright install chromium             # once, and again after Playwright is updated
-npm run test:e2e                            # play the match in Chromium
+npm run test:e2e                            # run them in Chromium
 docker compose down                         # stop the game
 ```
 
