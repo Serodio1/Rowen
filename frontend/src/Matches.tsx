@@ -235,7 +235,7 @@ function Summary({
               ? name(match.deck)
               : `${match.deck_name} (${name(match.deck)})`}
           </strong>{" "}
-          against {name(match.ai_deck)}
+          against {name(match.ai_deck)} ({LEVELS[match.level]})
         </p>
         <p className="text-sm opacity-80">
           <time dateTime={match.started_at}>{when(match.started_at)}</time>
@@ -271,6 +271,9 @@ function Summary({
 }
 
 const OUTCOMES = { won: "Won", lost: "Lost", drawn: "Drawn" } as const;
+
+// The name of each level of the AI, as the decks show it.
+const LEVELS = { easy: "Easy", normal: "Normal", hard: "Hard" } as const;
 
 /** Return when a match started, as the player's browser writes dates. */
 function when(time: string): string {

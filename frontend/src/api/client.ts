@@ -45,17 +45,26 @@ export type Action = View["legal_actions"][number];
 export type Move =
   paths["/matches/{match_id}/actions"]["post"]["requestBody"]["content"]["application/json"];
 
-/**
- * What the page sends to start a match: the id of a faction's own deck, or,
- * for a player who is logged in, that of a deck they built. Never both.
- */
-export type NewMatch = { deck: string } | { my_deck: string };
-
 /** A page of the player's matches, the newest first, and whether more are left. */
 export type Matches = MethodResponse<Api, "get", "/matches">;
 
 /** One of the player's matches, in the list: `result` is null while it goes on. */
 export type MatchSummary = Matches["matches"][number];
+
+/**
+ * How well the AI plays: `easy` is the baseline AI, `normal` and `hard` the
+ * Monte Carlo AI, which guesses the cards it can't see (ADR 0018).
+ */
+export type Level = MatchSummary["level"];
+
+/**
+ * What the page sends to start a match: the id of a faction's own deck, or,
+ * for a player who is logged in, that of a deck they built, never both; and
+ * the level of the AI.
+ */
+export type NewMatch = ({ deck: string } | { my_deck: string }) & {
+  level: Level;
+};
 
 /** How the player's matches with one deck ended: how many of each. */
 export type DeckStats = MethodResponse<Api, "get", "/stats">["decks"][number];

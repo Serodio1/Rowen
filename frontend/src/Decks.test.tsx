@@ -515,7 +515,7 @@ test("a player plays a deck they built from the decks to play", async () => {
     await screen.findByRole("button", { name: "Keep this hand" }),
   ).toBeEnabled();
   expect(sent.filter((request) => request.to === "POST /api/matches")).toEqual([
-    { to: "POST /api/matches", body: { my_deck: "d1" } },
+    { to: "POST /api/matches", body: { my_deck: "d1", level: "normal" } },
   ]);
 });
 
