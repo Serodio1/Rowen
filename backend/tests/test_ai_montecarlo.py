@@ -168,6 +168,21 @@ def test_guess_keeps_everything_the_view_shows(
             # Seen from the guess, the view is the same: the same board,
             # scores and legal actions.
             assert player_view(guessed, index) == view
+            # The guess is the baseline's imagined match with only the hidden
+            # cards changed: every other field is kept, even one added later.
+            imagined = baseline.imagine(view)
+            assert replace(guessed, players=imagined.players) == imagined
+            for guessed_player, imagined_player in zip(
+                guessed.players, imagined.players, strict=True
+            ):
+                assert (
+                    replace(
+                        guessed_player,
+                        deck=imagined_player.deck,
+                        hand=imagined_player.hand,
+                    )
+                    == imagined_player
+                )
             # With the real deck lists, every guessed card comes from the
             # player's own list. The hand the view shows is left out: a
             # Scarecrow can take back the opponent's Spy.

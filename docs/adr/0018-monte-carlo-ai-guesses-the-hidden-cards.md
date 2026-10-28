@@ -1,6 +1,7 @@
 # ADR 0018: Let a Monte Carlo AI guess the hidden cards
 
-- **Status:** Accepted
+- **Status:** Accepted; the AI skips the legality check and may import
+  `dataclasses` (see the end)
 - **Date:** 2026-10-28
 
 ## Context
@@ -72,3 +73,19 @@ replay doesn't run the AI again: the AI may use randomness of its own.
   player has passed.
 - The rules are still only in the engine: a new card needs no change to
   either AI.
+
+## Update (2026-10-29)
+
+- **The AI skips the legality check.** `apply` checks each action against
+  `legal_actions` before carrying it out, and in the play-outs that was about
+  a quarter of the AI's time, for actions it had just taken from
+  `legal_actions` itself. The AI now calls `apply_legal`, which carries the
+  action out without the check. The API still calls `apply`, so a player's
+  move is always checked. On the container, 96 decisions of 16 samples took
+  16.5 s instead of 22.5 s, with the same actions.
+- **The AI may import `dataclasses`.** The guess rebuilt the match field by
+  field, so a field added to the state later, such as a leader used once a
+  match, would have been dropped in every guess with no error. It now uses
+  `dataclasses.replace`, which changes the hidden cards and keeps every other
+  field. The AI's import contract allows `dataclasses` and still nothing else
+  outside the engine.

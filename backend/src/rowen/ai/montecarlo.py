@@ -24,13 +24,15 @@ The randomness comes from a seed, so the same view and seed always give the
 same action, which keeps the tests repeatable.
 """
 
+from dataclasses import replace
+
 from rowen.ai import baseline
 from rowen.engine.actions import Action, EndRedraw, Pass
 from rowen.engine.cards import Ability, Card, UnitCard
-from rowen.engine.game import apply, legal_actions, match_over
+from rowen.engine.game import apply_legal, legal_actions, match_over
 from rowen.engine.rng import Rng
 from rowen.engine.scoring import player_total
-from rowen.engine.state import GameState, PlayerState
+from rowen.engine.state import GameState
 from rowen.engine.view import PlayerView, SideView
 
 # The samples for each level of the AI; Easy is the baseline AI. Against the
@@ -110,19 +112,11 @@ def guess(
         cards, rng = rng.shuffled(pool)
         cards = cards[:hidden] + (baseline.UNKNOWN,) * (hidden - len(cards))
         if index == view.player:
-            players[index] = _with_hidden(player, deck=cards)
+            players[index] = replace(player, deck=cards)
         else:
             size = len(player.hand)
-            players[index] = _with_hidden(player, hand=cards[:size], deck=cards[size:])
-    state = GameState(
-        players=(players[0], players[1]),
-        current=imagined.current,
-        round_starter=imagined.round_starter,
-        round=imagined.round,
-        reviving=imagined.reviving,
-        rng=imagined.rng,
-    )
-    return state, rng
+            players[index] = replace(player, hand=cards[:size], deck=cards[size:])
+    return replace(imagined, players=(players[0], players[1])), rng
 
 
 def _unseen(view: PlayerView, deck: tuple[Card, ...], index: int) -> tuple[Card, ...]:
@@ -160,25 +154,6 @@ def _spy(card: Card) -> bool:
     return isinstance(card, UnitCard) and card.ability is Ability.SPY
 
 
-def _with_hidden(
-    player: PlayerState,
-    *,
-    deck: tuple[Card, ...],
-    hand: tuple[Card, ...] | None = None,
-) -> PlayerState:
-    """Return the player with the guessed cards in their deck, and in their hand."""
-    return PlayerState(
-        deck=deck,
-        hand=player.hand if hand is None else hand,
-        rows=player.rows,
-        weather=player.weather,
-        discard=player.discard,
-        lives=player.lives,
-        passed=player.passed,
-        redraws_left=player.redraws_left,
-    )
-
-
 def _play_out(state: GameState, action: Action) -> int:
     """Return the score, for the player whose turn it is, after the action.
 
@@ -187,9 +162,9 @@ def _play_out(state: GameState, action: Action) -> int:
     round counts as the life it wins.
     """
     player, this_round = state.current, state.round
-    state, _ = apply(state, action)
+    state, _ = apply_legal(state, action)
     while state.round == this_round and not match_over(state):
-        state, _ = apply(state, _next(state))
+        state, _ = apply_legal(state, _next(state))
     return baseline.score(state, player)
 
 

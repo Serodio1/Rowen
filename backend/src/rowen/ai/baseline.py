@@ -6,11 +6,11 @@ view's legal actions.
 
 To choose one, it asks the engine "what if?". It imagines the match from its
 view, with an unknown card in place of each card it can't see. There it tries
-each legal action with ``apply`` and scores the result: the points, cards and
-lives it has more of than the opponent. Then it plays the action with the best
-score. The state is never changed, so trying an action leaves the match as it
-was (ADR 0003). And the rules stay in the engine: a new card needs no code
-here.
+each legal action with ``apply_legal`` and scores the result: the points,
+cards and lives it has more of than the opponent. Then it plays the action with
+the best score. The state is never changed, so trying an action leaves the
+match as it was (ADR 0003). And the rules stay in the engine: a new card needs
+no code here.
 
 The engine tells what an action does, but not what the opponent will do next.
 So while the opponent still plays, whether to pass is a rule of thumb, in
@@ -28,7 +28,7 @@ from rowen.engine.abilities import muster_group
 from rowen.engine.actions import Action, EndRedraw, Pass, Redraw
 from rowen.engine.cards import Ability, Row, UnitCard
 from rowen.engine.events import RoundEnded
-from rowen.engine.game import apply, legal_actions, match_over, match_winner
+from rowen.engine.game import apply_legal, legal_actions, match_over, match_winner
 from rowen.engine.rng import Rng
 from rowen.engine.scoring import player_total
 from rowen.engine.state import GameState, PlayerState, RowState
@@ -187,7 +187,7 @@ def _value(state: GameState, action: Action) -> int:
     it brings back, and for the next one too if that is a Medic.
     """
     player = state.current
-    state, _ = apply(state, action)
+    state, _ = apply_legal(state, action)
     if state.reviving:
         return max(_value(state, revive) for revive in legal_actions(state))
     return score(state, player)
@@ -202,15 +202,15 @@ def _finish(state: GameState, action: Action) -> int:
     unit they could revive is tried as well, and the best one counts.
     """
     player, this_round = state.current, state.round
-    state, _ = apply(state, action)
+    state, _ = apply_legal(state, action)
     if state.reviving:
         return max(_finish(state, revive) for revive in legal_actions(state))
     if not _goes_on(state, this_round):
         return score(state, player)
 
-    passed, _ = apply(state, Pass())
+    passed, _ = apply_legal(state, Pass())
     while _goes_on(state, this_round):
-        state, _ = apply(state, next_play(state, player))
+        state, _ = apply_legal(state, next_play(state, player))
     return max(score(passed, player), score(state, player))
 
 
@@ -255,7 +255,7 @@ def _lead_after(state: GameState, action: Action, player: int) -> int:
     If the action ends the round, that is the lead the round ended with, as
     the board is cleared after it.
     """
-    after, events = apply(state, action)
+    after, events = apply_legal(state, action)
     for event in events:
         if isinstance(event, RoundEnded):
             return event.scores[player] - event.scores[1 - player]
