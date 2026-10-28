@@ -6,7 +6,9 @@ export { expect } from "@playwright/test";
 // once (the api zone in frontend/nginx.conf, ADR 0011). Every test is the same
 // visitor, and in CI the tests are quick: one after the other, they went over
 // the 20 and a request was turned down (429). After this long with no request,
-// the 20 are all there again.
+// the 20 are all there again. Moves have a limit of their own, 1 a second
+// and 20 more at once (the moves zone): a test plays at most about 20 moves,
+// so it doesn't wait for that one.
 const API_LIMIT_REFILLS_MS = (20 / 5) * 1000;
 
 /**
