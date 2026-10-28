@@ -19,6 +19,9 @@ round: the AI then plays the rest of the round in its head, in ``_finish``, to
 see whether winning it is worth the cards (ADR 0006).
 
 Before round 1, the AI swaps its spare Muster cards, up to two (``_redraw``).
+
+The Monte Carlo AI (``rowen.ai.montecarlo``) builds on this one: it uses
+``imagine``, ``best``, ``next_play`` and ``score`` too.
 """
 
 from rowen.engine.abilities import muster_group
@@ -88,10 +91,10 @@ def choose_action(view: PlayerView) -> Action:
         return max(candidates, key=lambda action: _finish(state, action))
 
     if view.reviving:
-        return _best(state, actions)
+        return best(state, actions)
     if not plays or _should_pass(view):
         return Pass()
-    return _best(state, plays)
+    return best(state, plays)
 
 
 def imagine(view: PlayerView) -> GameState:
@@ -171,7 +174,7 @@ def _should_pass(view: PlayerView) -> bool:
     return mine.total - theirs.total >= PASS_LEAD and mine.lives > 1
 
 
-def _best(state: GameState, actions: tuple[Action, ...]) -> Action:
+def best(state: GameState, actions: tuple[Action, ...]) -> Action:
     """Return the action with the best score after it; the first one on a tie."""
     return max(actions, key=lambda action: _value(state, action))
 
@@ -187,14 +190,14 @@ def _value(state: GameState, action: Action) -> int:
     state, _ = apply(state, action)
     if state.reviving:
         return max(_value(state, revive) for revive in legal_actions(state))
-    return _score(state, player)
+    return score(state, player)
 
 
 def _finish(state: GameState, action: Action) -> int:
     """Return the score, for the player whose turn it is, at the end of the round.
 
     The opponent has passed, so every turn left in the round is the player's.
-    After the action, they can pass at once, or play on as ``_next_play`` says
+    After the action, they can pass at once, or play on as ``next_play`` says
     until the round ends: the better of the two counts. After a Medic, each
     unit they could revive is tried as well, and the best one counts.
     """
@@ -203,12 +206,12 @@ def _finish(state: GameState, action: Action) -> int:
     if state.reviving:
         return max(_finish(state, revive) for revive in legal_actions(state))
     if not _goes_on(state, this_round):
-        return _score(state, player)
+        return score(state, player)
 
     passed, _ = apply(state, Pass())
     while _goes_on(state, this_round):
-        state, _ = apply(state, _next_play(state, player))
-    return max(_score(passed, player), _score(state, player))
+        state, _ = apply(state, next_play(state, player))
+    return max(score(passed, player), score(state, player))
 
 
 def _goes_on(state: GameState, this_round: int) -> bool:
@@ -220,7 +223,7 @@ def _goes_on(state: GameState, this_round: int) -> bool:
     return state.round == this_round and not match_over(state)
 
 
-def _next_play(state: GameState, player: int) -> Action:
+def next_play(state: GameState, player: int) -> Action:
     """Return the player's next action, in a round the opponent has passed.
 
     Once ahead, they pass: the round is won. Until then, they play the action
@@ -231,7 +234,7 @@ def _next_play(state: GameState, player: int) -> Action:
     """
     actions = legal_actions(state)
     if state.reviving:
-        return _best(state, actions)
+        return best(state, actions)
     lead = _lead(state, player)
     if lead > 0:
         return Pass()
@@ -242,7 +245,7 @@ def _next_play(state: GameState, player: int) -> Action:
     )
     if not closer:
         return Pass()
-    return _best(state, closer)
+    return best(state, closer)
 
 
 def _lead_after(state: GameState, action: Action, player: int) -> int:
@@ -264,7 +267,7 @@ def _lead(state: GameState, player: int) -> int:
     return player_total(state, player) - player_total(state, 1 - player)
 
 
-def _score(state: GameState, player: int) -> int:
+def score(state: GameState, player: int) -> int:
     """Return how well the match is going for ``player``: the higher, the better.
 
     That is what they have more of than the opponent: points on the board,

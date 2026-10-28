@@ -30,6 +30,7 @@ plus a section on the alternatives that were considered.
 | [0015](0015-players-own-their-matches.md) | Give a logged-in player's matches an owner, keep their results and list them by cursor | Accepted |
 | [0016](0016-check-a-revision-before-it-gets-the-requests.md) | Check a new revision before it gets the requests, built from fixed base images | Accepted |
 | [0017](0017-keep-a-copy-of-a-built-deck-in-each-match.md) | Keep a copy of a player's built deck in each match they play with it | Accepted |
+| [0018](0018-monte-carlo-ai-guesses-the-hidden-cards.md) | Let a Monte Carlo AI guess the hidden cards | Accepted |
 
 ## Writing a new ADR
 
