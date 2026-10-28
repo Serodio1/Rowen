@@ -99,3 +99,14 @@ visitors: nginx writes a block whose fourth group is 0 either with that 0
 form had its own bucket, so the block got twice the limits. nginx now reads
 the first 8 bytes of the address as it keeps it (`$binary_remote_addr`), which
 has one form for each block. The decision, one /64 per visitor, is the same.
+
+## Update (2026-10-29)
+
+On the hard level (ADR 0018) the AI thinks for about 0.2 s a move, so at 5
+requests a second one address could keep the API's one CPU busy, and every
+other visitor would wait. Moves (`POST /api/matches/{id}/actions`) now have a
+zone of their own on top of the `api` zone: 1 a second, burst 20. One address
+keeps the CPU busy at most about a fifth of the time. A player clicking
+quickly makes about 2.5 moves a second for a few seconds, within the burst.
+This guards the other players, not the bill: that is still the spending cap
+(ADR 0010), which a busy instance would reach days later instead of hours.

@@ -171,9 +171,9 @@ jobs:
       # match (at most 100 moves), always playing the first legal move with the
       # match's version, read back at the end, and then the first move again,
       # which comes too late: 409. The API then restarts (nginx with it), and
-      # the match is still there, kept in PostgreSQL. A move every quarter of a
-      # second stays under nginx's limit of 5 requests a second. Then, that the
-      # API ignores an address a visitor writes in X-Forwarded-For. Then an
+      # the match is still there, kept in PostgreSQL. A move a second stays
+      # under nginx's limit of 1 move a second. Then, that the API ignores an
+      # address a visitor writes in X-Forwarded-For. Then an
       # account, as the page makes it (with its Origin): logged in, a match of
       # its own, in its list (and none older than it, so nginx passes the
       # query on), out of a guest's reach (404), no stats yet, a log out from
@@ -182,8 +182,10 @@ jobs:
       # come last): a request over 16 KB, for a new match and for a move, new
       # matches in a row, each with another address in X-Forwarded-For, until
       # nginx answers 429 with its error, logins with a wrong password in a
-      # row, the same way, and then requests for the decks in a row, until the
-      # same 429.
+      # row, the same way, moves in a row, 3 a second (the match is over, so
+      # each gets 409 until nginx turns one down: after a wait for the api
+      # zone to fill again, and below its 5 a second, so it is the moves zone),
+      # and then requests for the decks in a row, until the same 429.
       # The first request tries again for a few seconds, in case nginx is not
       # listening yet.
       - name: Smoke test
@@ -208,7 +210,7 @@ jobs:
             move=$(jq --compact-output '{version, action: .view.legal_actions[0]}' <<< "$match")
             match=$(curl --fail --silent --show-error --header 'Content-Type: application/json' \
               --data "$move" "$url/api/matches/$id/actions")
-            sleep 0.25
+            sleep 1
           done
           curl --fail --silent --show-error "$url/api/matches/$id" | jq --exit-status .view.match_over
           answer=$(curl --silent --show-error --write-out '\n%{http_code}' --header 'Content-Type: application/json' \
@@ -260,6 +262,16 @@ jobs:
               "$url/api/session")
             [ "$(tail --lines 1 <<< "$answer")" = 429 ] && break
             [ "$(tail --lines 1 <<< "$answer")" = 401 ]
+          done
+          [ "$(tail --lines 1 <<< "$answer")" = 429 ]
+          head --lines 1 <<< "$answer" | jq --exit-status '.code == "too_many_requests" and (.message | type) == "string"'
+          sleep 4
+          for n in $(seq 60); do
+            answer=$(curl --silent --show-error --write-out '\n%{http_code}' --header 'Content-Type: application/json' \
+              --data "$first" "$url/api/matches/$id/actions")
+            [ "$(tail --lines 1 <<< "$answer")" = 429 ] && break
+            [ "$(tail --lines 1 <<< "$answer")" = 409 ]
+            sleep 0.3
           done
           [ "$(tail --lines 1 <<< "$answer")" = 429 ]
           head --lines 1 <<< "$answer" | jq --exit-status '.code == "too_many_requests" and (.message | type) == "string"'
