@@ -153,7 +153,6 @@ Done when: it looks good enough for the README GIF.
   stays.
 - Deck builder: pick a faction and cards, validated by the engine's rules.
 - Match history and personal statistics.
-- *Could:* leaderboard.
 
 ### Phase 5 — Smarter AI and full rules → `v0.5.0`
 
@@ -172,6 +171,8 @@ Done when: it looks good enough for the README GIF.
 
 - Player vs player over WebSockets.
 - Replay viewer.
+- A leaderboard (a *could* of Phase 4, moved here: against the AI alone, it
+  says little).
 - New factions and cards (Rui).
 
 ## Working agreement
