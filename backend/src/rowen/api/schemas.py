@@ -576,7 +576,8 @@ class Move(Schema):
     the match is at another version by then, the move isn't played.
     """
 
-    version: int
+    # Strict: JSON's true isn't version 1.
+    version: StrictInt
     action: Action
 
 

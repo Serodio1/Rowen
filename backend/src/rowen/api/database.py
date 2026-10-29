@@ -43,6 +43,7 @@ from sqlalchemy import (
     event,
     func,
     select,
+    text,
     tuple_,
     update,
 )
@@ -54,6 +55,7 @@ from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
     Session,
+    defer,
     joinedload,
     mapped_column,
     relationship,
@@ -113,6 +115,15 @@ class MatchRow(Base):
         # database finds them in this index, already in order, without
         # reading every match.
         Index("ix_matches_owner", "account_id", "created_at", "id"),
+        # How an owner's matches ended with each deck, as stats counts them:
+        # all of it in the index, so the database reads none of the rows.
+        Index(
+            "ix_matches_stats",
+            "account_id",
+            "player_deck",
+            postgresql_include=["outcome"],
+            postgresql_where=text("outcome IS NOT NULL"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
@@ -173,7 +184,8 @@ class SessionRow(Base):
     account_id: Mapped[UUID] = mapped_column(
         ForeignKey("accounts.id", ondelete="CASCADE"), index=True
     )
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Indexed: each login deletes the sessions that are over.
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -366,6 +378,8 @@ class PostgresMatchStore:
         """
         statement = (
             select(MatchRow)
+            # The list doesn't need the moves, the largest part of a match.
+            .options(defer(MatchRow.actions))
             .where(MatchRow.account_id == owner)
             .order_by(MatchRow.created_at.desc(), MatchRow.id.desc())
             .limit(limit)
