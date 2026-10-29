@@ -51,6 +51,7 @@ from rowen.engine.decks import (
     MAX_SPECIALS,
     MIN_UNITS,
     Deck,
+    Passive,
     build_deck,
     choices,
     max_copies,
@@ -67,6 +68,7 @@ from rowen.engine.events import (
     RoundEnded,
     ScarecrowPlayed,
     UnitDestroyed,
+    UnitKept,
     UnitMustered,
     UnitPlayed,
     UnitRevived,
@@ -76,7 +78,7 @@ from rowen.engine.events import (
 )
 from rowen.engine.game import IllegalActionError, apply, start_match
 from rowen.engine.state import GameState
-from rowen.engine.texts import describe
+from rowen.engine.texts import PASSIVE_TEXTS, describe
 from rowen.engine.view import (
     EventView,
     OpponentDrew,
@@ -92,6 +94,7 @@ from rowen.engine.view import (
 __all__ = [
     "MAX_SPECIALS",
     "MIN_UNITS",
+    "PASSIVE_TEXTS",
     "WEATHER_ROWS",
     "Ability",
     "Action",
@@ -110,6 +113,7 @@ __all__ = [
     "OpponentDrew",
     "OpponentRedrew",
     "Pass",
+    "Passive",
     "PlayHorn",
     "PlayScarecrow",
     "PlaySpecial",
@@ -128,6 +132,7 @@ __all__ = [
     "SpecialKind",
     "UnitCard",
     "UnitDestroyed",
+    "UnitKept",
     "UnitMustered",
     "UnitPlayed",
     "UnitRevived",

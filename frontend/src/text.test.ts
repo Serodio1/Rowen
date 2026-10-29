@@ -239,6 +239,10 @@ test.each<[Event, string]>([
     { type: "cards_drawn", player: 0, cards: ["soldier", "medic"] },
     "You drew Soldier, Medic.",
   ],
+  [
+    { type: "unit_kept", player: 1, card: "soldier", row: "melee" },
+    "Soldier stays in the AI's melee row.",
+  ],
   [{ type: "opponent_drew", player: 1, count: 1 }, "The AI drew 1 card."],
   [{ type: "opponent_drew", player: 1, count: 2 }, "The AI drew 2 cards."],
   [

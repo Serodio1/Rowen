@@ -31,6 +31,7 @@ from rowen.engine.events import (
     RoundEnded,
     ScarecrowPlayed,
     UnitDestroyed,
+    UnitKept,
     UnitMustered,
     UnitPlayed,
     UnitRevived,
@@ -141,6 +142,7 @@ def make_view() -> PlayerView:
         hand_size=5,
         deck_size=12,
         total=13,
+        passive=None,
     )
     you = SideView(
         rows={
@@ -170,6 +172,7 @@ def make_view() -> PlayerView:
         hand_size=2,
         deck_size=14,
         total=15,
+        passive=None,
     )
     return PlayerView(
         player=0,
@@ -349,6 +352,10 @@ def test_an_action_reads_as_a_choice(action: Action, text: str) -> None:
         (
             CardsDrawn(player=0, cards=("sniper", "war-horn")),
             "You drew Sniper, War Horn.",
+        ),
+        (
+            UnitKept(player=1, card="catapult", row=Row.SIEGE),
+            "Catapult stays in the AI's siege row.",
         ),
         (OpponentDrew(player=1, count=2), "The AI drew 2 cards."),
         (OpponentDrew(player=1, count=1), "The AI drew 1 card."),

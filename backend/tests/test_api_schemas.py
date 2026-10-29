@@ -12,7 +12,7 @@ from rowen.api import schemas
 from rowen.api.app import app
 from rowen.data import deck_ids, load_deck
 from rowen.engine import public as engine
-from rowen.engine.texts import ABILITY_TEXTS, LEGEND_TEXT, SPECIAL_TEXTS
+from rowen.engine.texts import ABILITY_TEXTS, LEGEND_TEXT, PASSIVE_TEXTS, SPECIAL_TEXTS
 
 MELEE, RANGED, SIEGE = engine.Row.MELEE, engine.Row.RANGED, engine.Row.SIEGE
 
@@ -94,6 +94,7 @@ EMPTY_SIDE = engine.SideView(
     hand_size=0,
     deck_size=0,
     total=0,
+    passive=None,
 )
 EMPTY_VIEW = engine.PlayerView(
     player=0,
@@ -187,6 +188,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                 hand_size=2,
                 deck_size=12,
                 total=1,
+                passive=engine.Passive.DRAW_ON_ROUND_WIN,
             ),
             engine.SideView(
                 rows={
@@ -202,6 +204,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                 hand_size=7,
                 deck_size=11,
                 total=0,
+                passive=None,
             ),
         ),
         current=0,
@@ -248,6 +251,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                     "discard": [],
                     "lives": 2,
                     "passed": False,
+                    "passive": "Draws a card after winning a round.",
                     "redraws_left": 0,
                     "hand_size": 2,
                     "deck_size": 12,
@@ -263,6 +267,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                     "discard": [SNIPER_JSON],
                     "lives": 1,
                     "passed": True,
+                    "passive": None,
                     "redraws_left": 0,
                     "hand_size": 7,
                     "deck_size": 11,
@@ -420,6 +425,7 @@ def test_a_view_after_a_medic_says_the_player_is_reviving() -> None:
                 "nothing_to_revive",
                 "player_passed",
                 "round_ended",
+                "unit_kept",
                 "match_ended",
                 "card_redrawn",
                 "redraw_ended",
@@ -658,7 +664,8 @@ def with_rules(value: Any) -> Any:
     Only special cards have a "kind", so each dict with one gets the row its
     weather hits, from ``WEATHER_ROWS_JSON``, wherever the card is. Only units
     have a "legend", so each dict with one gets whether it goes on the
-    opponent's side: only a Spy does. And each card gets what it does.
+    opponent's side: only a Spy does. And each card gets what it does, and
+    each side what its passive does: only a side has a "redraws_left".
     """
     if isinstance(value, dict):
         added = {key: with_rules(item) for key, item in value.items()}
@@ -675,6 +682,8 @@ def with_rules(value: Any) -> Any:
                     else [ABILITY_TEXTS[value["ability"]]]
                 ),
             ]
+        if "redraws_left" in value and value["passive"] is not None:
+            added["passive"] = PASSIVE_TEXTS[value["passive"]]
         return added
     if isinstance(value, (list, tuple)):
         return [with_rules(item) for item in value]

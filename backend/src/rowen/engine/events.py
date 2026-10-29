@@ -216,6 +216,22 @@ class RoundEnded:
 
 
 @dataclass(frozen=True, kw_only=True)
+class UnitKept:
+    """A unit stayed on the board for the next round, by its faction's passive
+    (``Passive.KEEP_A_UNIT``, rules, section 12).
+
+    Attributes:
+        player: The index of the player whose side it is on.
+        card: The id of the unit.
+        row: The row it stays in.
+    """
+
+    player: int
+    card: str
+    row: Row
+
+
+@dataclass(frozen=True, kw_only=True)
 class MatchEnded:
     """A player has no lives left, so the match is over (rules, section 10).
 
@@ -271,6 +287,7 @@ type Event = (
     | UnitDestroyed
     | PlayerPassed
     | RoundEnded
+    | UnitKept
     | MatchEnded
     | CardRedrawn
     | RedrawEnded

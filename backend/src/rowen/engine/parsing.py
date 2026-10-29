@@ -12,9 +12,10 @@ field is checked, and an error says what is wrong and where, for example
 from collections.abc import Mapping, Set
 
 from rowen.engine.cards import Ability, Row, SpecialCard, SpecialKind, UnitCard
-from rowen.engine.decks import Deck
+from rowen.engine.decks import Deck, Passive
 
 DECK_FIELDS = frozenset({"id", "name", "units", "specials"})
+OPTIONAL_DECK_FIELDS = frozenset({"passive"})
 UNIT_FIELDS = frozenset({"id", "name", "rows", "strength", "copies"})
 OPTIONAL_UNIT_FIELDS = frozenset({"ability", "group", "legend"})
 SPECIAL_FIELDS = frozenset({"id", "name", "kind"})
@@ -55,17 +56,21 @@ def parse_deck(data: object, specials: Mapping[str, SpecialCard]) -> Deck:
     """Create a deck from a JSON object.
 
     Args:
-        data: The deck: its units (with the number of copies of each) and the
-            number of copies of each special card.
+        data: The deck: its units (with the number of copies of each), the
+            number of copies of each special card and, if the faction has one,
+            its passive.
         specials: Every special card, by id, as returned by `parse_specials`.
     """
-    fields = _object(data, required=DECK_FIELDS)
+    fields = _object(data, required=DECK_FIELDS, optional=OPTIONAL_DECK_FIELDS)
     units = _parse_units(_get(fields, "units", list))
     special_cards = _parse_special_copies(_get(fields, "specials", dict), specials)
     return Deck(
         id=_get(fields, "id", str),
         name=_get(fields, "name", str),
         cards=(*units, *special_cards),
+        passive=(
+            Passive(_get(fields, "passive", str)) if "passive" in fields else None
+        ),
     )
 
 

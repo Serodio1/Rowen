@@ -164,8 +164,19 @@ def test_the_decks_are_the_ones_in_the_data_files(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "decks": [
-            {"id": "humans", "name": "Humans"},
-            {"id": "robots", "name": "Robots"},
+            {
+                "id": "humans",
+                "name": "Humans",
+                "passive": "Draws a card after winning a round.",
+            },
+            {
+                "id": "robots",
+                "name": "Robots",
+                "passive": (
+                    "After each round, one random unit stays on the board, but "
+                    "not a Legend or a Spy."
+                ),
+            },
         ]
     }
 
@@ -182,7 +193,7 @@ def test_the_names_of_the_decks_are_read_from_the_data_files(
 
     decks = client.get("/decks").json()["decks"]
 
-    assert decks[0] == {"id": "humans", "name": "The Humans"}
+    assert decks[0]["name"] == "The Humans"
 
 
 def test_every_deck_in_the_list_can_start_a_match(client: TestClient) -> None:
@@ -500,7 +511,7 @@ def test_the_app_keeps_its_matches_in_a_store_of_its_own() -> None:
 def test_the_ai_doesnt_play_once_the_match_is_over() -> None:
     # Each player plays the first legal action in their own view, to the end.
     # With this seed, the match ends with the AI as the current player.
-    state = start_match((DECKS["humans"], DECKS["robots"]), seed=0)
+    state = start_match((DECKS["humans"], DECKS["robots"]), seed=103)
     view = player_view(state, HUMAN)
     while not view.match_over:
         state, _ = apply(state, player_view(state, view.current).legal_actions[0])

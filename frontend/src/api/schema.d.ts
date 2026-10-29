@@ -417,13 +417,16 @@ export interface components {
     };
     /**
      * DeckSummary
-     * @description A deck the player can choose: its id, to start a match, and its name.
+     * @description A deck the player can choose: its id, to start a match, its name, and
+     *     what its faction's passive does, if it has one.
      */
     DeckSummary: {
       /** Id */
       id: string;
       /** Name */
       name: string;
+      /** Passive */
+      passive: string | null;
     };
     /**
      * Decks
@@ -495,6 +498,7 @@ export interface components {
       | components["schemas"]["UnitDestroyed"]
       | components["schemas"]["PlayerPassed"]
       | components["schemas"]["RoundEnded"]
+      | components["schemas"]["UnitKept"]
       | components["schemas"]["MatchEnded"]
       | components["schemas"]["CardRedrawn"]
       | components["schemas"]["RedrawEnded"]
@@ -1017,6 +1021,8 @@ export interface components {
       deck_size: number;
       /** Total */
       total: number;
+      /** Passive */
+      passive: string | null;
     };
     /**
      * SpecialCard
@@ -1114,6 +1120,23 @@ export interface components {
       row: components["schemas"]["Row"];
       /** Card */
       card: string;
+    };
+    /**
+     * UnitKept
+     * @description A unit stays on the board for the next round, by its faction's passive:
+     *     ``engine.UnitKept``.
+     */
+    UnitKept: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "unit_kept";
+      /** Player */
+      player: number;
+      /** Card */
+      card: string;
+      row: components["schemas"]["Row"];
     };
     /**
      * UnitMustered

@@ -1,6 +1,7 @@
 {
   "id": "robots",
   "name": "Robots",
+  "passive": "keep_a_unit",
   "units": [
     {
       "id": "robot",
