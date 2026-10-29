@@ -63,7 +63,8 @@ class RowView:
     Attributes:
         units: The units in the row, in order, with their current strength.
         horn: The War Horn in the row's horn slot, if there is one.
-        scarecrows: The Scarecrows in the row.
+        scarecrows: The Scarecrows in the row, in their order.
+        scarecrow_places: How many units come before each Scarecrow.
         weathered: Whether the row is under weather.
         score: The row's score: the sum of its units' strength.
     """
@@ -71,6 +72,7 @@ class RowView:
     units: tuple[UnitView, ...]
     horn: SpecialCard | None
     scarecrows: tuple[SpecialCard, ...]
+    scarecrow_places: tuple[int, ...]
     weathered: bool
     score: int
 
@@ -263,6 +265,7 @@ def _row_view(row: RowState, *, weathered: bool) -> RowView:
         units=units,
         horn=row.horn,
         scarecrows=row.scarecrows,
+        scarecrow_places=row.scarecrow_places,
         weathered=weathered,
         score=sum(unit.strength for unit in units),
     )

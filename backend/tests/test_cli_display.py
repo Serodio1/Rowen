@@ -104,7 +104,9 @@ CARDS: tuple[Card, ...] = (
 )
 NAMES = {card.id: card.name for card in CARDS}
 
-EMPTY_ROW = RowView(units=(), horn=None, scarecrows=(), weathered=False, score=0)
+EMPTY_ROW = RowView(
+    units=(), horn=None, scarecrows=(), scarecrow_places=(), weathered=False, score=0
+)
 
 
 def make_view() -> PlayerView:
@@ -147,6 +149,7 @@ def make_view() -> PlayerView:
                 units=(UnitView(card=SOLDIER, strength=8),),
                 horn=WAR_HORN,
                 scarecrows=(SCARECROW,),
+                scarecrow_places=(0,),
                 score=8,
             ),
             Row.RANGED: replace(

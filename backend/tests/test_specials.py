@@ -408,10 +408,84 @@ def test_scarecrow_takes_the_units_place_and_the_unit_goes_to_the_hand() -> None
 
     state, events = apply(state, SWAP_SNIPER)
 
-    assert state.players[0].rows[Row.RANGED] == RowState(scarecrows=(SCARECROW,))
+    assert state.players[0].rows[Row.RANGED] == RowState(
+        scarecrows=(SCARECROW,), scarecrow_places=(0,)
+    )
     assert state.players[0].hand == (KNIGHT, SNIPER)
     assert events == (
         ScarecrowPlayed(player=0, card="scarecrow", row=Row.RANGED, unit="sniper"),
+    )
+
+
+def test_scarecrow_stays_in_the_place_of_the_unit_it_took_back() -> None:
+    board = {Row.MELEE: (KNIGHT, SCOUT, CHAMPION), Row.RANGED: (), Row.SIEGE: ()}
+    state = make_state(player((SCARECROW, KNIGHT), board=board))
+    swap = PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="scout")
+
+    state, _ = apply(state, swap)
+
+    # One unit before it: the Knight.
+    assert state.players[0].rows[Row.MELEE] == RowState(
+        units=(KNIGHT, CHAMPION), scarecrows=(SCARECROW,), scarecrow_places=(1,)
+    )
+
+
+def test_scarecrows_keep_their_order_in_the_row() -> None:
+    # The second Scarecrow takes the unit before the first one's place: it
+    # comes first, though both now have no unit before them.
+    scarecrow = replace(SCARECROW, id="scarecrow-2")
+    board = {Row.MELEE: (KNIGHT, SCOUT), Row.RANGED: (), Row.SIEGE: ()}
+    state = make_state(player((SCARECROW, scarecrow, KNIGHT), board=board))
+    state, _ = apply(
+        state, PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="scout")
+    )
+    state = replace(state, current=0)
+
+    state, _ = apply(
+        state, PlayScarecrow(card="scarecrow-2", row=Row.MELEE, unit="knight")
+    )
+
+    assert state.players[0].rows[Row.MELEE] == RowState(
+        scarecrows=(scarecrow, SCARECROW), scarecrow_places=(0, 0)
+    )
+
+
+def test_a_scarecrow_comes_after_one_that_was_before_its_unit() -> None:
+    # The first Scarecrow takes the Knight's place, just before the Scout:
+    # the second, in the Scout's place, comes after it.
+    scarecrow = replace(SCARECROW, id="scarecrow-2")
+    board = {Row.MELEE: (KNIGHT, SCOUT), Row.RANGED: (), Row.SIEGE: ()}
+    state = make_state(player((SCARECROW, scarecrow, KNIGHT), board=board))
+    state, _ = apply(
+        state, PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="knight")
+    )
+    state = replace(state, current=0)
+
+    state, _ = apply(
+        state, PlayScarecrow(card="scarecrow-2", row=Row.MELEE, unit="scout")
+    )
+
+    assert state.players[0].rows[Row.MELEE] == RowState(
+        scarecrows=(SCARECROW, scarecrow), scarecrow_places=(0, 0)
+    )
+
+
+def test_a_scarecrow_moves_up_when_a_unit_before_it_is_destroyed() -> None:
+    board = {Row.MELEE: (CHAMPION, KNIGHT), Row.RANGED: (), Row.SIEGE: ()}
+    row = RowState(
+        units=(CHAMPION, KNIGHT), scarecrows=(SCARECROW,), scarecrow_places=(2,)
+    )
+    first = replace(
+        player((WILDFIRE, KNIGHT), board=board),
+        rows={**player(board=board).rows, Row.MELEE: row},
+    )
+    state = make_state(first, player(board=board))
+
+    state, _ = apply(state, PLAY_WILDFIRE)
+
+    # The Champions (8) on both sides burn: the Knight is left before it.
+    assert state.players[0].rows[Row.MELEE] == RowState(
+        units=(KNIGHT,), scarecrows=(SCARECROW,), scarecrow_places=(1,)
     )
 
 
@@ -431,7 +505,7 @@ def test_scarecrow_takes_one_copy_of_the_unit() -> None:
     state, _ = apply(state, SWAP_SNIPER)
 
     assert state.players[0].rows[Row.RANGED] == RowState(
-        units=(SNIPER,), scarecrows=(SCARECROW,)
+        units=(SNIPER,), scarecrows=(SCARECROW,), scarecrow_places=(0,)
     )
 
 
@@ -441,7 +515,9 @@ def test_scarecrow_of_player_1_goes_on_their_side() -> None:
 
     state, events = apply(state, swap)
 
-    assert state.players[1].rows[Row.MELEE] == RowState(scarecrows=(SCARECROW,))
+    assert state.players[1].rows[Row.MELEE] == RowState(
+        scarecrows=(SCARECROW,), scarecrow_places=(0,)
+    )
     assert state.players[1].hand == (KNIGHT, KNIGHT)
     assert state.players[0].rows == player().rows
     assert events == (

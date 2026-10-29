@@ -72,10 +72,13 @@ WAR_HORN_JSON = {
     "description": [SPECIAL_TEXTS[engine.SpecialKind.WAR_HORN]],
 }
 
-EMPTY_ROW = engine.RowView(units=(), horn=None, scarecrows=(), weathered=False, score=0)
+EMPTY_ROW = engine.RowView(
+    units=(), horn=None, scarecrows=(), scarecrow_places=(), weathered=False, score=0
+)
 EMPTY_ROW_JSON: dict[str, Any] = {
     "units": [],
     "horn": None,
+    "scarecrow_places": [],
     "scarecrows": [],
     "weathered": False,
     "score": 0,
@@ -163,6 +166,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                         units=(engine.UnitView(card=SNIPER, strength=1),),
                         horn=None,
                         scarecrows=(),
+                        scarecrow_places=(),
                         weathered=True,
                         score=1,
                     ),
@@ -170,6 +174,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                         units=(),
                         horn=WAR_HORN,
                         scarecrows=(),
+                        scarecrow_places=(),
                         weathered=False,
                         score=0,
                     ),
@@ -225,6 +230,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                         "ranged": {
                             "units": [{"card": SNIPER_JSON, "strength": 1}],
                             "horn": None,
+                            "scarecrow_places": [],
                             "scarecrows": [],
                             "weathered": True,
                             "score": 1,
@@ -232,6 +238,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                         "siege": {
                             "units": [],
                             "horn": WAR_HORN_JSON,
+                            "scarecrow_places": [],
                             "scarecrows": [],
                             "weathered": False,
                             "score": 0,

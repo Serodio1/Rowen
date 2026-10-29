@@ -2274,6 +2274,13 @@
             "type": "array",
             "title": "Scarecrows"
           },
+          "scarecrow_places": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Scarecrow Places"
+          },
           "weathered": {
             "type": "boolean",
             "title": "Weathered"
@@ -2289,6 +2296,7 @@
           "units",
           "horn",
           "scarecrows",
+          "scarecrow_places",
           "weathered",
           "score"
         ],

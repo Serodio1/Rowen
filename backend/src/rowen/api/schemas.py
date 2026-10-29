@@ -366,6 +366,8 @@ class RowView(Schema):
     units: tuple[UnitView, ...]
     horn: SpecialCard | None
     scarecrows: tuple[SpecialCard, ...]
+    # How many units come before each of the Scarecrows, which are in order.
+    scarecrow_places: tuple[int, ...]
     weathered: bool
     score: int
 
@@ -748,6 +750,7 @@ def _row(row: engine.RowView) -> RowView:
         ),
         horn=None if row.horn is None else _special(row.horn),
         scarecrows=tuple(_special(card) for card in row.scarecrows),
+        scarecrow_places=row.scarecrow_places,
         weathered=row.weathered,
         score=row.score,
     )

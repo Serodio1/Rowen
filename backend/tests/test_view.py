@@ -130,6 +130,20 @@ def test_both_players_see_the_same_of_each_player() -> None:
     assert player_view(state, 0).players == player_view(state, 1).players
 
 
+def test_a_row_says_where_its_scarecrows_are_among_its_units() -> None:
+    scarecrow = SpecialCard(
+        id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW
+    )
+    state = make_state()
+    melee = RowState(units=(KNIGHT,), scarecrows=(scarecrow,), scarecrow_places=(0,))
+    first = replace(state.players[0], rows={**state.players[0].rows, Row.MELEE: melee})
+    state = with_player(state, 0, first)
+
+    row = player_view(state, 1).players[0].rows[Row.MELEE]
+
+    assert (row.scarecrows, row.scarecrow_places) == ((scarecrow,), (0,))
+
+
 def test_units_come_with_their_current_strength_and_rows_with_their_score() -> None:
     side = player_view(make_state(), 1).players[0]
 
@@ -138,6 +152,7 @@ def test_units_come_with_their_current_strength_and_rows_with_their_score() -> N
         units=(UnitView(card=SNIPER, strength=2),),
         horn=WAR_HORN,
         scarecrows=(),
+        scarecrow_places=(),
         weathered=True,
         score=2,
     )
