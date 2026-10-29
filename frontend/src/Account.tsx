@@ -143,7 +143,9 @@ export function AccountDialog({
       aria-labelledby={`${id}-title`}
       className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
       onKeyDown={(event) => {
-        if (event.key === "Escape") {
+        // Not while the account is on its way: the API may log the player
+        // in all the same (onSuccess, which still runs then).
+        if (event.key === "Escape" && !enter.isPending) {
           onClose();
         }
       }}
@@ -220,12 +222,19 @@ export function AccountDialog({
             At least 8 characters.
           </p>
         )}
-        <button type="submit" className={BUTTON} disabled={enter.isPending}>
+        {/* aria-disabled, not disabled: a disabled button loses the focus,
+            and then Escape and Tab start again from the top of the page. */}
+        <button
+          type="submit"
+          className={BUTTON}
+          aria-disabled={enter.isPending}
+        >
           {title}
         </button>
         <button
           type="button"
           className="text-sm text-gold-300 underline hover:text-gold-200"
+          disabled={enter.isPending}
           onClick={() => {
             setMaking(!making);
             enter.reset();
@@ -233,7 +242,12 @@ export function AccountDialog({
         >
           {making ? "I have an account: log in" : "No account yet? Create one"}
         </button>
-        <button type="button" className={BUTTON} onClick={onClose}>
+        <button
+          type="button"
+          className={BUTTON}
+          disabled={enter.isPending}
+          onClick={onClose}
+        >
           Cancel
         </button>
       </form>

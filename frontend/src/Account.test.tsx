@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect, test } from "vitest";
-import { sent, showApp, type Answer } from "./fake-api.tsx";
+import { later, sent, showApp, type Answer } from "./fake-api.tsx";
 import { DECKS } from "./test-data.ts";
 
 const DECKS_ANSWER = { status: 200, body: { decks: DECKS } };
@@ -205,6 +205,28 @@ test.each(["Cancel", "Escape"])(
   },
 );
 
+test("while the login is on its way, it can't be cancelled", async () => {
+  const answer = later();
+  showApp({ ...GUEST, "POST /api/session": answer.response });
+
+  await logInWith("rui", "dragon123");
+
+  const dialog = screen.getByRole("dialog");
+  await waitFor(() => {
+    expect(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    ).toBeDisabled();
+  });
+  fireEvent.keyDown(screen.getByLabelText("Username"), { key: "Escape" });
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+  // The API logged the player in: the page says so.
+  answer.answer(Response.json({ username: "rui" }));
+  expect(
+    await screen.findByRole("button", { name: "Log out" }),
+  ).toBeInTheDocument();
+});
+
 test("a second submit while the first is on its way sends nothing", async () => {
   const requests = showApp({
     ...GUEST,
@@ -221,7 +243,7 @@ test("a second submit while the first is on its way sends nothing", async () => 
       within(screen.getByRole("dialog")).getByRole("button", {
         name: "Log in",
       }),
-    ).toBeDisabled();
+    ).toHaveAttribute("aria-disabled", "true");
   });
   expect(sent(requests, "POST /api/session")).toHaveLength(1);
 });

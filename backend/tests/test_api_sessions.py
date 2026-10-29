@@ -336,6 +336,24 @@ def test_the_games_own_page_and_programs_can(client: TestClient) -> None:
     assert program.status_code == 200
 
 
+def test_the_port_is_part_of_the_games_own_address(client: TestClient) -> None:
+    # The game at another port, as Vite's or Docker's: the browser sends the
+    # port in Host and in Origin, and the same name at another port is
+    # another site.
+    on_a_port = TestClient(app, base_url="https://testserver:8443")
+
+    own = on_a_port.post(
+        "/accounts", json=RUI, headers={"Origin": "https://testserver:8443"}
+    )
+    other = on_a_port.post(
+        "/session", json=RUI, headers={"Origin": "https://testserver"}
+    )
+
+    assert own.status_code == 201
+    assert other.status_code == 403
+    assert other.json()["code"] == "forbidden_origin"
+
+
 def test_a_page_of_another_site_can_still_read(client: TestClient) -> None:
     # Reading changes nothing; the browser keeps the answer from that page
     # anyway, since the API sends no CORS headers.

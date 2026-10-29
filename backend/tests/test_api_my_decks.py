@@ -124,14 +124,19 @@ def test_the_spaces_around_a_name_are_left_out(client: TestClient) -> None:
     assert build(client, name="  Mine  ")["name"] == "Mine"
 
 
-@pytest.mark.parametrize("name", ["", "   ", "x" * 31])
+# U+0085 is a space to Python, which leaves it out, and not to the browser.
+@pytest.mark.parametrize("name", ["", "   ", "\u0085", "x" * 31])
 def test_a_name_has_1_to_30_characters(client: TestClient, name: str) -> None:
     as_(client, RUI)
 
     response = client.post("/my-decks", json=choice(name=name))
 
+    # Said for the player, who sees it.
     assert response.status_code == 422
-    assert response.json()["code"] == "invalid_request"
+    assert response.json() == {
+        "code": "invalid_request",
+        "message": "A deck's name needs 1 to 30 characters, and no invisible ones.",
+    }
 
 
 @pytest.mark.parametrize(
@@ -223,8 +228,10 @@ def test_a_deck_that_breaks_the_rules_is_turned_down(
 
     assert response.status_code == 422
     assert response.json()["code"] == "invalid_deck"
-    # The message never holds a value from the request.
+    # The message never holds a value from the request, and is for the
+    # player: it names no address of the API.
     assert "<script>" not in response.text
+    assert "/decks" not in response.json()["message"]
     assert client.get("/my-decks").json()["decks"] == []
 
 

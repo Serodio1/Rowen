@@ -13,7 +13,7 @@ import {
   type PlayerDeck,
   type PlayerDecks,
 } from "./api/client.ts";
-import { later, sent, showApp, to, type Answer } from "./fake-api.tsx";
+import { later, sent, settle, showApp, to, type Answer } from "./fake-api.tsx";
 import { CAPTAIN, DECKS, HOARFROST, SOLDIER, view } from "./test-data.ts";
 
 // The rules are the API's: these small numbers keep the tests short.
@@ -118,6 +118,26 @@ test("the player's decks that didn't come to their list can be asked for again",
   ).toHaveTextContent("Mine");
 });
 
+test("the factions that didn't come to the player's decks say so, and can be asked for again", async () => {
+  const answers: Record<string, Answer> = {
+    "GET /api/session": { status: 200, body: { username: "rui" } },
+    "GET /api/my-decks": decks([]),
+  };
+  showApp(answers);
+  await openDecks();
+  await screen.findByRole("heading", { name: "My decks" });
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Could not reach the server.",
+  );
+
+  answers["GET /api/decks"] = { status: 200, body: { decks: DECKS } };
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+  expect(
+    await screen.findByRole("button", { name: "New Humans deck" }),
+  ).toBeInTheDocument();
+});
+
 test("the cards that didn't come to the editor can be asked for again", async () => {
   const answers: Record<string, Answer> = {
     "GET /api/decks": { status: 200, body: { decks: DECKS } },
@@ -157,7 +177,7 @@ test("a deck is built by adding cards from one column to the other", async () =>
   const save = screen.getByRole("button", { name: "Save" });
   expect(save).toBeDisabled();
   expect(
-    screen.getByText("Choose cards on the left to add them."),
+    screen.getByText("Choose cards from the list of cards to add them."),
   ).toBeVisible();
 
   for (let n = 0; n < 3; n++) {
@@ -286,6 +306,18 @@ test("a deck is changed in place, with its copies to start from", async () => {
   });
 });
 
+test("a deck with a name of only spaces can't be saved", async () => {
+  showApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
+  await openDecks();
+  fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
+  await screen.findByRole("list", { name: "Cards" });
+
+  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "   " } });
+
+  // Enter doesn't send the form either: a browser doesn't, with its Save off.
+  expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+});
+
 test("Cancel leaves the deck as it was", async () => {
   const requests = showApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
   await openDecks();
@@ -383,7 +415,10 @@ test("a deck is saved once, however fast Save is pressed", async () => {
   fireEvent.submit(form);
 
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
   expect(
     requests.filter((request) => to(request).startsWith("PUT")),
@@ -508,6 +543,71 @@ test("after a player logs out, the next one doesn't see their decks", async () =
 
   expect(await screen.findByText("No deck built yet.")).toBeInTheDocument();
   expect(screen.queryByText("Mine")).not.toBeInTheDocument();
+});
+
+test("logging in asks for the player's decks once", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/session": {
+      status: 401,
+      body: { code: "not_logged_in", message: "The player isn't logged in." },
+    },
+    "POST /api/session": { status: 200, body: { username: "rui" } },
+    "GET /api/my-decks": decks([MINE]),
+  };
+  const requests = showApp(answers);
+  fireEvent.click(await screen.findByRole("button", { name: "Log in" }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("Username"), {
+    target: { value: "rui" },
+  });
+  fireEvent.change(within(dialog).getByLabelText("Password"), {
+    target: { value: "dragon123" },
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Log in" }));
+
+  await (await yourDecks()).findByRole("button", { name: "Mine (Humans)" });
+  await settle();
+  expect(sent(requests, "GET /api/my-decks")).toHaveLength(1);
+});
+
+test("logging out from the player's decks asks for them no more", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+    "DELETE /api/session": { status: 204, body: null },
+  };
+  const requests = showApp(answers);
+  await openDecks();
+  await screen.findByRole("list", { name: "Your decks" });
+  const before = sent(requests, "GET /api/my-decks").length;
+
+  fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+  await screen.findByRole("button", { name: "Log in" });
+  await settle();
+  // A guest's request would only get a 401.
+  expect(sent(requests, "GET /api/my-decks")).toHaveLength(before);
+});
+
+test("logging out after Back puts the focus on the decks to play", async () => {
+  showApp({
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+    "DELETE /api/session": { status: 204, body: null },
+  });
+  await openDecks();
+  fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+  const logOut = screen.getByRole("button", { name: "Log out" });
+  logOut.focus();
+
+  fireEvent.click(logOut);
+
+  await waitFor(() => {
+    expect(
+      screen.getByRole("heading", { name: "Choose your deck" }),
+    ).toHaveFocus();
+  });
 });
 
 /** Return the part of the decks to play with the player's own. */

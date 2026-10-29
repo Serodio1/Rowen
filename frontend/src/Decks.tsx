@@ -109,6 +109,14 @@ export function MyDecks({ api, onBack }: { api: Api; onBack: () => void }) {
               You have {decks.data.most} decks, the most you may keep: delete
               one to build another.
             </p>
+          ) : factions.isError ? (
+            // No faction, no deck to build from: say why.
+            <Failed
+              error={factions.error}
+              onRetry={() => {
+                void factions.refetch();
+              }}
+            />
           ) : (
             <div className="flex flex-wrap justify-center gap-2">
               {factions.data?.map((faction) => (
@@ -408,7 +416,9 @@ function DeckEditor({
               <button
                 type="submit"
                 className={BUTTON}
-                disabled={!valid || name.trim() === "" || save.isPending}
+                disabled={!valid || name.trim() === ""}
+                // Keeps the focus while it saves; onSubmit sends it once.
+                aria-disabled={save.isPending}
               >
                 Save
               </button>
@@ -512,7 +522,9 @@ function Columns({
         </CardColumn>
         <CardColumn title="Your deck" ref={deck}>
           {inDeck.length === 0 ? (
-            <li className="italic">Choose cards on the left to add them.</li>
+            <li className="italic">
+              Choose cards from the list of cards to add them.
+            </li>
           ) : (
             inDeck.map((choice, index) => (
               <ChoiceButton
