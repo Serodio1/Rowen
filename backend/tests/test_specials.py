@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from dataclasses import replace
 
 import pytest
+from cards import HOARFROST, KNIGHT, SCOUT, SNIPER, WAR_HORN
 
 from rowen.engine.actions import (
     Action,
@@ -35,9 +36,6 @@ from rowen.engine.scoring import player_total
 from rowen.engine.specials import EFFECTS
 from rowen.engine.state import GameState, PlayerState, RowState
 
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
-KNIGHT = UnitCard(id="knight", name="Knight", rows=(Row.MELEE,), strength=5)
-SCOUT = UnitCard(id="scout", name="Scout", rows=(Row.MELEE,), strength=3)
 CHAMPION = UnitCard(id="champion", name="Champion", rows=(Row.MELEE,), strength=8)
 HUMAN = UnitCard(
     id="human",
@@ -57,13 +55,11 @@ INFORMANT = UnitCard(
     strength=3,
     ability=Ability.SPY,
 )
-HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
 THICK_FOG = SpecialCard(id="thick-fog", name="Thick Fog", kind=SpecialKind.THICK_FOG)
 DOWNPOUR = SpecialCard(id="downpour", name="Downpour", kind=SpecialKind.DOWNPOUR)
 CLEAR_SKIES = SpecialCard(
     id="clear-skies", name="Clear Skies", kind=SpecialKind.CLEAR_SKIES
 )
-WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
 WILDFIRE = SpecialCard(id="wildfire", name="Wildfire", kind=SpecialKind.WILDFIRE)
 SCARECROW = SpecialCard(id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW)
 

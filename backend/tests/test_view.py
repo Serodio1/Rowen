@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 import pytest
+from cards import KNIGHT, SCOUT, SNIPER, WAR_HORN
 
 from rowen.data import load_deck
 from rowen.engine.cards import Row, SpecialCard, SpecialKind, UnitCard
@@ -38,10 +39,6 @@ from rowen.engine.view import (
     player_view,
 )
 
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
-KNIGHT = UnitCard(id="knight", name="Knight", rows=(Row.MELEE,), strength=5)
-SCOUT = UnitCard(id="scout", name="Scout", rows=(Row.MELEE,), strength=3)
-WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
 THICK_FOG = SpecialCard(id="thick-fog", name="Thick Fog", kind=SpecialKind.THICK_FOG)
 
 # Cards held only in hidden places, to check they never show up in a view.

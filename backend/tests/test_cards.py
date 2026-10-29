@@ -3,6 +3,7 @@
 import dataclasses
 
 import pytest
+from cards import SNIPER
 
 from rowen.engine.cards import (
     WEATHER_ROWS,
@@ -15,7 +16,6 @@ from rowen.engine.cards import (
 
 # Valid cards from docs/cards.md. Each test changes one field with
 # dataclasses.replace, which builds a new card and runs its checks again.
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
 PRESIDENT = UnitCard(
     id="president",
     name="President",

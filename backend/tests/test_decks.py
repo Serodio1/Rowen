@@ -4,6 +4,7 @@ import dataclasses
 from collections import Counter
 
 import pytest
+from cards import HOARFROST, SNIPER, WAR_HORN
 
 from rowen.engine.cards import Ability, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.decks import (
@@ -15,9 +16,6 @@ from rowen.engine.decks import (
     choices,
     max_copies,
 )
-
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
-WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
 
 
 def make_deck(*, units: int = MIN_UNITS, specials: int = 0) -> Deck:
@@ -82,7 +80,6 @@ FACTION = Deck(
     name="Faction",
     cards=(*PLAIN * 2, *(BOND,) * 5, *(MUSTER,) * 2, *(SPY,) * 4, LEGEND, WAR_HORN),
 )
-HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
 FOG = SpecialCard(id="thick-fog", name="Thick Fog", kind=SpecialKind.THICK_FOG)
 SKIES = SpecialCard(id="clear-skies", name="Clear Skies", kind=SpecialKind.CLEAR_SKIES)
 SPECIALS = {card.id: card for card in (WAR_HORN, HOARFROST, FOG, SKIES)}

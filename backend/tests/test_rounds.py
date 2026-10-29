@@ -4,6 +4,7 @@ from collections import Counter
 from dataclasses import replace
 
 import pytest
+from cards import HOARFROST, KNIGHT, SCOUT, SNIPER, WAR_HORN
 
 from rowen.data import load_deck
 from rowen.engine.actions import Action, Pass, PlayUnit
@@ -32,9 +33,6 @@ from rowen.engine.state import (
     empty_rows,
 )
 
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
-KNIGHT = UnitCard(id="knight", name="Knight", rows=(Row.MELEE,), strength=5)
-SCOUT = UnitCard(id="scout", name="Scout", rows=(Row.MELEE,), strength=3)
 INFILTRATOR = UnitCard(
     id="infiltrator",
     name="Infiltrator",
@@ -42,8 +40,6 @@ INFILTRATOR = UnitCard(
     strength=4,
     ability=Ability.SPY,
 )
-WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
-HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
 SCARECROW = SpecialCard(id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW)
 
 
