@@ -363,6 +363,13 @@ def test_gives_up_a_round_it_cant_win() -> None:
     assert ai_choice(player((KNIGHT, SNIPER, SCOUT)), passed(40)) == Pass()
 
 
+def test_plays_on_in_a_round_that_loses_the_match() -> None:
+    # On its last life, 40 behind, the AI can't win. Passing would keep its
+    # cards, but they count for nothing once the match is lost: it plays on.
+    ai = player((KNIGHT, SCOUT), lives=1)
+    assert ai_choice(ai, passed(40, lives=1)) == PLAY_KNIGHT
+
+
 @pytest.mark.parametrize(
     ("deck", "action"),
     [((SCOUT, SCOUT), PLAY_INFORMANT), ((SCOUT,), Pass()), ((), Pass())],

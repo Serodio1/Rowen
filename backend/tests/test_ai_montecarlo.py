@@ -286,6 +286,22 @@ def test_passes_when_the_opponent_holds_too_little() -> None:
     assert action == Pass()
 
 
+def test_plays_on_when_every_sample_loses_the_match() -> None:
+    # The last round: the AI leads by a point with three Scouts, and the
+    # opponent holds seven Knights. Every sample loses the match, whatever the
+    # AI does. Passing would keep its cards, but they count for nothing once
+    # the match is lost: it plays on, as the opponent may still go wrong.
+    state = match(
+        player((SCOUT,) * 3, siege=(wall(1),), lives=1),
+        player((KNIGHT,) * 7, lives=1),
+    )
+    decks = ((SCOUT,) * 3 + (wall(1),), (KNIGHT,) * 7)
+
+    action = choose_action(player_view(state, 0), decks=decks, samples=4, seed=0)
+
+    assert action == PlayUnit(card="scout", row=Row.MELEE)
+
+
 @pytest.mark.parametrize(
     ("opponent_passed", "reviving"), [(True, False), (False, True)]
 )
