@@ -181,6 +181,24 @@ def test_a_deck_of_a_faction_that_doesnt_exist_is_turned_down(
 
 @pytest.mark.parametrize(
     "copies",
+    [{"<img src=x onerror=alert(1)>": "x"}, {"x" * 65: 1}],
+)
+def test_a_card_id_the_api_turns_down_isnt_sent_back(
+    client: TestClient, copies: dict[str, Any]
+) -> None:
+    # The keys of copies are the client's: the answer stops at copies.
+    as_(client, RUI)
+
+    response = client.post("/my-decks", json=choice(copies=copies))
+
+    assert response.status_code == 422
+    assert response.json()["message"].startswith(
+        "The request isn't valid at body.copies: "
+    )
+
+
+@pytest.mark.parametrize(
+    "copies",
     [
         # Too many copies of a card, of a Legend, of a Bond.
         HUMANS | {"soldier": 4},

@@ -217,6 +217,8 @@ def test_behind_nginx_the_addresses_the_api_gives_out_start_with_api(
     assert response.headers["Location"] == f"/api/matches/{match_id}"
     assert proxied.get(response.headers["Location"]).status_code == 200
     assert "'/api/openapi.json'" in docs.text
+    # The only docs page: no other runs a CDN's scripts on the game's address.
+    assert proxied.get("/api/redoc").status_code == 404
 
 
 def test_the_player_gets_their_view_and_the_ais_first_moves(

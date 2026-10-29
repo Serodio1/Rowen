@@ -157,6 +157,10 @@ app = FastAPI(
     # address, which behind nginx is not the browser's, and the page never adds
     # the slash. Such an address is just unknown (404).
     redirect_slashes=False,
+    # Only /docs: each docs page runs scripts from a CDN on the game's
+    # address, and the README sends people to this one.
+    redoc_url=None,
+    swagger_ui_oauth2_redirect_url=None,
 )
 
 
@@ -1059,12 +1063,15 @@ def _invalid_request(request: Request, error: RequestValidationError) -> JSONRes
 
     A field the request has and shouldn't is named by the request, not by the
     API: only where it is goes back, not its name, so no value the client sent
-    is ever sent back.
+    is ever sent back. The same for the keys of ``copies``, the card ids the
+    client chose: where stops at ``copies``.
     """
     first = error.errors()[0]
     location = first["loc"]
     if first["type"] == "extra_forbidden":
         location = location[:-1]
+    if "copies" in location:
+        location = location[: location.index("copies") + 1]
     where = ".".join(str(part) for part in location)
     return _error(
         status.HTTP_422_UNPROCESSABLE_CONTENT,
