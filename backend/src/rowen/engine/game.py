@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from rowen.engine import abilities, specials
+from rowen.engine import abilities, passives, specials
 from rowen.engine.actions import (
     Action,
     EndRedraw,
@@ -31,6 +31,7 @@ from rowen.engine.scoring import player_total
 from rowen.engine.state import (
     GameState,
     PlayerState,
+    RowState,
     empty_rows,
     with_player,
     with_unit,
@@ -64,7 +65,7 @@ def start_match(decks: tuple[Deck, Deck], seed: int) -> GameState:
     cards_1, rng = rng.shuffled(decks[1].cards)
     first_player, rng = rng.coin_flip()
     return GameState(
-        players=(_deal(cards_0), _deal(cards_1)),
+        players=(_deal(cards_0, decks[0]), _deal(cards_1, decks[1])),
         current=first_player,
         round_starter=first_player,
         rng=rng,
@@ -193,15 +194,17 @@ def match_winner(state: GameState) -> int | None:
     )
 
 
-def _deal(cards: tuple[Card, ...]) -> PlayerState:
+def _deal(cards: tuple[Card, ...], deck: Deck) -> PlayerState:
     """Return a player who has drawn their hand from these shuffled cards.
 
-    They can still swap ``MAX_REDRAWS`` cards before round 1.
+    They can still swap ``MAX_REDRAWS`` cards before round 1, and they have
+    their deck's passive.
     """
     return PlayerState(
         hand=cards[:HAND_SIZE],
         deck=cards[HAND_SIZE:],
         redraws_left=MAX_REDRAWS,
+        passive=deck.passive,
     )
 
 
@@ -435,25 +438,38 @@ def _start_next_round(
     """Clear the board and give the first turn of the next round.
 
     The winner of the round goes first. After a tie, the player who went first
-    in it goes first again (rules, section 9).
+    in it goes first again (rules, section 9). The factions' passives are
+    carried out as the board is cleared (rules, section 12).
     """
     starter = state.round_starter if winner is None else winner
+    kept_0, state = passives.unit_to_keep(state, 0)
+    kept_1, state = passives.unit_to_keep(state, 1)
     state = replace(
         state,
-        players=(_clear_board(state.players[0]), _clear_board(state.players[1])),
+        players=(
+            _clear_board(state.players[0], kept_0),
+            _clear_board(state.players[1], kept_1),
+        ),
         round=state.round + 1,
         round_starter=starter,
     )
+    events: tuple[Event, ...] = tuple(
+        passives.kept_event(index, kept)
+        for index, kept in enumerate((kept_0, kept_1))
+        if kept is not None
+    )
+    state, drawn = passives.draw_for_winner(state, winner)
     state, auto_passes = _pass_empty_hands(state)
-    return _turn_to(state, starter), auto_passes
+    return _turn_to(state, starter), events + drawn + auto_passes
 
 
-def _clear_board(player: PlayerState) -> PlayerState:
+def _clear_board(player: PlayerState, kept: passives.Kept | None) -> PlayerState:
     """Move the player's cards in play to their discard pile, for a new round.
 
     That is the cards on their side of the board, even an opponent's Spy, and
-    the weather cards they played (rules, section 9). The hand and the deck
-    stay as they are: no cards are drawn.
+    the weather cards they played (rules, section 9), except the unit they
+    keep by their passive, if any, which stays alone in its row. The hand and
+    the deck stay as they are.
     """
     in_play: list[Card] = []
     for row in player.rows.values():
@@ -462,9 +478,14 @@ def _clear_board(player: PlayerState) -> PlayerState:
         if row.horn is not None:
             in_play.append(row.horn)
     in_play.extend(player.weather)
+    rows = empty_rows()
+    if kept is not None:
+        kept_row, unit = kept
+        in_play.remove(unit)
+        rows = {**rows, kept_row: RowState(units=(unit,))}
     return replace(
         player,
-        rows=empty_rows(),
+        rows=rows,
         weather=(),
         discard=(*player.discard, *in_play),
         passed=False,

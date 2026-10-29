@@ -5,8 +5,17 @@
 import type { Card, Deck, View } from "./api/client.ts";
 
 export const DECKS: Deck[] = [
-  { id: "humans", name: "Humans" },
-  { id: "robots", name: "Robots" },
+  {
+    id: "humans",
+    name: "Humans",
+    passive: "Draws a card after winning a round.",
+  },
+  {
+    id: "robots",
+    name: "Robots",
+    passive:
+      "After each round, one random unit stays on the board, but not a Legend or a Spy.",
+  },
 ];
 
 export const SOLDIER = {
@@ -72,6 +81,7 @@ export function side(changes: Partial<Side> = {}): Side {
     hand_size: 10,
     deck_size: 12,
     total: 0,
+    passive: null,
     ...changes,
   };
 }

@@ -44,6 +44,7 @@ from rowen.engine.public import (
     SideView,
     SpecialCard,
     UnitDestroyed,
+    UnitKept,
     UnitMustered,
     UnitPlayed,
     UnitRevived,
@@ -200,6 +201,11 @@ def event_text(event: EventView, viewer: int, names: Mapping[str, str]) -> str:
             if event.winner is None:
                 return f"Round over: {scores}. It's a tie."
             return f"Round over: {scores}. {_who(event.winner, viewer)} won the round."
+        case UnitKept():
+            return (
+                f"{names[event.card]} stays in {_whose(event.player, viewer)}"
+                f" {event.row} row."
+            )
         case MatchEnded():
             if event.winner is None:
                 return "Match over. It's a draw."

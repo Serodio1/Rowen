@@ -339,6 +339,11 @@ function PlayerPanel({
           </>
         )}
       </dl>
+      {side.passive !== null && (
+        <p className="mt-1 text-xs opacity-80">
+          <span className="font-bold">Passive:</span> {side.passive}
+        </p>
+      )}
       {side.passed && (
         <p className="mt-1 font-display text-sm text-gold-300 italic">Passed</p>
       )}

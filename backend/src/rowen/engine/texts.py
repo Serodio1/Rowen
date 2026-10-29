@@ -2,13 +2,15 @@
 
 The texts are here, beside the rules they tell of, so a client shows them
 without knowing the rules (ADR 0002): when a rule changes, its text changes
-in the same place. A new ability or special card needs its text here too:
-``describe`` looks it up, and a test checks that every one has one.
+in the same place. A new ability, special card or passive needs its text
+here too: ``describe`` and the clients look them up, and a test checks that
+every one has one.
 """
 
 from collections.abc import Mapping
 
 from rowen.engine.cards import Ability, Card, SpecialKind, UnitCard
+from rowen.engine.decks import Passive
 
 # What each ability does (rules, section 7).
 ABILITY_TEXTS: Mapping[Ability, str] = {
@@ -61,6 +63,16 @@ SPECIAL_TEXTS: Mapping[SpecialKind, str] = {
     SpecialKind.SCARECROW: (
         "Takes a unit on your side, not a Legend, back to your hand, and stays "
         "in its place with strength 0."
+    ),
+}
+
+
+# What each faction's passive does (rules, section 12).
+PASSIVE_TEXTS: Mapping[Passive, str] = {
+    Passive.DRAW_ON_ROUND_WIN: "Draws a card after winning a round.",
+    Passive.KEEP_A_UNIT: (
+        "After each round, one random unit stays on the board, but not a "
+        "Legend or a Spy."
     ),
 }
 

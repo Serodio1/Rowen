@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 
 from rowen.engine.cards import Card, SpecialCard, UnitCard
 
@@ -13,6 +14,18 @@ MAX_SPECIALS = 10
 # 12): a Legend only one, and a Bond or Muster unit as many as its faction's
 # own deck has, if that is more, so the player can still have the whole group.
 MAX_COPIES = 3
+
+
+class Passive(StrEnum):
+    """A faction's passive: a rule of its own that works by itself, with no
+    action, at the end of each round that doesn't end the match (rules,
+    section 12). ``rowen.engine.passives`` carries each one out.
+    """
+
+    # After winning a round, draw a card (not on a tie).
+    DRAW_ON_ROUND_WIN = "draw_on_round_win"
+    # After each round, one random unit stays on the board.
+    KEEP_A_UNIT = "keep_a_unit"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -27,11 +40,14 @@ class Deck:
         id: Unique identifier, lowercase with hyphens (``"humans"``).
         name: The name shown to the player (``"Humans"``).
         cards: Every card in the deck, one entry per copy.
+        passive: The passive of the deck's faction, if it has one. A deck a
+            player builds has its faction's.
     """
 
     id: str
     name: str
     cards: tuple[Card, ...]
+    passive: Passive | None = None
 
     def __post_init__(self) -> None:
         units = sum(isinstance(card, UnitCard) for card in self.cards)
@@ -128,4 +144,4 @@ def build_deck(
                 f"{id}: {card.id} can have 1 to {most} copies, got {count}"
             )
         cards += [card] * count
-    return Deck(id=id, name=name, cards=tuple(cards))
+    return Deck(id=id, name=name, cards=tuple(cards), passive=faction.passive)

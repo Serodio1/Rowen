@@ -1252,16 +1252,28 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "passive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passive"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "id",
-          "name"
+          "name",
+          "passive"
         ],
         "title": "DeckSummary",
-        "description": "A deck the player can choose: its id, to start a match, and its name."
+        "description": "A deck the player can choose: its id, to start a match, its name, and\nwhat its faction's passive does, if it has one."
       },
       "Decks": {
         "properties": {
@@ -1379,6 +1391,9 @@
             "$ref": "#/components/schemas/RoundEnded"
           },
           {
+            "$ref": "#/components/schemas/UnitKept"
+          },
+          {
             "$ref": "#/components/schemas/MatchEnded"
           },
           {
@@ -1409,6 +1424,7 @@
             "round_ended": "#/components/schemas/RoundEnded",
             "scarecrow_played": "#/components/schemas/ScarecrowPlayed",
             "unit_destroyed": "#/components/schemas/UnitDestroyed",
+            "unit_kept": "#/components/schemas/UnitKept",
             "unit_mustered": "#/components/schemas/UnitMustered",
             "unit_played": "#/components/schemas/UnitPlayed",
             "unit_revived": "#/components/schemas/UnitRevived",
@@ -2402,6 +2418,17 @@
           "total": {
             "type": "integer",
             "title": "Total"
+          },
+          "passive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passive"
           }
         },
         "additionalProperties": false,
@@ -2415,7 +2442,8 @@
           "redraws_left",
           "hand_size",
           "deck_size",
-          "total"
+          "total",
+          "passive"
         ],
         "title": "SideView",
         "description": "What both players see of one player, as ``engine.SideView`` describes it."
@@ -2610,6 +2638,36 @@
         ],
         "title": "UnitDestroyed",
         "description": "A unit was destroyed: ``engine.UnitDestroyed``."
+      },
+      "UnitKept": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "unit_kept",
+            "title": "Type"
+          },
+          "player": {
+            "type": "integer",
+            "title": "Player"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "player",
+          "card",
+          "row"
+        ],
+        "title": "UnitKept",
+        "description": "A unit stays on the board for the next round, by its faction's passive:\n``engine.UnitKept``."
       },
       "UnitMustered": {
         "properties": {

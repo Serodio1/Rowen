@@ -279,6 +279,17 @@ class PlayerPassed(Schema):
     player: int
 
 
+class UnitKept(Schema):
+    """A unit stays on the board for the next round, by its faction's passive:
+    ``engine.UnitKept``.
+    """
+
+    type: Literal["unit_kept"]
+    player: int
+    card: str
+    row: Row
+
+
 class RoundEnded(Schema):
     """Both players passed and the round was scored: ``engine.RoundEnded``."""
 
@@ -344,6 +355,7 @@ type EventView = Annotated[
     | UnitDestroyed
     | PlayerPassed
     | RoundEnded
+    | UnitKept
     | MatchEnded
     | CardRedrawn
     | RedrawEnded
@@ -397,6 +409,8 @@ class SideView(Schema):
     hand_size: int
     deck_size: int
     total: int
+    # What their faction's passive does, if it has one.
+    passive: str | None
 
 
 class PlayerView(Schema):
@@ -414,10 +428,13 @@ class PlayerView(Schema):
 
 
 class DeckSummary(Schema):
-    """A deck the player can choose: its id, to start a match, and its name."""
+    """A deck the player can choose: its id, to start a match, its name, and
+    what its faction's passive does, if it has one.
+    """
 
     id: str
     name: str
+    passive: str | None
 
 
 class Decks(Schema):
@@ -739,7 +756,13 @@ def _side(side: engine.SideView) -> SideView:
         hand_size=side.hand_size,
         deck_size=side.deck_size,
         total=side.total,
+        passive=passive_text(side.passive),
     )
+
+
+def passive_text(passive: engine.Passive | None) -> str | None:
+    """Return what a faction's passive does, as the API sends it."""
+    return None if passive is None else engine.PASSIVE_TEXTS[passive]
 
 
 def _row(row: engine.RowView) -> RowView:
@@ -931,6 +954,10 @@ def _event(event: engine.EventView) -> EventView:
         case engine.RoundEnded():
             return RoundEnded(
                 type="round_ended", scores=event.scores, winner=event.winner
+            )
+        case engine.UnitKept():
+            return UnitKept(
+                type="unit_kept", player=event.player, card=event.card, row=event.row
             )
         case engine.MatchEnded():
             return MatchEnded(type="match_ended", winner=event.winner)

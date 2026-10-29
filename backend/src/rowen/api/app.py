@@ -87,6 +87,7 @@ from rowen.api.schemas import (
     from_choices,
     from_events,
     from_view,
+    passive_text,
     to_action,
 )
 from rowen.api.schemas import RoundEnded as RoundEndedJson
@@ -309,7 +310,12 @@ def list_decks() -> Decks:
     The AI plays another one of them.
     """
     decks = [load_deck(deck_id) for deck_id in deck_ids()]
-    return Decks(decks=tuple(DeckSummary(id=deck.id, name=deck.name) for deck in decks))
+    return Decks(
+        decks=tuple(
+            DeckSummary(id=deck.id, name=deck.name, passive=passive_text(deck.passive))
+            for deck in decks
+        )
+    )
 
 
 @app.post(

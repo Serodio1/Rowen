@@ -239,6 +239,24 @@ test("each player's panel shows their total, lives and cards in hand, and whethe
   expect(within(you).queryByText("Swaps left")).not.toBeInTheDocument();
 });
 
+test("each player's panel shows their faction's passive, if it has one", () => {
+  const passives = view({
+    players: [side({ passive: "Draws a card after winning a round." }), side()],
+  });
+  render(<Board view={passives} />);
+
+  expect(
+    within(screen.getByRole("group", { name: "You" })).getByText(
+      "Draws a card after winning a round.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("group", { name: "The AI" })).queryByText(
+      "Passive:",
+    ),
+  ).not.toBeInTheDocument();
+});
+
 test("with the same total, neither player is ahead", () => {
   const even = view({ players: [side({ total: 5 }), side({ total: 5 })] });
   render(<Board view={even} />);

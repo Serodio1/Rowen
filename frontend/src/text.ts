@@ -236,6 +236,8 @@ export function eventText(
           : `${event.winner === viewer ? "you" : "the AI"} won`;
       return `Round ${String(round)}: ${how}, ${String(high)} to ${String(low)}.`;
     }
+    case "unit_kept":
+      return `${name(event.card)} stays in ${whose(event.player)} ${event.row} row.`;
     case "match_ended":
       return event.winner === null
         ? "Match over. It's a draw."

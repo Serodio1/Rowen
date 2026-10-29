@@ -371,15 +371,30 @@ function ChooseDeck({
       {decks.isSuccess && (
         <div className="flex flex-wrap justify-center gap-3">
           {decks.data.map((deck) => (
-            <button
+            <div
               key={deck.id}
-              type="button"
-              className={`${BUTTON} px-8 py-4 text-xl`}
-              disabled={start.isPending || waiting}
-              onClick={startWith({ deck: deck.id, level })}
+              className="flex max-w-56 flex-col items-center gap-1"
             >
-              {deck.name}
-            </button>
+              <button
+                type="button"
+                className={`${BUTTON} px-8 py-4 text-xl`}
+                disabled={start.isPending || waiting}
+                onClick={startWith({ deck: deck.id, level })}
+                aria-describedby={
+                  deck.passive === null ? undefined : `passive-${deck.id}`
+                }
+              >
+                {deck.name}
+              </button>
+              {deck.passive !== null && (
+                <p
+                  id={`passive-${deck.id}`}
+                  className="text-center text-sm opacity-80"
+                >
+                  {deck.passive}
+                </p>
+              )}
+            </div>
           ))}
         </div>
       )}
