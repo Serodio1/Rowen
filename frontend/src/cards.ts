@@ -27,7 +27,7 @@ const ART = import.meta.glob<string>("./art/*.webp", {
  *   their own.
  */
 export function artOf(
-  card: Card,
+  card: Pick<Card, "id">,
   art: Record<string, string> = ART,
 ): string | undefined {
   return art[`./art/${card.id}.webp`];

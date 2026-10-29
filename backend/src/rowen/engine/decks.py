@@ -17,7 +17,7 @@ MAX_COPIES = 3
 
 
 class Passive(StrEnum):
-    """A faction's passive: a rule of its own that works by itself, with no
+    """A leader's passive: a rule of its own that works by itself, with no
     action, at the end of each round that doesn't end the match (rules,
     section 12). ``rowen.engine.passives`` carries each one out.
     """
@@ -26,6 +26,24 @@ class Passive(StrEnum):
     DRAW_ON_ROUND_WIN = "draw_on_round_win"
     # After each round, one random unit stays on the board.
     KEEP_A_UNIT = "keep_a_unit"
+
+
+@dataclass(frozen=True, kw_only=True)
+class Leader:
+    """A deck's leader: who leads the faction, and the passive they bring
+    (rules, section 12). Each faction has one, and a deck a player builds has
+    its faction's.
+
+    Attributes:
+        id: Unique identifier, lowercase with hyphens (``"humans-leader"``);
+            the page finds the leader's art by it.
+        name: The name shown to the player (``"The Commander"``).
+        passive: The rule the leader brings.
+    """
+
+    id: str
+    name: str
+    passive: Passive
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -40,14 +58,14 @@ class Deck:
         id: Unique identifier, lowercase with hyphens (``"humans"``).
         name: The name shown to the player (``"Humans"``).
         cards: Every card in the deck, one entry per copy.
-        passive: The passive of the deck's faction, if it has one. A deck a
-            player builds has its faction's.
+        leader: The deck's leader, if it has one. A deck a player builds has
+            its faction's.
     """
 
     id: str
     name: str
     cards: tuple[Card, ...]
-    passive: Passive | None = None
+    leader: Leader | None = None
 
     def __post_init__(self) -> None:
         units = sum(isinstance(card, UnitCard) for card in self.cards)
@@ -144,4 +162,4 @@ def build_deck(
                 f"{id}: {card.id} can have 1 to {most} copies, got {count}"
             )
         cards += [card] * count
-    return Deck(id=id, name=name, cards=tuple(cards), passive=faction.passive)
+    return Deck(id=id, name=name, cards=tuple(cards), leader=faction.leader)

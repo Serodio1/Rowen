@@ -2,10 +2,10 @@
 # requires-python = ">=3.14"
 # dependencies = ["pillow==12.3.0"]
 # ///
-"""Turn the cards' pictures into the art the game shows.
+"""Turn the pictures of the cards and leaders into the art the game shows.
 
-Each picture in the folder given is named by a card's id, such as
-``human.png`` or ``computer-spy.jpg`` (the ids are in the deck files in
+Each picture in the folder given is named by a card's or a leader's id, such
+as ``human.png`` or ``humans-leader.jpg`` (the ids are in the deck files in
 ``backend/src/rowen/data``). Each one is cut to the card's shape (2:3, around
 its middle), made 400 by 600 pixels and saved as WebP in ``frontend/src/art``,
 where the page finds it (``frontend/src/cards.ts``).
@@ -15,8 +15,8 @@ script only::
 
     uv run scripts/convert_art.py <folder with the pictures>
 
-A picture whose name is not a card's id is an error (a typo would leave its
-card without art); a card with no picture is only listed.
+A picture whose name is not a card's or a leader's id is an error (a typo
+would leave its card without art); one with no picture is only listed.
 """
 
 import json
@@ -39,10 +39,15 @@ PICTURES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 def card_ids() -> set[str]:
-    """Return the id of every card in the deck files and the special cards."""
+    """Return the id of every card and leader in the deck files and of the
+    special cards.
+    """
     ids = {card["id"] for card in json.loads((DATA / "specials.json").read_text())}
-    for deck in (DATA / "decks").glob("*.json"):
-        ids |= {card["id"] for card in json.loads(deck.read_text())["units"]}
+    for file in (DATA / "decks").glob("*.json"):
+        deck = json.loads(file.read_text())
+        ids |= {card["id"] for card in deck["units"]}
+        if "leader" in deck:
+            ids.add(deck["leader"]["id"])
     return ids
 
 

@@ -12,10 +12,11 @@ field is checked, and an error says what is wrong and where, for example
 from collections.abc import Mapping, Set
 
 from rowen.engine.cards import Ability, Row, SpecialCard, SpecialKind, UnitCard
-from rowen.engine.decks import Deck, Passive
+from rowen.engine.decks import Deck, Leader, Passive
 
 DECK_FIELDS = frozenset({"id", "name", "units", "specials"})
-OPTIONAL_DECK_FIELDS = frozenset({"passive"})
+OPTIONAL_DECK_FIELDS = frozenset({"leader"})
+LEADER_FIELDS = frozenset({"id", "name", "passive"})
 UNIT_FIELDS = frozenset({"id", "name", "rows", "strength", "copies"})
 OPTIONAL_UNIT_FIELDS = frozenset({"ability", "group", "legend"})
 SPECIAL_FIELDS = frozenset({"id", "name", "kind"})
@@ -58,7 +59,7 @@ def parse_deck(data: object, specials: Mapping[str, SpecialCard]) -> Deck:
     Args:
         data: The deck: its units (with the number of copies of each), the
             number of copies of each special card and, if the faction has one,
-            its passive.
+            its leader.
         specials: Every special card, by id, as returned by `parse_specials`.
     """
     fields = _object(data, required=DECK_FIELDS, optional=OPTIONAL_DECK_FIELDS)
@@ -68,10 +69,21 @@ def parse_deck(data: object, specials: Mapping[str, SpecialCard]) -> Deck:
         id=_get(fields, "id", str),
         name=_get(fields, "name", str),
         cards=(*units, *special_cards),
-        passive=(
-            Passive(_get(fields, "passive", str)) if "passive" in fields else None
-        ),
+        leader=_parse_leader(fields["leader"]) if "leader" in fields else None,
     )
+
+
+def _parse_leader(data: object) -> Leader:
+    """Create a deck's leader from its JSON object."""
+    try:
+        fields = _object(data, required=LEADER_FIELDS)
+        return Leader(
+            id=_get(fields, "id", str),
+            name=_get(fields, "name", str),
+            passive=Passive(_get(fields, "passive", str)),
+        )
+    except ValueError as error:
+        raise ValueError(f"leader: {error}") from error
 
 
 def _parse_units(entries: list[object]) -> list[UnitCard]:

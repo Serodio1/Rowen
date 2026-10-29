@@ -1,7 +1,11 @@
 {
   "id": "robots",
   "name": "Robots",
-  "passive": "keep_a_unit",
+  "leader": {
+    "id": "robots-leader",
+    "name": "The Overseer",
+    "passive": "keep_a_unit"
+  },
   "units": [
     {
       "id": "robot",

@@ -1253,16 +1253,15 @@
             "type": "string",
             "title": "Name"
           },
-          "passive": {
+          "leader": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/Leader"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Passive"
+            ]
           }
         },
         "additionalProperties": false,
@@ -1270,10 +1269,10 @@
         "required": [
           "id",
           "name",
-          "passive"
+          "leader"
         ],
         "title": "DeckSummary",
-        "description": "A deck the player can choose: its id, to start a match, its name, and\nwhat its faction's passive does, if it has one."
+        "description": "A deck the player can choose: its id, to start a match, its name, and\nits leader, if it has one."
       },
       "Decks": {
         "properties": {
@@ -1476,6 +1475,31 @@
         ],
         "title": "HornPlayed",
         "description": "A player played a War Horn: ``engine.HornPlayed``."
+      },
+      "Leader": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "passive": {
+            "type": "string",
+            "title": "Passive"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "passive"
+        ],
+        "title": "Leader",
+        "description": "A deck's leader, as ``engine.Leader`` describes it, with what its\npassive does in words, for the player."
       },
       "Match": {
         "properties": {
@@ -2419,16 +2443,15 @@
             "type": "integer",
             "title": "Total"
           },
-          "passive": {
+          "leader": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/Leader"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Passive"
+            ]
           }
         },
         "additionalProperties": false,
@@ -2443,7 +2466,7 @@
           "hand_size",
           "deck_size",
           "total",
-          "passive"
+          "leader"
         ],
         "title": "SideView",
         "description": "What both players see of one player, as ``engine.SideView`` describes it."

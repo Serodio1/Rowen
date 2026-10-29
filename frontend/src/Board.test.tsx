@@ -239,22 +239,24 @@ test("each player's panel shows their total, lives and cards in hand, and whethe
   expect(within(you).queryByText("Swaps left")).not.toBeInTheDocument();
 });
 
-test("each player's panel shows their faction's passive, if it has one", () => {
-  const passives = view({
-    players: [side({ passive: "Draws a card after winning a round." }), side()],
-  });
-  render(<Board view={passives} />);
+test("a player's leader has a slot of their own, with what their passive does", () => {
+  const leader = {
+    id: "humans-leader",
+    name: "The Commander",
+    passive: "Draws a card after winning a round.",
+  };
+  render(<Board view={view({ players: [side({ leader }), side()] })} />);
 
-  expect(
-    within(screen.getByRole("group", { name: "You" })).getByText(
-      "Draws a card after winning a round.",
-    ),
-  ).toBeInTheDocument();
-  expect(
-    within(screen.getByRole("group", { name: "The AI" })).queryByText(
-      "Passive:",
-    ),
-  ).not.toBeInTheDocument();
+  // Only the player has a leader here; the AI has none.
+  const figure = screen.getByRole("figure");
+  expect(figure).toHaveAccessibleName(
+    "Your leader, The Commander: Draws a card after winning a round.",
+  );
+  // Shown on hover.
+  expect(figure).toHaveAttribute(
+    "title",
+    "The Commander: Draws a card after winning a round.",
+  );
 });
 
 test("with the same total, neither player is ahead", () => {

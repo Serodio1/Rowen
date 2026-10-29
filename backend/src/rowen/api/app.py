@@ -86,8 +86,8 @@ from rowen.api.schemas import (
     Stats,
     from_choices,
     from_events,
+    from_leader,
     from_view,
-    passive_text,
     to_action,
 )
 from rowen.api.schemas import RoundEnded as RoundEndedJson
@@ -312,7 +312,7 @@ def list_decks() -> Decks:
     decks = [load_deck(deck_id) for deck_id in deck_ids()]
     return Decks(
         decks=tuple(
-            DeckSummary(id=deck.id, name=deck.name, passive=passive_text(deck.passive))
+            DeckSummary(id=deck.id, name=deck.name, leader=from_leader(deck.leader))
             for deck in decks
         )
     )

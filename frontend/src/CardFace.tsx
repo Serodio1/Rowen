@@ -1,4 +1,4 @@
-import type { Card } from "./api/client.ts";
+import type { Card, Leader } from "./api/client.ts";
 import { artOf, cardIcons, placeholderLook, type Look } from "./cards.ts";
 import { Icon } from "./icons.tsx";
 import { describe } from "./text.ts";
@@ -170,5 +170,39 @@ function Strength({
         </svg>
       )}
     </span>
+  );
+}
+
+/**
+ * A deck's leader: their art, if there is any, their name and what the
+ * passive they bring does. `id` names the text, for a button it describes.
+ */
+export function LeaderFace({
+  leader,
+  id,
+  large = false,
+}: {
+  leader: Leader;
+  id?: string;
+  large?: boolean;
+}) {
+  const art = artOf(leader);
+  return (
+    <div className="mt-1 flex items-start gap-2 text-xs lg:text-sm">
+      {art !== undefined && (
+        <img
+          src={art}
+          alt=""
+          className={`${large ? "h-28" : "h-16"} aspect-2/3 shrink-0 rounded border border-wood-600 object-cover`}
+        />
+      )}
+      <p id={id} className="min-w-0 opacity-90">
+        <span className="block font-bold text-gold-200">
+          {leader.name}
+          <span className="sr-only">:</span>
+        </span>{" "}
+        <span>{leader.passive}</span>
+      </p>
+    </div>
   );
 }

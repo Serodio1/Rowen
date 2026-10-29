@@ -1,6 +1,7 @@
 # ADR 0019: Give each faction a passive, kept with its deck and carried out by the engine
 
-- **Status:** Accepted
+- **Status:** Accepted; the passive comes with the faction's leader (see the
+  update at the end)
 - **Date:** 2026-10-29
 
 ## Context
@@ -59,3 +60,21 @@ more factions are to come, so a new passive should be easy to add.
   rules and stopped before round 3, 15 could no longer be replayed. The API
   answers such a match with a 500 error. The results of finished matches are
   stored (ADR 0015), so the list of matches and the stats are not affected.
+
+## Update (2026-10-29, later): the passive comes with the faction's leader
+
+Each faction now has a **leader** who brings its passive: The Commander for
+the Humans, The Overseer for the Robots (rules, section 12, D10). A leader
+has no ability to use during the match: it gives the passive a face, with a
+name and art of its own (`docs/art.md`).
+
+- `Deck.passive` became `Deck.leader`, a `Leader` with an id, a name and the
+  passive; in a faction's file, `"leader": {"id", "name", "passive"}`. Each
+  player's state, and each side of the view, keeps the leader.
+  `rowen.engine.passives` reads the passive from it.
+- The API sends the leader (id, name and the passive's text) in each side
+  and in the list of decks. The page shows the leader's art, name and
+  passive in each player's panel, and under each deck to choose.
+- More leaders, each with another passive, can come later: a faction's deck
+  names one, and a player would choose among them when building a deck.
+

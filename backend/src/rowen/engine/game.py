@@ -198,13 +198,13 @@ def _deal(cards: tuple[Card, ...], deck: Deck) -> PlayerState:
     """Return a player who has drawn their hand from these shuffled cards.
 
     They can still swap ``MAX_REDRAWS`` cards before round 1, and they have
-    their deck's passive.
+    their deck's leader.
     """
     return PlayerState(
         hand=cards[:HAND_SIZE],
         deck=cards[HAND_SIZE:],
         redraws_left=MAX_REDRAWS,
-        passive=deck.passive,
+        leader=deck.leader,
     )
 
 

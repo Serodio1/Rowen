@@ -94,7 +94,7 @@ EMPTY_SIDE = engine.SideView(
     hand_size=0,
     deck_size=0,
     total=0,
-    passive=None,
+    leader=None,
 )
 EMPTY_VIEW = engine.PlayerView(
     player=0,
@@ -188,7 +188,11 @@ def test_a_view_is_sent_field_by_field() -> None:
                 hand_size=2,
                 deck_size=12,
                 total=1,
-                passive=engine.Passive.DRAW_ON_ROUND_WIN,
+                leader=engine.Leader(
+                    id="humans-leader",
+                    name="The Commander",
+                    passive=engine.Passive.DRAW_ON_ROUND_WIN,
+                ),
             ),
             engine.SideView(
                 rows={
@@ -204,7 +208,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                 hand_size=7,
                 deck_size=11,
                 total=0,
-                passive=None,
+                leader=None,
             ),
         ),
         current=0,
@@ -251,7 +255,11 @@ def test_a_view_is_sent_field_by_field() -> None:
                     "discard": [],
                     "lives": 2,
                     "passed": False,
-                    "passive": "Draws a card after winning a round.",
+                    "leader": {
+                        "id": "humans-leader",
+                        "name": "The Commander",
+                        "passive": "Draws a card after winning a round.",
+                    },
                     "redraws_left": 0,
                     "hand_size": 2,
                     "deck_size": 12,
@@ -267,7 +275,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                     "discard": [SNIPER_JSON],
                     "lives": 1,
                     "passed": True,
-                    "passive": None,
+                    "leader": None,
                     "redraws_left": 0,
                     "hand_size": 7,
                     "deck_size": 11,
@@ -665,7 +673,7 @@ def with_rules(value: Any) -> Any:
     weather hits, from ``WEATHER_ROWS_JSON``, wherever the card is. Only units
     have a "legend", so each dict with one gets whether it goes on the
     opponent's side: only a Spy does. And each card gets what it does, and
-    each side what its passive does: only a side has a "redraws_left".
+    each side's leader what its passive does: only a side has a "redraws_left".
     """
     if isinstance(value, dict):
         added = {key: with_rules(item) for key, item in value.items()}
@@ -682,8 +690,9 @@ def with_rules(value: Any) -> Any:
                     else [ABILITY_TEXTS[value["ability"]]]
                 ),
             ]
-        if "redraws_left" in value and value["passive"] is not None:
-            added["passive"] = PASSIVE_TEXTS[value["passive"]]
+        if "redraws_left" in value and value["leader"] is not None:
+            leader = value["leader"]
+            added["leader"] = {**leader, "passive": PASSIVE_TEXTS[leader["passive"]]}
         return added
     if isinstance(value, (list, tuple)):
         return [with_rules(item) for item in value]

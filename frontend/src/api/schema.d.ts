@@ -418,15 +418,14 @@ export interface components {
     /**
      * DeckSummary
      * @description A deck the player can choose: its id, to start a match, its name, and
-     *     what its faction's passive does, if it has one.
+     *     its leader, if it has one.
      */
     DeckSummary: {
       /** Id */
       id: string;
       /** Name */
       name: string;
-      /** Passive */
-      passive: string | null;
+      leader: components["schemas"]["Leader"] | null;
     };
     /**
      * Decks
@@ -524,6 +523,19 @@ export interface components {
       /** Card */
       card: string;
       row: components["schemas"]["Row"];
+    };
+    /**
+     * Leader
+     * @description A deck's leader, as ``engine.Leader`` describes it, with what its
+     *     passive does in words, for the player.
+     */
+    Leader: {
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+      /** Passive */
+      passive: string;
     };
     /**
      * Match
@@ -1021,8 +1033,7 @@ export interface components {
       deck_size: number;
       /** Total */
       total: number;
-      /** Passive */
-      passive: string | null;
+      leader: components["schemas"]["Leader"] | null;
     };
     /**
      * SpecialCard

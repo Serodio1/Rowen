@@ -6,8 +6,9 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import type { Action, Card, View } from "./api/client.ts";
+import type { Action, Card, Leader, View } from "./api/client.ts";
 import { CardFace } from "./CardFace.tsx";
+import { artOf } from "./cards.ts";
 import { Icon } from "./icons.tsx";
 import { onFirstClick } from "./clicks.ts";
 import {
@@ -170,10 +171,20 @@ export function Board({
       onKeyDown={onKeyDown}
       className="wood grid grid-cols-1 gap-3 rounded-xl border-2 border-wood-600 p-2 shadow-2xl shadow-black/60 lg:grid-cols-[12rem_minmax(0,1fr)_6rem] lg:gap-x-4 lg:p-3"
     >
-      <div className="grid grid-cols-3 gap-2 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:grid-cols-1 lg:content-center lg:gap-6">
-        <PlayerPanel name="The AI" side={ai} ahead={ai.total > you.total} />
+      <div className="grid grid-cols-3 gap-2 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:grid-cols-1 lg:content-center lg:gap-3">
+        <div className="flex flex-col gap-2">
+          {ai.leader !== null && (
+            <LeaderSlot leader={ai.leader} whose="The AI's" />
+          )}
+          <PlayerPanel name="The AI" side={ai} ahead={ai.total > you.total} />
+        </div>
         <Weather cards={weatherCards} hidden={stage.hidden} />
-        <PlayerPanel name="You" side={you} ahead={you.total > ai.total} />
+        <div className="flex flex-col gap-2">
+          <PlayerPanel name="You" side={you} ahead={you.total > ai.total} />
+          {you.leader !== null && (
+            <LeaderSlot leader={you.leader} whose="Your" />
+          )}
+        </div>
       </div>
       <div className="flex flex-col gap-2 lg:col-start-2 lg:row-start-1">
         {(["siege", "ranged", "melee"] as const).map((row) => (
@@ -339,15 +350,38 @@ function PlayerPanel({
           </>
         )}
       </dl>
-      {side.passive !== null && (
-        <p className="mt-1 text-xs opacity-80">
-          <span className="font-bold">Passive:</span> {side.passive}
-        </p>
-      )}
       {side.passed && (
         <p className="mt-1 font-display text-sm text-gold-300 italic">Passed</p>
       )}
     </div>
+  );
+}
+
+/**
+ * A player's leader, in a slot of their own beside their panel: the leader's
+ * art. Their name and what their passive does show on hover, and screen
+ * readers read them; the list of decks shows them in full.
+ *
+ * @param whose - Whose leader it is, as it starts a sentence: `Your`.
+ */
+function LeaderSlot({ leader, whose }: { leader: Leader; whose: string }) {
+  const art = artOf(leader);
+  const id = useId();
+  return (
+    <figure
+      aria-labelledby={id}
+      className="self-center rounded-md border-2 border-gold-600/70 bg-wood-900/85 p-1 shadow-inner shadow-black/50"
+      title={`${leader.name}: ${leader.passive}`}
+    >
+      {art === undefined ? (
+        <div className="h-20 w-14 rounded bg-wood-700" />
+      ) : (
+        <img src={art} alt="" className="h-20 w-14 rounded object-cover" />
+      )}
+      <figcaption id={id} className="sr-only">
+        {whose} leader, {leader.name}: {leader.passive}
+      </figcaption>
+    </figure>
   );
 }
 

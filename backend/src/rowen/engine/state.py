@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 
 from rowen.engine.cards import Card, Row, SpecialCard, UnitCard
-from rowen.engine.decks import Passive
+from rowen.engine.decks import Leader
 from rowen.engine.rng import Rng
 
 # Lives each player starts the match with (rules, section 2).
@@ -66,7 +66,8 @@ class PlayerState:
         passed: Whether the player has passed this round.
         redraws_left: How many more cards the player can swap before round 1
             (rules, section 3). It is 0 once they are done redrawing.
-        passive: Their faction's passive, if it has one (rules, section 12).
+        leader: Their deck's leader, if it has one, with the passive they
+            bring (rules, section 12).
     """
 
     deck: tuple[Card, ...]
@@ -77,7 +78,7 @@ class PlayerState:
     lives: int = STARTING_LIVES
     passed: bool = False
     redraws_left: int = 0
-    passive: Passive | None = None
+    leader: Leader | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

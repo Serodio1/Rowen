@@ -142,7 +142,7 @@ def make_view() -> PlayerView:
         hand_size=5,
         deck_size=12,
         total=13,
-        passive=None,
+        leader=None,
     )
     you = SideView(
         rows={
@@ -172,7 +172,7 @@ def make_view() -> PlayerView:
         hand_size=2,
         deck_size=14,
         total=15,
-        passive=None,
+        leader=None,
     )
     return PlayerView(
         player=0,
