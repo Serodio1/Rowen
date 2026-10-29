@@ -66,9 +66,6 @@ export type NewMatch = ({ deck: string } | { my_deck: string }) & {
   level: Level;
 };
 
-/** How the player's matches with one deck ended: how many of each. */
-export type DeckStats = MethodResponse<Api, "get", "/stats">["decks"][number];
-
 /**
  * What a deck built from a faction may hold: each card once, with the most
  * copies it may have, and how many units and special cards a deck needs.

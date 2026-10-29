@@ -17,6 +17,7 @@ import {
   saveDeck,
 } from "./api/requests.ts";
 import { CardFace } from "./CardFace.tsx";
+import { Failed } from "./Failed.tsx";
 import { ALERT, BUTTON, PANEL } from "./styles.ts";
 import { cardText } from "./text.ts";
 
@@ -72,20 +73,12 @@ export function MyDecks({ api, onBack }: { api: Api; onBack: () => void }) {
       </h2>
       {decks.isPending && <p className="italic">Loading your decks…</p>}
       {decks.isError && (
-        <>
-          <p role="alert" className={ALERT}>
-            {decks.error.message}
-          </p>
-          <button
-            type="button"
-            className={BUTTON}
-            onClick={() => {
-              void decks.refetch();
-            }}
-          >
-            Try again
-          </button>
-        </>
+        <Failed
+          error={decks.error}
+          onRetry={() => {
+            void decks.refetch();
+          }}
+        />
       )}
       {decks.isSuccess &&
         (decks.data.decks.length === 0 ? (
@@ -359,20 +352,12 @@ function DeckEditor({
       </h2>
       {choices.isPending && <p className="italic">Loading the cards…</p>}
       {choices.isError && (
-        <>
-          <p role="alert" className={ALERT}>
-            {choices.error.message}
-          </p>
-          <button
-            type="button"
-            className={BUTTON}
-            onClick={() => {
-              void choices.refetch();
-            }}
-          >
-            Try again
-          </button>
-        </>
+        <Failed
+          error={choices.error}
+          onRetry={() => {
+            void choices.refetch();
+          }}
+        />
       )}
       {choices.isSuccess && (
         <Columns

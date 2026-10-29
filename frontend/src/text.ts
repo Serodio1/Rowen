@@ -72,17 +72,28 @@ export function resultText(view: View): string {
  * once the player passed: it is named by its id.)
  */
 export function cardNames(view: View): Map<string, string> {
-  const cards: Card[] = [...view.hand];
-  for (const side of view.players) {
-    cards.push(...side.discard, ...side.weather);
-    for (const row of [side.rows.melee, side.rows.ranged, side.rows.siege]) {
-      cards.push(...row.units.map((unit) => unit.card), ...row.scarecrows);
-      if (row.horn !== null) {
-        cards.push(row.horn);
+  return new Map([...cardsById([view])].map(([id, card]) => [id, card.name]));
+}
+
+/** Return every card the views show, by id. */
+export function cardsById(views: readonly View[]): Map<string, Card> {
+  const cards = new Map<string, Card>();
+  for (const view of views) {
+    const all: Card[] = [...view.hand];
+    for (const side of view.players) {
+      all.push(...side.discard, ...side.weather);
+      for (const row of [side.rows.melee, side.rows.ranged, side.rows.siege]) {
+        all.push(...row.units.map((unit) => unit.card), ...row.scarecrows);
+        if (row.horn !== null) {
+          all.push(row.horn);
+        }
       }
     }
+    for (const card of all) {
+      cards.set(card.id, card);
+    }
   }
-  return new Map(cards.map((card) => [card.id, card.name]));
+  return cards;
 }
 
 /**

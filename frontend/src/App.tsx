@@ -30,10 +30,10 @@ import {
   type RequestError,
 } from "./api/requests.ts";
 import { Board } from "./Board.tsx";
+import { Failed } from "./Failed.tsx";
 import { CardFace } from "./CardFace.tsx";
 import { Banner, CardPreview, Showcase } from "./Showcase.tsx";
 import {
-  cardsById,
   mayMove,
   NO_STEPS,
   stageOf,
@@ -57,6 +57,7 @@ import {
 import {
   actionText,
   cardNames,
+  cardsById,
   cardText,
   eventText,
   happened,
@@ -348,20 +349,12 @@ function ChooseDeck({
       <LevelChoice level={level} onLevel={onLevel} disabled={start.isPending} />
       {decks.isPending && <p className="italic">Loading the decks…</p>}
       {decks.isError && (
-        <>
-          <p role="alert" className={ALERT}>
-            {decks.error.message}
-          </p>
-          <button
-            type="button"
-            className={BUTTON}
-            onClick={() => {
-              void decks.refetch();
-            }}
-          >
-            Try again
-          </button>
-        </>
+        <Failed
+          error={decks.error}
+          onRetry={() => {
+            void decks.refetch();
+          }}
+        />
       )}
       {decks.isSuccess && (
         <div className="flex flex-wrap justify-center gap-3">
@@ -486,20 +479,12 @@ function YourDecks({
       </h3>
       {decks.isPending && <p className="italic">Loading your decks…</p>}
       {decks.isError && (
-        <>
-          <p role="alert" className={ALERT}>
-            {decks.error.message}
-          </p>
-          <button
-            type="button"
-            className={BUTTON}
-            onClick={() => {
-              void decks.refetch();
-            }}
-          >
-            Try again
-          </button>
-        </>
+        <Failed
+          error={decks.error}
+          onRetry={() => {
+            void decks.refetch();
+          }}
+        />
       )}
       {decks.isSuccess &&
         (decks.data.decks.length === 0 ? (
