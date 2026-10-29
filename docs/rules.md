@@ -192,21 +192,21 @@ except:
 - a **Bond** or **Muster** unit: as many as the faction's own deck has, if that
   is more (5 Humans, 4 Planes), so the whole group can be in the deck.
 
-Each faction has a **passive**: a rule of its own that works by itself, with no
-action, at the end of each round that doesn't end the match. A built deck has
-its faction's passive.
+Each faction has a **leader**, who brings a **passive**: a rule of its own that
+works by itself, with no action, at the end of each round that doesn't end the
+match. A built deck has its faction's leader. (Later, a faction may have more
+leaders, each with a passive of their own.)
 
-- **Humans:** after winning a round, they draw a card from their deck. A tie is
-  not a win, and with an empty deck there is nothing to draw.
-- **Robots:** after each round, a tie included, one of their units chosen at
-  random stays in its row for the next round, at its base strength. It is
-  never a Legend, nor a Spy, which the opponent played on their side. The
-  other cards go to the discard pile as usual (section 9).
+- **Humans**, led by **The Commander:** after winning a round, they draw a card
+  from their deck. A tie is not a win, and with an empty deck there is nothing
+  to draw.
+- **Robots**, led by **The Overseer:** after each round, a tie included, one of
+  their units chosen at random stays in its row for the next round, at its base
+  strength. It is never a Legend, nor a Spy, which the opponent played on their
+  side. The other cards go to the discard pile as usual (section 9).
 
 ## 13. Later (not in the MVP)
 
-- **Leaders:** one per deck, with an ability usable once per match (it takes a
-  turn).
 - **More faction passives**, for example:
   - win rounds that end in a tie;
   - choose who plays first in round 1;
@@ -229,3 +229,4 @@ its faction's passive.
 | D7 | Does Muster also play the cards of its group from the hand? | Yes: from the deck and the hand, so one card plays the whole group (section 7.2) |
 | D8 | What does Wildfire destroy when the strongest unit is a Legend? | The strongest units that aren't Legends: Legends are left out of the count (section 8) |
 | D9 | Which passive does each faction have? | Humans draw a card after winning a round; Robots keep one random unit, not a Legend or a Spy, after each round (section 12) |
+| D10 | What does a leader do? | Brings the faction's passive; no ability to use during the match. One leader per faction for now (section 12) |

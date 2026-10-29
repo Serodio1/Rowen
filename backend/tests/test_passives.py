@@ -1,4 +1,4 @@
-"""Tests for the factions' passives (rules, section 12)."""
+"""Tests for the leaders and the passives they bring (rules, section 12)."""
 
 from collections import Counter
 from dataclasses import replace
@@ -9,7 +9,7 @@ from cards import KNIGHT, SCOUT, SNIPER
 from rowen.data import load_deck, load_specials
 from rowen.engine.actions import Pass
 from rowen.engine.cards import Ability, Card, Row, UnitCard
-from rowen.engine.decks import Passive, build_deck
+from rowen.engine.decks import Leader, Passive, build_deck
 from rowen.engine.events import CardsDrawn, Event, MatchEnded, RoundEnded, UnitKept
 from rowen.engine.game import apply, start_match
 from rowen.engine.parsing import parse_deck
@@ -36,7 +36,8 @@ def player(
     deck: tuple[Card, ...] = (),
     lives: int = 2,
 ) -> PlayerState:
-    """Return a player with these units on the board, each in its first row.
+    """Return a player with these units on the board, each in its first row,
+    and a leader with the passive, if one is given.
 
     They hold a Knight, so they don't pass by themselves when the next round
     starts.
@@ -46,7 +47,11 @@ def player(
         for row in Row
     }
     return PlayerState(
-        deck=deck, hand=(KNIGHT,), rows=rows, lives=lives, passive=passive
+        deck=deck,
+        hand=(KNIGHT,),
+        rows=rows,
+        lives=lives,
+        leader=None if passive is None else Leader(id="l", name="L", passive=passive),
     )
 
 
@@ -77,19 +82,22 @@ def cards_of(player: PlayerState) -> Counter[str]:
     )
 
 
-# Every faction has a passive, and every passive a text
+# Every faction has a leader, and every passive a text
+
+HUMANS_LEADER = Leader(id="humans-leader", name="The Commander", passive=DRAW)
+ROBOTS_LEADER = Leader(id="robots-leader", name="The Overseer", passive=KEEP)
 
 
-def test_each_faction_has_its_passive() -> None:
-    assert load_deck("humans").passive is DRAW
-    assert load_deck("robots").passive is KEEP
+def test_each_faction_has_its_leader() -> None:
+    assert load_deck("humans").leader == HUMANS_LEADER
+    assert load_deck("robots").leader == ROBOTS_LEADER
 
 
 def test_every_passive_has_a_text() -> None:
     assert set(PASSIVE_TEXTS) == set(Passive)
 
 
-# A deck's data, as in its JSON file, without a passive.
+# A deck's data, as in its JSON file, without a leader.
 SCOUTS = {
     "id": "scouts",
     "name": "Scouts",
@@ -100,16 +108,23 @@ SCOUTS = {
 }
 
 
-def test_a_deck_without_a_passive_has_none() -> None:
-    assert parse_deck(SCOUTS, load_specials()).passive is None
+def test_a_deck_without_a_leader_has_none() -> None:
+    assert parse_deck(SCOUTS, load_specials()).leader is None
 
 
-def test_an_unknown_passive_is_an_error() -> None:
-    with pytest.raises(ValueError, match="fly"):
-        parse_deck({**SCOUTS, "passive": "fly"}, load_specials())
+@pytest.mark.parametrize(
+    ("leader", "error"),
+    [
+        pytest.param({"id": "x", "name": "X", "passive": "fly"}, "fly", id="passive"),
+        pytest.param({"id": "x", "name": "X"}, "missing fields: passive", id="field"),
+    ],
+)
+def test_a_leader_with_bad_data_is_an_error(leader: object, error: str) -> None:
+    with pytest.raises(ValueError, match=f"leader: .*{error}"):
+        parse_deck({**SCOUTS, "leader": leader}, load_specials())
 
 
-def test_a_built_deck_has_its_factions_passive() -> None:
+def test_a_built_deck_has_its_factions_leader() -> None:
     robots = load_deck("robots")
     copies = Counter(card.id for card in robots.cards)
     deck = build_deck(
@@ -119,15 +134,15 @@ def test_a_built_deck_has_its_factions_passive() -> None:
         specials=load_specials(),
         copies=copies,
     )
-    assert deck.passive is KEEP
+    assert deck.leader == ROBOTS_LEADER
 
 
-def test_each_player_starts_with_their_decks_passive() -> None:
+def test_each_player_starts_with_their_decks_leader() -> None:
     state = start_match((load_deck("humans"), load_deck("robots")), seed=1)
 
-    assert [player.passive for player in state.players] == [DRAW, KEEP]
-    view = player_view(state, 0)
-    assert [side.passive for side in view.players] == [DRAW, KEEP]
+    leaders = [HUMANS_LEADER, ROBOTS_LEADER]
+    assert [player.leader for player in state.players] == leaders
+    assert [side.leader for side in player_view(state, 0).players] == leaders
 
 
 # Humans: draw a card after winning a round
@@ -253,7 +268,7 @@ def test_the_unit_kept_counts_in_the_next_round() -> None:
     assert player_view(state, 0).players[0].total == 6
 
 
-def test_a_player_without_a_passive_keeps_nothing_and_draws_nothing() -> None:
+def test_a_player_without_a_leader_keeps_nothing_and_draws_nothing() -> None:
     state, events = end_round(player(SNIPER, deck=(SCOUT,)), player(KNIGHT))
 
     assert state.players[0].hand == (KNIGHT,)

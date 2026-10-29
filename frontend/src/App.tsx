@@ -32,7 +32,7 @@ import {
 } from "./api/requests.ts";
 import { Board } from "./Board.tsx";
 import { Failed } from "./Failed.tsx";
-import { CardFace } from "./CardFace.tsx";
+import { CardFace, LeaderFace } from "./CardFace.tsx";
 import { Banner, CardPreview, Showcase } from "./Showcase.tsx";
 import {
   mayMove,
@@ -381,18 +381,17 @@ function ChooseDeck({
                 disabled={start.isPending || waiting}
                 onClick={startWith({ deck: deck.id, level })}
                 aria-describedby={
-                  deck.passive === null ? undefined : `passive-${deck.id}`
+                  deck.leader === null ? undefined : `leader-${deck.id}`
                 }
               >
                 {deck.name}
               </button>
-              {deck.passive !== null && (
-                <p
-                  id={`passive-${deck.id}`}
-                  className="text-center text-sm opacity-80"
-                >
-                  {deck.passive}
-                </p>
+              {deck.leader !== null && (
+                <LeaderFace
+                  leader={deck.leader}
+                  id={`leader-${deck.id}`}
+                  large
+                />
               )}
             </div>
           ))}

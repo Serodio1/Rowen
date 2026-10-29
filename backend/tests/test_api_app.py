@@ -167,15 +167,23 @@ def test_the_decks_are_the_ones_in_the_data_files(client: TestClient) -> None:
             {
                 "id": "humans",
                 "name": "Humans",
-                "passive": "Draws a card after winning a round.",
+                "leader": {
+                    "id": "humans-leader",
+                    "name": "The Commander",
+                    "passive": "Draws a card after winning a round.",
+                },
             },
             {
                 "id": "robots",
                 "name": "Robots",
-                "passive": (
-                    "After each round, one random unit stays on the board, but "
-                    "not a Legend or a Spy."
-                ),
+                "leader": {
+                    "id": "robots-leader",
+                    "name": "The Overseer",
+                    "passive": (
+                        "After each round, one random unit stays on the board, "
+                        "but not a Legend or a Spy."
+                    ),
+                },
             },
         ]
     }

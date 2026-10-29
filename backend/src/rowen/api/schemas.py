@@ -397,6 +397,16 @@ class RowsView(Schema):
     siege: RowView
 
 
+class Leader(Schema):
+    """A deck's leader, as ``engine.Leader`` describes it, with what its
+    passive does in words, for the player.
+    """
+
+    id: str
+    name: str
+    passive: str
+
+
 class SideView(Schema):
     """What both players see of one player, as ``engine.SideView`` describes it."""
 
@@ -409,8 +419,7 @@ class SideView(Schema):
     hand_size: int
     deck_size: int
     total: int
-    # What their faction's passive does, if it has one.
-    passive: str | None
+    leader: Leader | None
 
 
 class PlayerView(Schema):
@@ -429,12 +438,12 @@ class PlayerView(Schema):
 
 class DeckSummary(Schema):
     """A deck the player can choose: its id, to start a match, its name, and
-    what its faction's passive does, if it has one.
+    its leader, if it has one.
     """
 
     id: str
     name: str
-    passive: str | None
+    leader: Leader | None
 
 
 class Decks(Schema):
@@ -756,13 +765,17 @@ def _side(side: engine.SideView) -> SideView:
         hand_size=side.hand_size,
         deck_size=side.deck_size,
         total=side.total,
-        passive=passive_text(side.passive),
+        leader=from_leader(side.leader),
     )
 
 
-def passive_text(passive: engine.Passive | None) -> str | None:
-    """Return what a faction's passive does, as the API sends it."""
-    return None if passive is None else engine.PASSIVE_TEXTS[passive]
+def from_leader(leader: engine.Leader | None) -> Leader | None:
+    """Return a deck's leader, as the API sends it."""
+    if leader is None:
+        return None
+    return Leader(
+        id=leader.id, name=leader.name, passive=engine.PASSIVE_TEXTS[leader.passive]
+    )
 
 
 def _row(row: engine.RowView) -> RowView:

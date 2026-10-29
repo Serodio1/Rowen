@@ -6,13 +6,14 @@ and the name are drawn by the page, from the card's data
 
 ## Where it comes from
 
-Rui Vasconcelos generated the 25 pictures with AI tools on 21 October 2026,
-from prompts written for Rowen:
+Rui Vasconcelos generated the 25 pictures of the cards with AI tools on
+21 October 2026, and the 2 of the leaders on 29 October 2026, from prompts
+written for Rowen:
 
 | Tool | Cards |
 | --- | --- |
 | [Grok](https://grok.com/), by xAI | Human, Soldier, Sniper, Informant, Medic, Smart Guy, Plane |
-| [Gemini](https://gemini.google.com/), by Google | all the others: the rest of the Humans, the Robots and the special cards |
+| [Gemini](https://gemini.google.com/), by Google | all the others: the rest of the Humans, the Robots and the special cards, and both leaders (The Commander, The Overseer) |
 
 Every prompt asked for an original design, with no text, frame or logo, and
 named no game. No picture, icon or font comes from The Witcher 3 or from
@@ -47,10 +48,11 @@ game.
 
 ## Adding or changing art
 
-1. Make a picture for the card, upright (2:3, or close: it is cut around its
+1. Make a picture for the card or leader, upright (2:3, or close: it is cut around its
    middle), with nothing important in the top corners or the bottom fifth.
-2. Name it by the card's id, as in the deck files in `backend/src/rowen/data`
-   (`computer-spy.png`), and put it in a folder with the others.
+2. Name it by the card's or leader's id, as in the deck files in
+   `backend/src/rowen/data` (`computer-spy.png`, `humans-leader.png`), and put
+   it in a folder with the others.
 3. From the repository's folder, run:
 
    ```sh

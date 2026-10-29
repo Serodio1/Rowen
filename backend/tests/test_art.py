@@ -1,4 +1,5 @@
-"""Tests that every card has its art in the frontend, and only cards do.
+"""Tests that every card and leader has its art in the frontend, and only
+they do.
 
 The page shows a card's art from ``frontend/src/art/<id>.webp`` (made by
 ``scripts/convert_art.py``), and a placeholder when there is none. The card
@@ -13,8 +14,12 @@ ART = Path(__file__).resolve().parents[2] / "frontend" / "src" / "art"
 
 
 def card_ids() -> set[str]:
-    """Return the id of every card in every deck, special cards included."""
-    return {card.id for deck_id in deck_ids() for card in load_deck(deck_id).cards}
+    """Return the id of every card in every deck, special cards included, and
+    of every deck's leader.
+    """
+    decks = [load_deck(deck_id) for deck_id in deck_ids()]
+    cards = {card.id for deck in decks for card in deck.cards}
+    return cards | {deck.leader.id for deck in decks if deck.leader is not None}
 
 
 def test_every_card_has_its_art() -> None:

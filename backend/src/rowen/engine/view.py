@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 from rowen.engine.actions import Action
 from rowen.engine.cards import Card, Row, SpecialCard, UnitCard
-from rowen.engine.decks import Passive
+from rowen.engine.decks import Leader
 from rowen.engine.events import (
     CardRedrawn,
     CardsDrawn,
@@ -94,8 +94,8 @@ class SideView:
         deck_size: How many cards are left in their deck. Nobody sees the
             order, not even them.
         total: Their total: the sum of their rows' scores.
-        passive: Their faction's passive, if it has one: anyone can look it
-            up, as their faction is in plain sight.
+        leader: Their deck's leader, if it has one: anyone can look it up,
+            as their faction is in plain sight.
     """
 
     rows: Mapping[Row, RowView]
@@ -107,7 +107,7 @@ class SideView:
     hand_size: int
     deck_size: int
     total: int
-    passive: Passive | None
+    leader: Leader | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -258,7 +258,7 @@ def _side_view(player: PlayerState, weather: frozenset[Row]) -> SideView:
         hand_size=len(player.hand),
         deck_size=len(player.deck),
         total=sum(row.score for row in rows.values()),
-        passive=player.passive,
+        leader=player.leader,
     )
 
 

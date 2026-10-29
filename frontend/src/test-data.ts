@@ -8,13 +8,21 @@ export const DECKS: Deck[] = [
   {
     id: "humans",
     name: "Humans",
-    passive: "Draws a card after winning a round.",
+    leader: {
+      id: "humans-leader",
+      name: "The Commander",
+      passive: "Draws a card after winning a round.",
+    },
   },
   {
     id: "robots",
     name: "Robots",
-    passive:
-      "After each round, one random unit stays on the board, but not a Legend or a Spy.",
+    leader: {
+      id: "robots-leader",
+      name: "The Overseer",
+      passive:
+        "After each round, one random unit stays on the board, but not a Legend or a Spy.",
+    },
   },
 ];
 
@@ -81,7 +89,7 @@ export function side(changes: Partial<Side> = {}): Side {
     hand_size: 10,
     deck_size: 12,
     total: 0,
-    passive: null,
+    leader: null,
     ...changes,
   };
 }

@@ -1,7 +1,11 @@
 {
   "id": "humans",
   "name": "Humans",
-  "passive": "draw_on_round_win",
+  "leader": {
+    "id": "humans-leader",
+    "name": "The Commander",
+    "passive": "draw_on_round_win"
+  },
   "units": [
     {
       "id": "human",

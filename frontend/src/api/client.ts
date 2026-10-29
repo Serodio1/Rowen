@@ -35,6 +35,9 @@ export type View = Match["view"];
 /** A card, such as one in the player's hand. */
 export type Card = View["hand"][number];
 
+/** A deck's leader: their id, their name and what their passive does. */
+export type Leader = NonNullable<Deck["leader"]>;
+
 /** One of the moves the player can make, as the view lists them. */
 export type Action = View["legal_actions"][number];
 

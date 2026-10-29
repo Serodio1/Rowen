@@ -141,7 +141,7 @@ def _imagine_player(view: PlayerView, index: int) -> PlayerState:
         lives=side.lives,
         passed=side.passed,
         redraws_left=side.redraws_left,
-        passive=side.passive,
+        leader=side.leader,
     )
 
 

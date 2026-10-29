@@ -151,10 +151,12 @@ test("the player can choose any of the API's decks", async () => {
     await screen.findByRole("button", { name: "Humans" }),
   ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Robots" })).toBeInTheDocument();
-  // Each deck says what its faction's passive does.
+  // Each deck says who leads it and what their passive does.
   expect(
     screen.getByRole("button", { name: "Humans" }),
-  ).toHaveAccessibleDescription("Draws a card after winning a round.");
+  ).toHaveAccessibleDescription(
+    "The Commander: Draws a card after winning a round.",
+  );
   expect(screen.queryByText("Loading the decks…")).not.toBeInTheDocument();
   // Once, even though StrictMode shows the page twice, as in development.
   expect(sent(requests, "GET /api/decks")).toHaveLength(1);
