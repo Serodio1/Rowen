@@ -102,6 +102,43 @@ test("a player with no deck is told so", async () => {
   expect(await screen.findByText("No deck built yet.")).toBeInTheDocument();
 });
 
+test("the player's decks that didn't come to their list can be asked for again", async () => {
+  const answers: Record<string, Answer> = { ...RUI };
+  showApp(answers);
+  await openDecks();
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Could not reach the server.",
+  );
+
+  answers["GET /api/my-decks"] = decks([MINE]);
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+  expect(
+    await screen.findByRole("list", { name: "Your decks" }),
+  ).toHaveTextContent("Mine");
+});
+
+test("the cards that didn't come to the editor can be asked for again", async () => {
+  const answers: Record<string, Answer> = {
+    "GET /api/decks": { status: 200, body: { decks: DECKS } },
+    "GET /api/session": { status: 200, body: { username: "rui" } },
+    "GET /api/my-decks": decks([]),
+  };
+  showApp(answers);
+  await openDecks();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "New Humans deck" }),
+  );
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Could not reach the server.",
+  );
+
+  answers["GET /api/decks/humans/choices"] = { status: 200, body: CHOICES };
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+  expect(await screen.findByRole("list", { name: "Cards" })).toBeVisible();
+});
+
 test("a deck is built by adding cards from one column to the other", async () => {
   const answers: Record<string, Answer> = {
     ...RUI,
