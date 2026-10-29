@@ -478,43 +478,56 @@ function BoardRow({
         className="relative flex min-w-0 flex-1 justify-center-safe gap-1 overflow-x-auto"
       >
         {placed(
-          row.units.map((unit, index) => {
-            const face = (
-              <CardFace
-                card={unit.card}
-                strength={unit.strength}
-                name={unitText(unit)}
-              />
-            );
-            const play = targets?.unit(unit.card.id);
-            const cell = cellOf.unit(side, kind, index);
-            return (
-              // Copies of a unit share its id, so the place in the row is the key.
-              <li
-                key={`unit-${String(index)}`}
-                data-cell={cell}
-                className={`${held(stage, cell)} ${
-                  targets?.taking === true && play === undefined
-                    ? "opacity-45"
-                    : ""
-                }`}
-              >
-                {targets === undefined || play === undefined ? (
-                  face
-                ) : (
-                  <TargetButton targets={targets} play={play}>
-                    {face}
-                    <span
-                      aria-hidden
-                      className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 bg-black/80 text-center font-display text-[0.65rem] text-gold-200"
-                    >
-                      Take back
-                    </span>
-                  </TargetButton>
-                )}
-              </li>
-            );
-          }),
+          withScarecrows(
+            row.units.map((unit, index) => {
+              const face = (
+                <CardFace
+                  card={unit.card}
+                  strength={unit.strength}
+                  name={unitText(unit)}
+                />
+              );
+              const play = targets?.unit(unit.card.id);
+              const cell = cellOf.unit(side, kind, index);
+              return (
+                // Copies of a unit share its id, so the place in the row is the key.
+                <li
+                  key={`unit-${String(index)}`}
+                  data-cell={cell}
+                  className={`${held(stage, cell)} ${
+                    targets?.taking === true && play === undefined
+                      ? "opacity-45"
+                      : ""
+                  }`}
+                >
+                  {targets === undefined || play === undefined ? (
+                    face
+                  ) : (
+                    <TargetButton targets={targets} play={play}>
+                      {face}
+                      <span
+                        aria-hidden
+                        className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 bg-black/80 text-center font-display text-[0.65rem] text-gold-200"
+                      >
+                        Take back
+                      </span>
+                    </TargetButton>
+                  )}
+                </li>
+              );
+            }),
+            row.scarecrows.map((card, index) => ({
+              place: row.scarecrow_places[index],
+              element: (
+                <li key={`scarecrow-${String(index)}`}>
+                  <CardFace card={card} name={cardText(card)} />
+                </li>
+              ),
+            })),
+          ),
+          // shortcut: a ghost's place counts only units, so in a row with a
+          // Scarecrow it can show one card off while it burns; count the
+          // Scarecrows in stage.ts's places if that is ever seen.
           // Units destroyed, until they have burned, where they were: only a
           // picture, as the log says what happened.
           (stage.ghosts.get(cellOf.row(side, kind)) ?? []).map(
@@ -537,11 +550,6 @@ function BoardRow({
             }),
           ),
         )}
-        {row.scarecrows.map((card, index) => (
-          <li key={`scarecrow-${String(index)}`}>
-            <CardFace card={card} name={cardText(card)} />
-          </li>
-        ))}
       </ul>
       {targets?.row !== undefined && (
         // Over the whole row, under the weather's name.
@@ -571,6 +579,22 @@ function BoardRow({
       )}
     </div>
   );
+}
+
+/**
+ * Return the units of a row with its Scarecrows in their places: each comes
+ * after as many units as its place says, and they keep their order.
+ */
+function withScarecrows(
+  units: readonly ReactElement[],
+  scarecrows: readonly { place: number | undefined; element: ReactElement }[],
+): ReactElement[] {
+  const all = [...units];
+  // From the last, so that each place counts only the units before it.
+  for (const scarecrow of [...scarecrows].reverse()) {
+    all.splice(scarecrow.place ?? all.length, 0, scarecrow.element);
+  }
+  return all;
 }
 
 /**
