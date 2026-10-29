@@ -128,6 +128,7 @@ def _imagine_player(view: PlayerView, index: int) -> PlayerState:
             units=tuple(unit.card for unit in row_view.units),
             horn=row_view.horn,
             scarecrows=row_view.scarecrows,
+            scarecrow_places=row_view.scarecrow_places,
         )
         for row, row_view in side.rows.items()
     }

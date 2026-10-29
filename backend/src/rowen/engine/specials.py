@@ -95,11 +95,24 @@ def play_scarecrow(
 
     The unit goes to the end of the player's hand, even an opponent's Spy, so
     it can be played again. The Scarecrow stays in the row, with no strength,
-    until the end of the round.
+    until the end of the round, in the unit's place: after the Scarecrows that
+    were before the unit, before those that were after it.
     """
+    place = state.players[player].rows[row].units.index(unit)
+    before = sum(
+        1
+        for other in state.players[player].rows[row].scarecrow_places
+        if other <= place
+    )
     state = without_unit(state, player, row, unit)
     owner = state.players[player]
-    row_state = replace(owner.rows[row], scarecrows=(*owner.rows[row].scarecrows, card))
+    scarecrows = owner.rows[row].scarecrows
+    places = owner.rows[row].scarecrow_places
+    row_state = replace(
+        owner.rows[row],
+        scarecrows=(*scarecrows[:before], card, *scarecrows[before:]),
+        scarecrow_places=(*places[:before], place, *places[before:]),
+    )
     owner = replace(
         owner, rows={**owner.rows, row: row_state}, hand=(*owner.hand, unit)
     )

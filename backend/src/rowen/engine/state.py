@@ -25,14 +25,17 @@ class RowState:
     Attributes:
         units: The units in the row, in the order they were played.
         horn: The War Horn in the row's horn slot, if there is one.
-        scarecrows: The Scarecrows played in the row this round. Each one
-            took a unit's place, but isn't a unit: it has no strength, so
-            scoring, Wildfire and Medic leave it alone.
+        scarecrows: The Scarecrows played in the row this round, in their
+            order in the row. Each one took a unit's place, but isn't a unit:
+            it has no strength, so scoring, Wildfire and Medic leave it alone.
+        scarecrow_places: Where each Scarecrow is among the units: how many
+            units come before it, one number for each of ``scarecrows``.
     """
 
     units: tuple[UnitCard, ...] = ()
     horn: SpecialCard | None = None
     scarecrows: tuple[SpecialCard, ...] = ()
+    scarecrow_places: tuple[int, ...] = ()
 
 
 def empty_rows() -> Mapping[Row, RowState]:
@@ -118,11 +121,19 @@ def with_unit(state: GameState, side: int, row: Row, unit: UnitCard) -> GameStat
 def without_unit(state: GameState, side: int, row: Row, unit: UnitCard) -> GameState:
     """Return the state with one copy of the unit taken out of a row on one side.
 
-    The other units in the row keep their order.
+    The other units in the row keep their order, and the Scarecrows their
+    places among them.
     """
     player = state.players[side]
     units = player.rows[row].units
     index = units.index(unit)
     units = units[:index] + units[index + 1 :]
-    rows = {**player.rows, row: replace(player.rows[row], units=units)}
+    places = tuple(
+        place - 1 if place > index else place
+        for place in player.rows[row].scarecrow_places
+    )
+    rows = {
+        **player.rows,
+        row: replace(player.rows[row], units=units, scarecrow_places=places),
+    }
     return with_player(state, side, replace(player, rows=rows))

@@ -864,7 +864,10 @@ test("a card that left the view is still named, as the page saw it before", asyn
   });
   const after = view({
     ...ROUND_1,
-    players: [side(), aiRows({ ...ranged, scarecrows: [scarecrow] })],
+    players: [
+      side(),
+      aiRows({ ...ranged, scarecrows: [scarecrow], scarecrow_places: [0] }),
+    ],
   });
   const { api } = fakeApi({
     ...THE_DECKS,

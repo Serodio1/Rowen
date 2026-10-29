@@ -957,6 +957,8 @@ export interface components {
       horn: components["schemas"]["SpecialCard"] | null;
       /** Scarecrows */
       scarecrows: components["schemas"]["SpecialCard"][];
+      /** Scarecrow Places */
+      scarecrow_places: number[];
       /** Weathered */
       weathered: boolean;
       /** Score */

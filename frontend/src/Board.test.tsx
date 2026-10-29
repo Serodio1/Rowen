@@ -47,6 +47,7 @@ function row(changes: Partial<Row> = {}): Row {
     units: [],
     horn: null,
     scarecrows: [],
+    scarecrow_places: [],
     weathered: false,
     score: 0,
     ...changes,
@@ -68,7 +69,11 @@ const YOURS = side({
       horn: WAR_HORN,
       score: 12,
     }),
-    siege: row({ scarecrows: [SCARECROW], weathered: true }),
+    siege: row({
+      scarecrows: [SCARECROW],
+      scarecrow_places: [0],
+      weathered: true,
+    }),
   },
   weather: [HOARFROST],
   lives: 2,
@@ -112,6 +117,7 @@ const AI_AHEAD = view({
           ],
           horn: WAR_HORN,
           scarecrows: [SCARECROW],
+          scarecrow_places: [2],
           weathered: true,
           score: 4,
         }),
@@ -185,6 +191,33 @@ test("a row shows its units with their strength now, its War Horn and its Scarec
   expect(
     cards(screen.getByRole("group", { name: /^The AI's siege row/ })),
   ).toEqual(["Captain (10 siege, legend)"]);
+});
+
+test("a Scarecrow is shown in the place of the unit it took back", () => {
+  const melee = row({
+    units: [
+      { card: SOLDIER, strength: 4 },
+      { card: SNIPER, strength: 6 },
+    ],
+    scarecrows: [SCARECROW],
+    scarecrow_places: [1],
+    score: 10,
+  });
+  render(
+    <Board
+      view={view({
+        players: [side({ rows: { ...side().rows, melee } }), side()],
+      })}
+    />,
+  );
+
+  expect(cards(screen.getByRole("group", { name: /^Your melee row/ }))).toEqual(
+    [
+      "Soldier (4 melee/ranged, agile)",
+      "Scarecrow (special)",
+      "Sniper (6 ranged)",
+    ],
+  );
 });
 
 test("each player's panel shows their total, lives and cards in hand, and whether they passed", () => {

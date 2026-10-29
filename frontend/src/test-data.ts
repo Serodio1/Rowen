@@ -58,6 +58,7 @@ export function side(changes: Partial<Side> = {}): Side {
     units: [],
     horn: null,
     scarecrows: [],
+    scarecrow_places: [],
     weathered: false,
     score: 0,
   };
