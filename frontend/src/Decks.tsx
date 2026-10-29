@@ -324,7 +324,6 @@ function DeckEditor({
       }),
     onSuccess: () => {
       forgetDecks(queryClient);
-      onDone();
     },
     onError: (error) => {
       // Decks built or deleted in another tab: the list is out of date.
@@ -403,7 +402,9 @@ function DeckEditor({
                 ) {
                   return;
                 }
-                save.mutate();
+                // Given here, and not to useMutation, so it isn't called once
+                // the player has left this editor, maybe for another deck.
+                save.mutate(undefined, { onSuccess: onDone });
               }}
             >
               <label htmlFor={nameId} className="flex flex-col text-sm">

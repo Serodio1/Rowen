@@ -336,6 +336,50 @@ test("a deck the API turns down says why, and stays to be changed", async () => 
   expect(screen.getByRole("heading", { name: "Change Mine" })).toBeVisible();
 });
 
+test("a deck saved after the player left its editor doesn't close the next one", async () => {
+  let answer: (response: Response) => void = () => {};
+  const other = { ...MINE, id: "d2", name: "Other" };
+  renderApp({
+    ...RUI,
+    "GET /api/my-decks": decks([MINE, other]),
+    "PUT /api/my-decks/d1": new Promise<Response>((resolve) => {
+      answer = resolve;
+    }),
+  });
+  await openDecks();
+  fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
+  await screen.findByRole("list", { name: "Cards" });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Change Other" }));
+  await screen.findByRole("list", { name: "Cards" });
+
+  await act(async () => {
+    answer(Response.json(MINE));
+    await Promise.resolve();
+  });
+
+  expect(screen.getByRole("heading", { name: "Change Other" })).toBeVisible();
+});
+
+test("the decks can't start a match before the page knows who is logged in", async () => {
+  let answer: (response: Response) => void = () => {};
+  renderApp({
+    ...RUI,
+    "GET /api/session": new Promise<Response>((resolve) => {
+      answer = resolve;
+    }),
+  });
+  const deck = await screen.findByRole("button", { name: "Humans" });
+  expect(deck).toBeDisabled();
+
+  answer(Response.json({ username: null }));
+
+  await waitFor(() => {
+    expect(deck).toBeEnabled();
+  });
+});
+
 test("a deck is saved once, however fast Save is pressed", async () => {
   const sent = renderApp({
     ...RUI,

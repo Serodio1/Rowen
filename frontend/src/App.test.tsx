@@ -1653,11 +1653,11 @@ test("clicking a discard pile lists its cards beside the board, the most recent 
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
   await screen.findByText("Choose a card to play, or pass.");
 
-  fireEvent.click(
-    within(
-      screen.getByRole("group", { name: "Your deck and discard pile" }),
-    ).getByRole("button", { name: "Look through the discard pile: 2 cards" }),
-  );
+  const open = within(
+    screen.getByRole("group", { name: "Your deck and discard pile" }),
+  ).getByRole("button", { name: "Look through the discard pile: 2 cards" });
+  open.focus();
+  fireEvent.click(open);
 
   const pile = screen.getByRole("region", { name: "Your discard pile" });
   expect(
@@ -1675,6 +1675,8 @@ test("clicking a discard pile lists its cards beside the board, the most recent 
   expect(
     screen.queryByRole("region", { name: "Your discard pile" }),
   ).not.toBeInTheDocument();
+  // Back on the pile, where the keyboard was.
+  expect(open).toHaveFocus();
 
   // The AI's, and Escape puts it away.
   fireEvent.click(
