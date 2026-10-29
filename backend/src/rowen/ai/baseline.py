@@ -275,7 +275,9 @@ def score(state: GameState, player: int) -> int:
     cards in the hand, worth ``CARD_VALUE`` each, and lives, worth
     ``LIFE_VALUE`` each. Once the match is over, who won counts above all,
     and the cards only break ties: of two ways to win the match, the AI
-    takes the one that spends fewer cards.
+    takes the one that spends fewer cards. Of two ways to lose it, it takes
+    the one that spends more: it plays on instead of giving up, as the
+    opponent may still go wrong.
     """
     mine, theirs = state.players[player], state.players[1 - player]
     cards = CARD_VALUE * (len(mine.hand) - len(theirs.hand))
@@ -283,7 +285,7 @@ def score(state: GameState, player: int) -> int:
         winner = match_winner(state)
         if winner is None:
             return cards
-        return (WIN if winner == player else -WIN) + cards
+        return WIN + cards if winner == player else -WIN - cards
 
     lives = LIFE_VALUE * (mine.lives - theirs.lives)
     return _lead(state, player) + cards + lives
