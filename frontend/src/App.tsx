@@ -20,6 +20,7 @@ import type {
 } from "./api/client.ts";
 import {
   decksQuery,
+  dropAccountData,
   forgetDecks,
   forgetMatches,
   matchQuery,
@@ -123,14 +124,22 @@ export function App({ api }: { api: Api }) {
     if (before === undefined || username === undefined || before === username) {
       return;
     }
-    forgetMatches(queryClient);
-    forgetDecks(queryClient);
-    setLoggedOut(before !== null && owner === before);
-    if (before !== null) {
-      setMatch((match) => (match?.owner === before ? null : match));
-      setShowing(null);
-      setLeft(true);
+    if (before === null) {
+      // A guest logged in: nothing of the account's is kept yet, and the
+      // page asks for it as it shows it.
+      setLoggedOut(false);
+      return;
     }
+    if (username === null) {
+      dropAccountData(queryClient);
+    } else {
+      forgetMatches(queryClient);
+      forgetDecks(queryClient);
+    }
+    setLoggedOut(owner === before);
+    setMatch((match) => (match?.owner === before ? null : match));
+    setShowing(null);
+    setLeft(true);
   }, [username, queryClient, owner]);
   const top = useRef<HTMLDivElement>(null);
   const wasLoggingIn = useRef(false);

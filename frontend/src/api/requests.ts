@@ -220,6 +220,17 @@ export function forgetDecks(queryClient: QueryClient) {
 }
 
 /**
+ * Throw away the player's matches, stats and decks once they log out,
+ * without asking for them again: a guest's page shows none of them, and the
+ * API would only answer 401.
+ */
+export function dropAccountData(queryClient: QueryClient) {
+  for (const queryKey of [["matches"], ["stats"], ["my-decks"]]) {
+    queryClient.removeQueries({ queryKey });
+  }
+}
+
+/**
  * Build a deck (`id` null) or change the deck with the id `id`, all of it at
  * once. The API checks it against the rules.
  */

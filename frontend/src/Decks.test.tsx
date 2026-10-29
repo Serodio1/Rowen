@@ -13,7 +13,7 @@ import {
   type PlayerDeck,
   type PlayerDecks,
 } from "./api/client.ts";
-import { later, sent, showApp, to, type Answer } from "./fake-api.tsx";
+import { later, sent, settle, showApp, to, type Answer } from "./fake-api.tsx";
 import { CAPTAIN, DECKS, HOARFROST, SOLDIER, view } from "./test-data.ts";
 
 // The rules are the API's: these small numbers keep the tests short.
@@ -520,6 +520,51 @@ test("after a player logs out, the next one doesn't see their decks", async () =
 
   expect(await screen.findByText("No deck built yet.")).toBeInTheDocument();
   expect(screen.queryByText("Mine")).not.toBeInTheDocument();
+});
+
+test("logging in asks for the player's decks once", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/session": {
+      status: 401,
+      body: { code: "not_logged_in", message: "The player isn't logged in." },
+    },
+    "POST /api/session": { status: 200, body: { username: "rui" } },
+    "GET /api/my-decks": decks([MINE]),
+  };
+  const requests = showApp(answers);
+  fireEvent.click(await screen.findByRole("button", { name: "Log in" }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("Username"), {
+    target: { value: "rui" },
+  });
+  fireEvent.change(within(dialog).getByLabelText("Password"), {
+    target: { value: "dragon123" },
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Log in" }));
+
+  await (await yourDecks()).findByRole("button", { name: "Mine (Humans)" });
+  await settle();
+  expect(sent(requests, "GET /api/my-decks")).toHaveLength(1);
+});
+
+test("logging out from the player's decks asks for them no more", async () => {
+  const answers: Record<string, Answer> = {
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+    "DELETE /api/session": { status: 204, body: null },
+  };
+  const requests = showApp(answers);
+  await openDecks();
+  await screen.findByRole("list", { name: "Your decks" });
+  const before = sent(requests, "GET /api/my-decks").length;
+
+  fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+  await screen.findByRole("button", { name: "Log in" });
+  await settle();
+  // A guest's request would only get a 401.
+  expect(sent(requests, "GET /api/my-decks")).toHaveLength(before);
 });
 
 /** Return the part of the decks to play with the player's own. */
