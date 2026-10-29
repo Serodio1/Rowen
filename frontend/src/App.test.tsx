@@ -1,90 +1,29 @@
-import { onlineManager, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager } from "@tanstack/react-query";
 import {
   act,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, expect, onTestFinished, test, vi } from "vitest";
-import { App } from "./App.tsx";
 import {
-  createApi,
   type Card,
   type Event,
   type Match,
   type Played,
   type View,
 } from "./api/client.ts";
-import { createQueryClient } from "./api/requests.ts";
+import {
+  fakeApi,
+  later,
+  type Answer,
+  renderApp,
+  sent,
+  settle,
+} from "./fake-api.tsx";
 import { TIMES } from "./stage.ts";
 import { DECKS, HOARFROST, SOLDIER, side, view } from "./test-data.ts";
-
-/**
- * An answer of the fake API: a status and a JSON body, any `Response`, or one
- * that comes when the test says so.
- */
-type Answer = { status: number; body: unknown } | Response | Promise<Response>;
-
-/**
- * Return a client whose `fetch` answers each request with the answer for its
- * method and path, such as `"GET /api/decks"`, and the requests it got. With
- * no answer for a request, the request fails, as when there is no network.
- */
-function fakeApi(answers: Record<string, Answer>) {
-  const requests: Request[] = [];
-  const api = createApi((request) => {
-    requests.push(request);
-    const answer =
-      answers[`${request.method} ${new URL(request.url).pathname}`];
-    if (answer === undefined) {
-      return Promise.reject(new TypeError("Failed to fetch"));
-    }
-    if (answer instanceof Response || answer instanceof Promise) {
-      // A copy for each request, as a server sends: a body can be read only
-      // once, so a second request would fail to read it.
-      return Promise.resolve(answer).then((response) => response.clone());
-    }
-    return Promise.resolve(
-      Response.json(answer.body, { status: answer.status }),
-    );
-  });
-  return { api, requests };
-}
-
-/** Return the requests for one method and path, such as `"GET /api/decks"`. */
-function sent(requests: Request[], to: string) {
-  return requests.filter(
-    (request) => `${request.method} ${new URL(request.url).pathname}` === to,
-  );
-}
-
-/** Show the page, as `main.tsx` does, with an empty cache of its own. */
-function renderApp(api: ReturnType<typeof fakeApi>["api"]) {
-  return render(
-    <QueryClientProvider client={createQueryClient()}>
-      <App api={api} />
-    </QueryClientProvider>,
-  );
-}
-
-/** Wait until a request the page may have just sent has gone out. */
-function settle() {
-  return new Promise((resolve) => setTimeout(resolve));
-}
-
-/**
- * Return an answer that comes only when the test calls `answer`, so the test
- * can look at the page while the request waits.
- */
-function later() {
-  let answer: (response: Response) => void = () => {};
-  const response = new Promise<Response>((resolve) => {
-    answer = resolve;
-  });
-  return { response, answer };
-}
 
 const THE_DECKS = { "GET /api/decks": { status: 200, body: { decks: DECKS } } };
 

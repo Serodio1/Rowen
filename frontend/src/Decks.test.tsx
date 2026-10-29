@@ -1,62 +1,20 @@
-import { focusManager, QueryClientProvider } from "@tanstack/react-query";
+import { focusManager } from "@tanstack/react-query";
 import {
   act,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
 import { expect, onTestFinished, test } from "vitest";
-import { App } from "./App.tsx";
 import {
-  createApi,
   type Choices,
   type Played,
   type PlayerDeck,
   type PlayerDecks,
 } from "./api/client.ts";
-import { createQueryClient } from "./api/requests.ts";
+import { later, sent, showApp, to, type Answer } from "./fake-api.tsx";
 import { CAPTAIN, DECKS, HOARFROST, SOLDIER, view } from "./test-data.ts";
-
-/**
- * An answer of the fake API: a status and a JSON body, or one that comes when
- * the test says so.
- */
-type Answer = { status: number; body: unknown } | Promise<Response>;
-
-/** A request the fake API got: its method and path, and its JSON body. */
-type Sent = { to: string; body: unknown };
-
-/**
- * Show the page with a fake API, which answers each request with the answer
- * for its method and path, such as `"GET /api/my-decks"`, and return the
- * requests it got. The answers may change during a test.
- */
-function renderApp(answers: Record<string, Answer>) {
-  const sent: Sent[] = [];
-  const api = createApi(async (request) => {
-    const to = `${request.method} ${new URL(request.url).pathname}`;
-    const text = await request.text();
-    sent.push({ to, body: text === "" ? null : JSON.parse(text) });
-    const answer = answers[to];
-    if (answer === undefined) {
-      throw new TypeError("Failed to fetch");
-    }
-    if (answer instanceof Promise) {
-      return (await answer).clone();
-    }
-    return answer.status === 204
-      ? new Response(null, { status: 204 })
-      : Response.json(answer.body, { status: answer.status });
-  });
-  render(
-    <QueryClientProvider client={createQueryClient()}>
-      <App api={api} />
-    </QueryClientProvider>,
-  );
-  return sent;
-}
 
 // The rules are the API's: these small numbers keep the tests short.
 const CHOICES = {
@@ -105,7 +63,7 @@ function card(column: "Cards" | "Your deck", name: RegExp) {
 }
 
 test("a guest has no decks to open", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/session": {
       status: 401,
@@ -120,7 +78,7 @@ test("a guest has no decks to open", async () => {
 });
 
 test("the player's decks are listed, and Back goes to the decks to play", async () => {
-  renderApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
+  showApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
   await openDecks();
 
   expect(screen.getByRole("heading", { name: "My decks" })).toHaveFocus();
@@ -138,7 +96,7 @@ test("the player's decks are listed, and Back goes to the decks to play", async 
 });
 
 test("a player with no deck is told so", async () => {
-  renderApp({ ...RUI, "GET /api/my-decks": decks([]) });
+  showApp({ ...RUI, "GET /api/my-decks": decks([]) });
   await openDecks();
 
   expect(await screen.findByText("No deck built yet.")).toBeInTheDocument();
@@ -149,7 +107,7 @@ test("a deck is built by adding cards from one column to the other", async () =>
     ...RUI,
     "GET /api/my-decks": decks([]),
   };
-  const sent = renderApp(answers);
+  const requests = showApp(answers);
   await openDecks();
   fireEvent.click(
     await screen.findByRole("button", { name: "New Humans deck" }),
@@ -200,18 +158,15 @@ test("a deck is built by adding cards from one column to the other", async () =>
 
   const list = await screen.findByRole("list", { name: "Your decks" });
   expect(list).toHaveTextContent("Soldiers");
-  expect(sent.find((request) => request.to === "POST /api/my-decks")).toEqual({
-    to: "POST /api/my-decks",
-    body: {
-      name: "Soldiers",
-      deck: "humans",
-      copies: { soldier: 3, hoarfrost: 1 },
-    },
+  expect(await sent(requests, "POST /api/my-decks")[0]?.json()).toEqual({
+    name: "Soldiers",
+    deck: "humans",
+    copies: { soldier: 3, hoarfrost: 1 },
   });
 });
 
 test("a card taken out to none is left out of the deck", async () => {
-  const sent = renderApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
+  const requests = showApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
   await openDecks();
   fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
   await screen.findByRole("list", { name: "Cards" });
@@ -223,18 +178,17 @@ test("a card taken out to none is left out of the deck", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
   await waitFor(() => {
-    expect(
-      sent.find((request) => request.to === "PUT /api/my-decks/d1")?.body,
-    ).toEqual({
-      name: "Mine",
-      deck: "humans",
-      copies: { soldier: 3, captain: 1 },
-    });
+    expect(sent(requests, "PUT /api/my-decks/d1")).toHaveLength(1);
+  });
+  expect(await sent(requests, "PUT /api/my-decks/d1")[0]?.json()).toEqual({
+    name: "Mine",
+    deck: "humans",
+    copies: { soldier: 3, captain: 1 },
   });
 });
 
 test("taking out a card's last copy moves the focus to the next card, the one before, or the deck", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/my-decks": decks([
       { ...MINE, copies: { soldier: 1, captain: 1, hoarfrost: 1 } },
@@ -253,7 +207,7 @@ test("taking out a card's last copy moves the focus to the next card, the one be
 });
 
 test("taking out a copy that isn't the last leaves the focus on the card", async () => {
-  renderApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
+  showApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
   await openDecks();
   fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
   await screen.findByRole("list", { name: "Cards" });
@@ -269,7 +223,7 @@ test("a deck is changed in place, with its copies to start from", async () => {
     ...RUI,
     "GET /api/my-decks": decks([MINE]),
   };
-  const sent = renderApp(answers);
+  const requests = showApp(answers);
   await openDecks();
   fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
 
@@ -288,9 +242,7 @@ test("a deck is changed in place, with its copies to start from", async () => {
   expect(
     await screen.findByRole("heading", { name: "My decks" }),
   ).toHaveFocus();
-  expect(
-    sent.find((request) => request.to === "PUT /api/my-decks/d1")?.body,
-  ).toEqual({
+  expect(await sent(requests, "PUT /api/my-decks/d1")[0]?.json()).toEqual({
     name: "Mine",
     deck: "humans",
     copies: { soldier: 2, captain: 1, hoarfrost: 1 },
@@ -298,7 +250,7 @@ test("a deck is changed in place, with its copies to start from", async () => {
 });
 
 test("Cancel leaves the deck as it was", async () => {
-  const sent = renderApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
+  const requests = showApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
   await openDecks();
   fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
   await screen.findByRole("list", { name: "Cards" });
@@ -309,11 +261,11 @@ test("Cancel leaves the deck as it was", async () => {
   expect(
     await screen.findByRole("heading", { name: "My decks" }),
   ).toHaveFocus();
-  expect(sent.some((request) => request.to.startsWith("PUT"))).toBe(false);
+  expect(requests.some((request) => to(request).startsWith("PUT"))).toBe(false);
 });
 
 test("a deck the API turns down says why, and stays to be changed", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/my-decks": decks([MINE]),
     "PUT /api/my-decks/d1": {
@@ -337,14 +289,12 @@ test("a deck the API turns down says why, and stays to be changed", async () => 
 });
 
 test("a deck saved after the player left its editor doesn't close the next one", async () => {
-  let answer: (response: Response) => void = () => {};
+  const answer = later();
   const other = { ...MINE, id: "d2", name: "Other" };
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/my-decks": decks([MINE, other]),
-    "PUT /api/my-decks/d1": new Promise<Response>((resolve) => {
-      answer = resolve;
-    }),
+    "PUT /api/my-decks/d1": answer.response,
   });
   await openDecks();
   fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
@@ -355,7 +305,7 @@ test("a deck saved after the player left its editor doesn't close the next one",
   await screen.findByRole("list", { name: "Cards" });
 
   await act(async () => {
-    answer(Response.json(MINE));
+    answer.answer(Response.json(MINE));
     await Promise.resolve();
   });
 
@@ -363,17 +313,12 @@ test("a deck saved after the player left its editor doesn't close the next one",
 });
 
 test("the decks can't start a match before the page knows who is logged in", async () => {
-  let answer: (response: Response) => void = () => {};
-  renderApp({
-    ...RUI,
-    "GET /api/session": new Promise<Response>((resolve) => {
-      answer = resolve;
-    }),
-  });
+  const answer = later();
+  showApp({ ...RUI, "GET /api/session": answer.response });
   const deck = await screen.findByRole("button", { name: "Humans" });
   expect(deck).toBeDisabled();
 
-  answer(Response.json({ username: null }));
+  answer.answer(Response.json({ username: null }));
 
   await waitFor(() => {
     expect(deck).toBeEnabled();
@@ -381,7 +326,7 @@ test("the decks can't start a match before the page knows who is logged in", asy
 });
 
 test("a deck is saved once, however fast Save is pressed", async () => {
-  const sent = renderApp({
+  const requests = showApp({
     ...RUI,
     "GET /api/my-decks": decks([MINE]),
     // No answer yet.
@@ -403,9 +348,9 @@ test("a deck is saved once, however fast Save is pressed", async () => {
   await waitFor(() => {
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
-  expect(sent.filter((request) => request.to.startsWith("PUT"))).toHaveLength(
-    1,
-  );
+  expect(
+    requests.filter((request) => to(request).startsWith("PUT")),
+  ).toHaveLength(1);
 });
 
 test("deleting a deck asks first", async () => {
@@ -413,7 +358,7 @@ test("deleting a deck asks first", async () => {
     ...RUI,
     "GET /api/my-decks": decks([MINE]),
   };
-  const sent = renderApp(answers);
+  const requests = showApp(answers);
   await openDecks();
 
   const ask = await screen.findByRole("button", { name: "Delete Mine" });
@@ -424,7 +369,9 @@ test("deleting a deck asks first", async () => {
   expect(within(question).getByRole("button", { name: "Keep" })).toHaveFocus();
   expect(ask).not.toBeInTheDocument();
   fireEvent.click(within(question).getByRole("button", { name: "Keep" }));
-  expect(sent.some((request) => request.to.startsWith("DELETE"))).toBe(false);
+  expect(requests.some((request) => to(request).startsWith("DELETE"))).toBe(
+    false,
+  );
   expect(screen.getByRole("button", { name: "Delete Mine" })).toHaveFocus();
 
   fireEvent.click(screen.getByRole("button", { name: "Delete Mine" }));
@@ -435,13 +382,11 @@ test("deleting a deck asks first", async () => {
   expect(await screen.findByText("No deck built yet.")).toBeInTheDocument();
   // The row went with the focus: it goes to the list's heading.
   expect(screen.getByRole("heading", { name: "My decks" })).toHaveFocus();
-  expect(sent.map((request) => request.to)).toContain(
-    "DELETE /api/my-decks/d1",
-  );
+  expect(requests.map(to)).toContain("DELETE /api/my-decks/d1");
 });
 
 test("a deck is deleted once, however fast Delete is clicked", async () => {
-  const sent = renderApp({
+  const requests = showApp({
     ...RUI,
     "GET /api/my-decks": decks([MINE]),
     // No answer yet.
@@ -459,12 +404,12 @@ test("a deck is deleted once, however fast Delete is clicked", async () => {
     expect(remove).toBeDisabled();
   });
   expect(
-    sent.filter((request) => request.to.startsWith("DELETE")),
+    requests.filter((request) => to(request).startsWith("DELETE")),
   ).toHaveLength(1);
 });
 
 test("a player with as many decks as they may keep can build no other", async () => {
-  renderApp({ ...RUI, "GET /api/my-decks": decks([MINE], 1) });
+  showApp({ ...RUI, "GET /api/my-decks": decks([MINE], 1) });
   await openDecks();
 
   expect(
@@ -478,7 +423,7 @@ test("a player with as many decks as they may keep can build no other", async ()
 });
 
 test("a deck the player can't save because they logged out elsewhere shows them as a guest", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/my-decks": decks([MINE]),
     "PUT /api/my-decks/d1": {
@@ -505,7 +450,7 @@ test("after a player logs out, the next one doesn't see their decks", async () =
     "GET /api/my-decks": decks([MINE]),
     "DELETE /api/session": { status: 204, body: null },
   };
-  renderApp(answers);
+  showApp(answers);
   await openDecks();
   await screen.findByRole("list", { name: "Your decks" });
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
@@ -534,7 +479,7 @@ async function yourDecks() {
 }
 
 test("a player plays a deck they built from the decks to play", async () => {
-  const sent = renderApp({
+  const requests = showApp({
     ...RUI,
     "GET /api/my-decks": decks([MINE]),
     "POST /api/matches": {
@@ -560,13 +505,13 @@ test("a player plays a deck they built from the decks to play", async () => {
   expect(
     await screen.findByRole("button", { name: "Keep this hand" }),
   ).toBeEnabled();
-  expect(sent.filter((request) => request.to === "POST /api/matches")).toEqual([
-    { to: "POST /api/matches", body: { my_deck: "d1", level: "easy" } },
-  ]);
+  const started = sent(requests, "POST /api/matches");
+  expect(started).toHaveLength(1);
+  expect(await started[0]?.json()).toEqual({ my_deck: "d1", level: "easy" });
 });
 
 test("a guest has no decks of their own to play", async () => {
-  const sent = renderApp({
+  const requests = showApp({
     ...RUI,
     "GET /api/session": {
       status: 401,
@@ -580,11 +525,11 @@ test("a guest has no decks of their own to play", async () => {
     screen.queryByRole("region", { name: "Your decks" }),
   ).not.toBeInTheDocument();
   // The API would turn them down.
-  expect(sent.map((request) => request.to)).not.toContain("GET /api/my-decks");
+  expect(requests.map(to)).not.toContain("GET /api/my-decks");
 });
 
 test("a player with no deck of their own is told where to build one", async () => {
-  renderApp({ ...RUI, "GET /api/my-decks": decks([]) });
+  showApp({ ...RUI, "GET /api/my-decks": decks([]) });
 
   expect(
     await (
@@ -595,7 +540,7 @@ test("a player with no deck of their own is told where to build one", async () =
 
 test("the player's decks that didn't come can be asked for again", async () => {
   const answers: Record<string, Answer> = { ...RUI };
-  renderApp(answers);
+  showApp(answers);
 
   const decksToPlay = await yourDecks();
   expect(await decksToPlay.findByRole("alert")).toHaveTextContent(
@@ -618,7 +563,7 @@ test("a deck deleted in another tab says so, and its button goes", async () => {
       body: { code: "deck_not_found", message: "The player has no such deck." },
     },
   };
-  renderApp(answers);
+  showApp(answers);
 
   const decksToPlay = await yourDecks();
   const mine = await decksToPlay.findByRole("button", {
@@ -638,7 +583,7 @@ test("a deck deleted in another tab says so, and its button goes", async () => {
 });
 
 test("while a match starts with one of the player's decks, no other can", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/my-decks": decks([MINE, { ...MINE, id: "d2", name: "Other" }]),
     // No answer yet.
@@ -669,7 +614,7 @@ test("a deck the API turns down as too many asks for the decks again", async () 
       body: { code: "too_many_decks", message: "The player has 10 decks." },
     },
   };
-  const sent = renderApp(answers);
+  const requests = showApp(answers);
   await openDecks();
   fireEvent.click(
     await screen.findByRole("button", { name: "New Humans deck" }),
@@ -684,9 +629,7 @@ test("a deck the API turns down as too many asks for the decks again", async () 
     "The player has 10 decks.",
   );
   await waitFor(() => {
-    expect(
-      sent.filter((request) => request.to === "GET /api/my-decks"),
-    ).toHaveLength(2);
+    expect(sent(requests, "GET /api/my-decks")).toHaveLength(2);
   });
 });
 
@@ -699,7 +642,7 @@ test("a deck already deleted in another tab asks for the decks again", async () 
       body: { code: "deck_not_found", message: "The player has no such deck." },
     },
   };
-  renderApp(answers);
+  showApp(answers);
   await openDecks();
   fireEvent.click(await screen.findByRole("button", { name: "Delete Mine" }));
   answers["GET /api/my-decks"] = decks([]);
@@ -713,7 +656,7 @@ test("coming back to the tab asks for the decks again", async () => {
     ...RUI,
     "GET /api/my-decks": decks([MINE]),
   };
-  renderApp(answers);
+  showApp(answers);
   await openDecks();
   await screen.findByRole("list", { name: "Your decks" });
 
