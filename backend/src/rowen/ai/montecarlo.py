@@ -5,7 +5,7 @@ unknown card, with no strength. So it never counts on what the opponent could
 play next. This AI guesses instead: it fills the hidden cards with real ones,
 at random, from the cards each player could still hold. Each guess is one
 whole match it could be playing, a *sample*. In each sample, it tries every
-legal action, and both players then play the rest of the round in a quicker
+legal action, and both players then play the rest of the match in a quicker
 version of the baseline's way (``_next``). The action with the best total
 score over all the samples is the one it plays (ADR 0018).
 
@@ -36,9 +36,8 @@ from rowen.engine.state import GameState
 from rowen.engine.view import PlayerView, SideView
 
 # The samples for each level of the AI; Easy is the baseline AI. Against the
-# baseline, in 160 to 320 matches each, 8 samples won 52% of the decisive
-# matches, 16 won 57% and 32 won 55%: 32 took twice the time of 16 for no gain
-# (ADR 0018).
+# baseline, in 400 matches of rowen-arena each, 8 samples won 57% of the
+# decisive matches and 16 won 66% (ADR 0018).
 NORMAL_SAMPLES = 8
 HARD_SAMPLES = 16
 
@@ -157,13 +156,13 @@ def _spy(card: Card) -> bool:
 def _play_out(state: GameState, action: Action) -> int:
     """Return the score, for the player whose turn it is, after the action.
 
-    After it, both players play on as ``_next`` says until the round ends, or
-    the match does. The score is the baseline's, so a lead at the end of the
-    round counts as the life it wins.
+    After it, both players play on as ``_next`` says until the match ends. The
+    score is the baseline's: who won, and then the cards left. Stopping at the
+    end of the round instead won less (ADR 0018).
     """
-    player, this_round = state.current, state.round
+    player = state.current
     state, _ = apply_legal(state, action)
-    while state.round == this_round and not match_over(state):
+    while not match_over(state):
         state, _ = apply_legal(state, _next(state))
     return baseline.score(state, player)
 
