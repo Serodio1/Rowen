@@ -109,6 +109,14 @@ export function MyDecks({ api, onBack }: { api: Api; onBack: () => void }) {
               You have {decks.data.most} decks, the most you may keep: delete
               one to build another.
             </p>
+          ) : factions.isError ? (
+            // No faction, no deck to build from: say why.
+            <Failed
+              error={factions.error}
+              onRetry={() => {
+                void factions.refetch();
+              }}
+            />
           ) : (
             <div className="flex flex-wrap justify-center gap-2">
               {factions.data?.map((faction) => (

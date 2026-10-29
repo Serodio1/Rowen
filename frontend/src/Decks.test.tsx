@@ -118,6 +118,26 @@ test("the player's decks that didn't come to their list can be asked for again",
   ).toHaveTextContent("Mine");
 });
 
+test("the factions that didn't come to the player's decks say so, and can be asked for again", async () => {
+  const answers: Record<string, Answer> = {
+    "GET /api/session": { status: 200, body: { username: "rui" } },
+    "GET /api/my-decks": decks([]),
+  };
+  showApp(answers);
+  await openDecks();
+  await screen.findByRole("heading", { name: "My decks" });
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Could not reach the server.",
+  );
+
+  answers["GET /api/decks"] = { status: 200, body: { decks: DECKS } };
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+  expect(
+    await screen.findByRole("button", { name: "New Humans deck" }),
+  ).toBeInTheDocument();
+});
+
 test("the cards that didn't come to the editor can be asked for again", async () => {
   const answers: Record<string, Answer> = {
     "GET /api/decks": { status: 200, body: { decks: DECKS } },

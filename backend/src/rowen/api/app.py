@@ -774,7 +774,7 @@ def _invalid_deck() -> ApiError:
         "invalid_deck",
         "This deck breaks the rules: each card must be one the deck may hold, "
         "with 1 copy up to the most it may have, and a deck needs enough units "
-        "and not too many special cards (GET /decks/{id}/choices).",
+        "and not too many special cards.",
     )
 
 
@@ -1077,9 +1077,19 @@ def _invalid_request(request: Request, error: RequestValidationError) -> JSONRes
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         Error(
             code="invalid_request",
-            message=f"The request isn't valid at {where}: {first['type']}.",
+            message=_PLAIN.get(
+                where, f"The request isn't valid at {where}: {first['type']}."
+            ),
         ),
     )
+
+
+# The mistakes a player can make that the page doesn't stop first, said for
+# the player, who sees the message. A deck's name of only characters that
+# Python takes as spaces and the browser doesn't (U+0085) is one.
+_PLAIN = {
+    "body.name": "A deck's name needs 1 to 30 characters, and no invisible ones.",
+}
 
 
 @app.exception_handler(HTTPException)
