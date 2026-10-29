@@ -4,6 +4,7 @@ import random
 from dataclasses import replace
 
 import pytest
+from cards import HOARFROST, KNIGHT, SCOUT, SNIPER, WAR_HORN
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -33,9 +34,6 @@ from rowen.engine.scoring import unit_strength
 from rowen.engine.state import GameState, PlayerState, RowState
 from rowen.engine.view import player_view
 
-SCOUT = UnitCard(id="scout", name="Scout", rows=(Row.MELEE,), strength=3)
-KNIGHT = UnitCard(id="knight", name="Knight", rows=(Row.MELEE,), strength=5)
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
 CATAPULT = UnitCard(id="catapult", name="Catapult", rows=(Row.SIEGE,), strength=4)
 INFORMANT = UnitCard(
     id="informant",
@@ -72,11 +70,9 @@ PILOT = UnitCard(
     ability=Ability.BOND,
     group="planes",
 )
-HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
 CLEAR_SKIES = SpecialCard(
     id="clear-skies", name="Clear Skies", kind=SpecialKind.CLEAR_SKIES
 )
-WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
 SCARECROW = SpecialCard(id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW)
 
 PLAY_KNIGHT = PlayUnit(card="knight", row=Row.MELEE)

@@ -2,6 +2,8 @@
 
 import dataclasses
 
+from cards import HOARFROST, SNIPER, WAR_HORN
+
 from rowen.engine.cards import Ability, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.rng import Rng
 from rowen.engine.scoring import (
@@ -12,7 +14,6 @@ from rowen.engine.scoring import (
 )
 from rowen.engine.state import GameState, PlayerState, RowState
 
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
 PRIME_MINISTER = UnitCard(
     id="prime-minister",
     name="Prime Minister",
@@ -45,8 +46,6 @@ CAPTAIN = UnitCard(
     ability=Ability.INSPIRE,
 )
 
-WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
-HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
 THICK_FOG = SpecialCard(id="thick-fog", name="Thick Fog", kind=SpecialKind.THICK_FOG)
 
 EMPTY_PLAYER = PlayerState(deck=(), hand=())

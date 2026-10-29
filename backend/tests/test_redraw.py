@@ -3,10 +3,11 @@
 from collections import Counter
 
 import pytest
+from cards import KNIGHT, SCOUT, SNIPER, WAR_HORN
 
 from rowen.data import load_deck
 from rowen.engine.actions import Action, EndRedraw, Pass, PlayUnit, Redraw
-from rowen.engine.cards import Card, Row, SpecialCard, SpecialKind, UnitCard
+from rowen.engine.cards import Card, Row
 from rowen.engine.events import CardRedrawn, RedrawEnded
 from rowen.engine.game import (
     MAX_REDRAWS,
@@ -17,11 +18,6 @@ from rowen.engine.game import (
 )
 from rowen.engine.rng import Rng
 from rowen.engine.state import GameState, PlayerState
-
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
-KNIGHT = UnitCard(id="knight", name="Knight", rows=(Row.MELEE,), strength=5)
-SCOUT = UnitCard(id="scout", name="Scout", rows=(Row.MELEE,), strength=3)
-WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
 
 DECKS = (load_deck("humans"), load_deck("robots"))
 

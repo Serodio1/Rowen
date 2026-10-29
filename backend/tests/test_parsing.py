@@ -5,11 +5,11 @@ import re
 from typing import Any
 
 import pytest
+from cards import SNIPER, WAR_HORN
 
-from rowen.engine.cards import Ability, Row, SpecialCard, SpecialKind, UnitCard
+from rowen.engine.cards import Ability, Row, UnitCard
 from rowen.engine.parsing import parse_deck, parse_specials
 
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
 PRESIDENT = UnitCard(
     id="president",
     name="President",
@@ -18,7 +18,6 @@ PRESIDENT = UnitCard(
     ability=Ability.INSPIRE,
     legend=True,
 )
-WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
 SPECIALS = {"war-horn": WAR_HORN}
 
 

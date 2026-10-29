@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 import pytest
+from cards import HOARFROST, SNIPER, WAR_HORN
 
 from rowen.ai.baseline import choose_action
 from rowen.cli.display import action_text, card_text, event_text, view_text
@@ -50,7 +51,6 @@ from rowen.engine.view import (
     player_view,
 )
 
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
 CATAPULT = UnitCard(id="catapult", name="Catapult", rows=(Row.SIEGE,), strength=8)
 SOLDIER = UnitCard(
     id="soldier",
@@ -82,11 +82,9 @@ SPY = UnitCard(
     ability=Ability.SPY,
 )
 DOWNPOUR = SpecialCard(id="downpour", name="Downpour", kind=SpecialKind.DOWNPOUR)
-HOARFROST = SpecialCard(id="hoarfrost", name="Hoarfrost", kind=SpecialKind.HOARFROST)
 CLEAR_SKIES = SpecialCard(
     id="clear-skies", name="Clear Skies", kind=SpecialKind.CLEAR_SKIES
 )
-WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
 WILDFIRE = SpecialCard(id="wildfire", name="Wildfire", kind=SpecialKind.WILDFIRE)
 SCARECROW = SpecialCard(id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW)
 

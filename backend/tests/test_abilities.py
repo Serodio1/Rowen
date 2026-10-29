@@ -5,10 +5,11 @@ test_turns.py.
 """
 
 import pytest
+from cards import KNIGHT, SCOUT, SNIPER, WAR_HORN
 
 from rowen.engine.abilities import on_opponent_side
 from rowen.engine.actions import Action, Pass, PlayUnit, Revive
-from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
+from rowen.engine.cards import Ability, Card, Row, UnitCard
 from rowen.engine.events import (
     CardsDrawn,
     NothingToRevive,
@@ -22,9 +23,6 @@ from rowen.engine.rng import Rng
 from rowen.engine.scoring import player_total
 from rowen.engine.state import GameState, PlayerState
 
-SNIPER = UnitCard(id="sniper", name="Sniper", rows=(Row.RANGED,), strength=6)
-KNIGHT = UnitCard(id="knight", name="Knight", rows=(Row.MELEE,), strength=5)
-SCOUT = UnitCard(id="scout", name="Scout", rows=(Row.MELEE,), strength=3)
 INFORMANT = UnitCard(
     id="informant",
     name="Informant",
@@ -83,7 +81,6 @@ SOLDIER = UnitCard(
 PRESIDENT = UnitCard(
     id="president", name="President", rows=(Row.MELEE,), strength=10, legend=True
 )
-WAR_HORN = SpecialCard(id="war-horn", name="War Horn", kind=SpecialKind.WAR_HORN)
 
 PLAY_INFORMANT = PlayUnit(card="informant", row=Row.MELEE)
 PLAY_MEDIC = PlayUnit(card="medic", row=Row.SIEGE)

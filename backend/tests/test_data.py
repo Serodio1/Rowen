@@ -49,6 +49,14 @@ def test_deck_ids_lists_the_deck_files() -> None:
     assert deck_ids() == ["humans", "robots"]
 
 
+def test_no_two_cards_share_an_id() -> None:
+    # An action names a card by its id: a Medic could revive the wrong one.
+    cards = [card for deck_id in deck_ids() for card in load_deck(deck_id).cards]
+    by_id = {card.id: card for card in cards}
+
+    assert all(card == by_id[card.id] for card in cards)
+
+
 # deck_ids() runs when the tests are collected, so a new deck file is tested
 # here without changing this file.
 @pytest.mark.parametrize("deck_id", deck_ids())
