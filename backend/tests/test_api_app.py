@@ -780,6 +780,9 @@ def test_an_action_of_the_wrong_shape_is_turned_down(
         {"action": {"type": "pass"}},
         {"version": "first", "action": {"type": "pass"}},
         {"version": None, "action": {"type": "pass"}},
+        # Taken as version 1 if the version weren't strict.
+        {"version": True, "action": {"type": "pass"}},
+        {"version": str(FIRST_VERSION), "action": {"type": "pass"}},
         {"version": FIRST_VERSION},
         {"version": FIRST_VERSION, "action": {"type": "pass"}, "player": 0},
     ],

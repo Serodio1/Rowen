@@ -430,7 +430,7 @@ def test_a_match_survives_a_restart_of_the_api(
     assert UUID(again.json()["id"]) == UUID(started.json()["id"])
 
 
-def test_the_apis_role_may_delete_sessions_and_decks_and_nothing_else(
+def test_the_apis_role_may_delete_sessions_and_decks_and_not_move_a_migration(
     migrations: Config, database_url: str
 ) -> None:
     # As online: rowen_app reads, adds and changes rows (docs/deploy.md), and
@@ -447,6 +447,10 @@ def test_the_apis_role_may_delete_sessions_and_decks_and_nothing_else(
                     " THEN CREATE ROLE rowen_app; END IF; END $$"
                 )
             )
+            # As the default privileges online give it.
+            connection.execute(
+                text("GRANT INSERT, UPDATE ON alembic_version TO rowen_app")
+            )
         command.downgrade(migrations, "a398e9df25d3")
         command.upgrade(migrations, "head")
         with engine.connect() as connection:
@@ -457,6 +461,12 @@ def test_the_apis_role_may_delete_sessions_and_decks_and_nothing_else(
                 ).scalar_one()
                 for table in ("matches", "accounts", "sessions", "player_decks")
             }
+            may_move_the_migration: bool = connection.execute(
+                text(
+                    "SELECT has_table_privilege('rowen_app', 'alembic_version',"
+                    " 'INSERT, UPDATE')"
+                )
+            ).scalar_one()
     finally:
         engine.dispose()
 
@@ -466,6 +476,7 @@ def test_the_apis_role_may_delete_sessions_and_decks_and_nothing_else(
         "sessions": True,
         "player_decks": True,
     }
+    assert not may_move_the_migration
 
 
 def test_deleting_an_account_deletes_its_sessions(
