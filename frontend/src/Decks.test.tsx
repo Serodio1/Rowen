@@ -177,7 +177,7 @@ test("a deck is built by adding cards from one column to the other", async () =>
   const save = screen.getByRole("button", { name: "Save" });
   expect(save).toBeDisabled();
   expect(
-    screen.getByText("Choose cards on the left to add them."),
+    screen.getByText("Choose cards from the list of cards to add them."),
   ).toBeVisible();
 
   for (let n = 0; n < 3; n++) {

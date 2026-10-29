@@ -522,7 +522,9 @@ function Columns({
         </CardColumn>
         <CardColumn title="Your deck" ref={deck}>
           {inDeck.length === 0 ? (
-            <li className="italic">Choose cards on the left to add them.</li>
+            <li className="italic">
+              Choose cards from the list of cards to add them.
+            </li>
           ) : (
             inDeck.map((choice, index) => (
               <ChoiceButton
