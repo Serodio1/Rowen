@@ -14,7 +14,7 @@
  */
 import { useEffect, useState } from "react";
 import type { Card, Event, MovePlayed, View } from "./api/client.ts";
-import { eventText } from "./text.ts";
+import { cardsById, eventText } from "./text.ts";
 
 /** How long each part of a step takes, in milliseconds. */
 export const TIMES = {
@@ -511,25 +511,4 @@ export function newIndexes(
     }
   });
   return added;
-}
-
-/** Return every card the views show, by id. */
-export function cardsById(views: readonly View[]): Map<string, Card> {
-  const cards = new Map<string, Card>();
-  for (const view of views) {
-    const all: Card[] = [...view.hand];
-    for (const side of view.players) {
-      all.push(...side.discard, ...side.weather);
-      for (const row of [side.rows.melee, side.rows.ranged, side.rows.siege]) {
-        all.push(...row.units.map((unit) => unit.card), ...row.scarecrows);
-        if (row.horn !== null) {
-          all.push(row.horn);
-        }
-      }
-    }
-    for (const card of all) {
-      cards.set(card.id, card);
-    }
-  }
-  return cards;
 }

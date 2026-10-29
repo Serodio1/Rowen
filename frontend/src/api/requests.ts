@@ -238,18 +238,10 @@ export function saveDeck(api: Api, id: string | null, choice: DeckChoice) {
  * Delete the deck with the id `id`. As with logging out, the API answers 204,
  * with no body.
  */
-export async function deleteDeck(api: Api, id: string): Promise<void> {
-  let answer;
-  try {
-    answer = await api.DELETE("/my-decks/{deck_id}", {
-      params: { path: { deck_id: id } },
-    });
-  } catch {
-    throw new RequestError(null, UNREACHABLE);
-  }
-  if (!answer.response.ok) {
-    throw turnedDown(answer.error);
-  }
+export function deleteDeck(api: Api, id: string): Promise<void> {
+  return sendEmpty(
+    api.DELETE("/my-decks/{deck_id}", { params: { path: { deck_id: id } } }),
+  );
 }
 
 /**
@@ -318,16 +310,8 @@ export function logIn(api: Api, credentials: Credentials) {
  * Log out. The API answers 204, with no body, so this checks the status
  * rather than the data.
  */
-export async function logOut(api: Api): Promise<void> {
-  let answer;
-  try {
-    answer = await api.DELETE("/session");
-  } catch {
-    throw new RequestError(null, UNREACHABLE);
-  }
-  if (!answer.response.ok) {
-    throw turnedDown(answer.error);
-  }
+export function logOut(api: Api): Promise<void> {
+  return sendEmpty(api.DELETE("/session"));
 }
 
 /**
@@ -350,6 +334,24 @@ async function send<T>(
     throw turnedDown(answer.error);
   }
   return answer.data;
+}
+
+/**
+ * Wait for the answer to `request`, which has no body when it works (a 204),
+ * or throw a `RequestError` if the request didn't work.
+ */
+async function sendEmpty(
+  request: Promise<{ response: Response; error?: unknown }>,
+): Promise<void> {
+  let answer;
+  try {
+    answer = await request;
+  } catch {
+    throw new RequestError(null, UNREACHABLE);
+  }
+  if (!answer.response.ok) {
+    throw turnedDown(answer.error);
+  }
 }
 
 /**
