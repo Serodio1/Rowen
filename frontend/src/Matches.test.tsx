@@ -1,62 +1,20 @@
-import { focusManager, QueryClientProvider } from "@tanstack/react-query";
+import { focusManager } from "@tanstack/react-query";
 import {
   act,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
 import { expect, onTestFinished, test } from "vitest";
-import { App } from "./App.tsx";
 import {
-  createApi,
   type Match,
   type Matches,
   type MatchSummary,
   type Played,
 } from "./api/client.ts";
-import { createQueryClient } from "./api/requests.ts";
+import { later, settle, showApp, to, type Answer } from "./fake-api.tsx";
 import { DECKS, view } from "./test-data.ts";
-
-/**
- * An answer of the fake API: a status and a JSON body, or one that comes when
- * the test says so.
- */
-type Answer = { status: number; body: unknown } | Promise<Response>;
-
-/**
- * Show the page with a fake API, which answers each request with the answer
- * for its method, path and query, such as `"GET /api/matches?before=m1"`,
- * and return the requests it got. The answers may change during a test.
- */
-function renderApp(answers: Record<string, Answer>) {
-  const requests: string[] = [];
-  const api = createApi((request) => {
-    const url = new URL(request.url);
-    const to = `${request.method} ${url.pathname}${url.search}`;
-    requests.push(to);
-    const answer = answers[to];
-    if (answer === undefined) {
-      return Promise.reject(new TypeError("Failed to fetch"));
-    }
-    if (answer instanceof Promise) {
-      return answer.then((response) => response.clone());
-    }
-    return Promise.resolve(
-      answer.status === 204
-        ? // A 204 has no body.
-          new Response(null, { status: 204 })
-        : Response.json(answer.body, { status: answer.status }),
-    );
-  });
-  render(
-    <QueryClientProvider client={createQueryClient()}>
-      <App api={api} />
-    </QueryClientProvider>,
-  );
-  return requests;
-}
 
 const RUI = {
   "GET /api/decks": { status: 200, body: { decks: DECKS } },
@@ -102,30 +60,13 @@ function stats(decks: unknown[]): Answer {
   return { status: 200, body: { decks } };
 }
 
-/**
- * Return an answer that comes only when the test calls `answer`, so the test
- * can look at the page while the request waits.
- */
-function later() {
-  let answer: (response: Response) => void = () => {};
-  const response = new Promise<Response>((resolve) => {
-    answer = resolve;
-  });
-  return { response, answer };
-}
-
-/** Wait until a request the page may have just sent has been answered. */
-function settle() {
-  return new Promise((resolve) => setTimeout(resolve));
-}
-
 /** Open the list of the player's matches. */
 async function openMatches() {
   fireEvent.click(await screen.findByRole("button", { name: "My matches" }));
 }
 
 test("a player who is logged in sees how their matches with each deck ended, and the matches", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/stats": stats([{ deck: "humans", won: 2, lost: 1, drawn: 0 }]),
     "GET /api/matches": page([summary(), WON]),
@@ -175,7 +116,7 @@ test("a player who is logged in sees how their matches with each deck ended, and
 });
 
 test("a match played with a deck the player built shows its name and faction", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary({ deck_name: "Mine" })]),
@@ -188,7 +129,7 @@ test("a match played with a deck the player built shows its name and faction", a
 });
 
 test("each match says the level of the AI it was played against", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary({ level: "hard" })]),
@@ -201,7 +142,7 @@ test("each match says the level of the AI it was played against", async () => {
 });
 
 test("a guest has no list of matches", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/session": {
       status: 401,
@@ -216,7 +157,7 @@ test("a guest has no list of matches", async () => {
 });
 
 test("with no match yet, the list says so", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([]),
@@ -231,7 +172,7 @@ test("with no match yet, the list says so", async () => {
 });
 
 test("the older matches come a page at a time, from the last one shown", async () => {
-  const requests = renderApp({
+  const requests = showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page(
@@ -268,7 +209,9 @@ test("the older matches come a page at a time, from the last one shown", async (
   expect(
     screen.queryByRole("button", { name: "Show more" }),
   ).not.toBeInTheDocument();
-  expect(requests.filter((to) => to.startsWith("GET /api/matches"))).toEqual([
+  expect(
+    requests.map(to).filter((where) => where.startsWith("GET /api/matches")),
+  ).toEqual([
     "GET /api/matches",
     "GET /api/matches?before=new",
     "GET /api/matches?before=older",
@@ -277,7 +220,7 @@ test("the older matches come a page at a time, from the last one shown", async (
 
 test("while the next page is asked for, no second one is", async () => {
   const next = later();
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary()], true),
@@ -302,7 +245,7 @@ test("a next page that didn't come says why, and Show more asks again", async ()
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary()], true),
   };
-  renderApp(answers);
+  showApp(answers);
   await openMatches();
   fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
 
@@ -332,7 +275,7 @@ test("a list that didn't come says why, and can be asked for again", async () =>
     ...RUI,
     "GET /api/stats": stats([]),
   };
-  renderApp(answers);
+  showApp(answers);
   await openMatches();
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -356,7 +299,7 @@ test("resuming a match gets it as it is now, and its end shows every round", asy
   };
   const second: RoundEnded = { type: "round_ended", scores: [9, 4], winner: 0 };
   const third: RoundEnded = { type: "round_ended", scores: [7, 3], winner: 0 };
-  const requests = renderApp({
+  const requests = showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary()]),
@@ -390,7 +333,7 @@ test("resuming a match gets it as it is now, and its end shows every round", asy
   fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
 
   expect(await screen.findByRole("button", { name: "Pass" })).toBeEnabled();
-  expect(requests).toContain("GET /api/matches/a-match");
+  expect(requests.map(to)).toContain("GET /api/matches/a-match");
   fireEvent.click(screen.getByRole("button", { name: "Pass" }));
 
   const end = await screen.findByRole("dialog", { name: "You won the match!" });
@@ -403,7 +346,7 @@ test("resuming a match gets it as it is now, and its end shows every round", asy
 
 test("while a match is asked for, to play on, no other one can be", async () => {
   const match = later();
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary(), summary({ id: "another" })]),
@@ -432,7 +375,7 @@ test("while a match is asked for, to play on, no other one can be", async () => 
 });
 
 test("two clicks in the same instant ask for one match only", async () => {
-  const requests = renderApp({
+  const requests = showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary(), summary({ id: "another" })]),
@@ -447,13 +390,13 @@ test("two clicks in the same instant ask for one match only", async () => {
   fireEvent.click(second as HTMLElement);
   await screen.findByRole("alert");
 
-  expect(requests.filter((to) => to.startsWith("GET /api/matches/"))).toEqual([
-    "GET /api/matches/a-match",
-  ]);
+  expect(
+    requests.map(to).filter((where) => where.startsWith("GET /api/matches/")),
+  ).toEqual(["GET /api/matches/a-match"]);
 });
 
 test("a match the player comes back to is asked for again, as it may have been played elsewhere", async () => {
-  const requests = renderApp({
+  const requests = showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary()]),
@@ -489,14 +432,16 @@ test("a match the player comes back to is asked for again, as it may have been p
   await screen.findByRole("button", { name: "Keep this hand" });
 
   expect(
-    requests.filter((to) => to === "GET /api/matches/a-match"),
+    requests.map(to).filter((where) => where === "GET /api/matches/a-match"),
   ).toHaveLength(2);
   // Logging out forgot the list: it is asked for again too.
-  expect(requests.filter((to) => to === "GET /api/matches")).toHaveLength(2);
+  expect(
+    requests.map(to).filter((where) => where === "GET /api/matches"),
+  ).toHaveLength(2);
 });
 
 test("a match that can't be resumed says why, and the list stays", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary()]),
@@ -518,7 +463,7 @@ test("a match that can't be resumed says why, and the list stays", async () => {
 });
 
 test("logging out during a match leaves it, and the decks show", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "POST /api/matches": {
       status: 201,
@@ -553,10 +498,10 @@ test("logging out during a match leaves it, and the decks show", async () => {
 });
 
 /** Return the number of times the list and the stats were asked for. */
-function asked(requests: string[]) {
+function asked(requests: Request[]) {
   return [
-    requests.filter((to) => to === "GET /api/matches").length,
-    requests.filter((to) => to === "GET /api/stats").length,
+    requests.map(to).filter((where) => where === "GET /api/matches").length,
+    requests.map(to).filter((where) => where === "GET /api/stats").length,
   ];
 }
 
@@ -574,7 +519,7 @@ async function openAndBack() {
 }
 
 test("the list comes from the cache, until a match starts", async () => {
-  const requests = renderApp({
+  const requests = showApp({
     ...NO_MATCHES,
     // A match over at once, so the page can leave it without a move.
     "POST /api/matches": {
@@ -601,7 +546,7 @@ test("the list comes from the cache, until a match starts", async () => {
 
 test("once a match ends, the list and the stats are asked for again", async () => {
   const over = view({ match_over: true, winner: 0, legal_actions: [] });
-  const requests = renderApp({
+  const requests = showApp({
     ...NO_MATCHES,
     "GET /api/matches": page([summary()]),
     "GET /api/matches/a-match": {
@@ -656,7 +601,7 @@ function newMatch(match = view()): Answer {
 
 test("a request turned down as not logged in shows the player as a guest", async () => {
   // The player logged out in another tab: this one still thinks not.
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/stats": GUEST_ANSWER,
     "GET /api/matches": GUEST_ANSWER,
@@ -682,7 +627,7 @@ test("coming back to the tab asks again who is logged in", async () => {
     ...RUI,
     "POST /api/matches": newMatch(),
   };
-  renderApp(answers);
+  showApp(answers);
   fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
   await screen.findByRole("button", { name: "Keep this hand" });
 
@@ -714,7 +659,7 @@ test("another account logged in elsewhere gets its own list", async () => {
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary()]),
   };
-  const requests = renderApp(answers);
+  const requests = showApp(answers);
   await openMatches();
   await screen.findByRole("listitem");
 
@@ -733,7 +678,9 @@ test("another account logged in elsewhere gets its own list", async () => {
   expect(
     await screen.findByText("No match yet: choose a deck to play one."),
   ).toBeInTheDocument();
-  expect(requests.filter((to) => to === "GET /api/matches")).toHaveLength(2);
+  expect(
+    requests.map(to).filter((where) => where === "GET /api/matches"),
+  ).toHaveLength(2);
 });
 
 test("a guest's match goes on when they log in and out", async () => {
@@ -744,7 +691,7 @@ test("a guest's match goes on when they log in and out", async () => {
     "POST /api/session": { status: 200, body: { username: "rui" } },
     "DELETE /api/session": { status: 204, body: null },
   };
-  renderApp(answers);
+  showApp(answers);
   fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
   await screen.findByRole("button", { name: "Keep this hand" });
 
@@ -766,7 +713,7 @@ test("a guest's match goes on when they log in and out", async () => {
 
 test("no logging out while a match starts", async () => {
   const match = later();
-  renderApp({ ...RUI, "POST /api/matches": match.response });
+  showApp({ ...RUI, "POST /api/matches": match.response });
   fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
 
   // Its answer would be a match of the account, for a guest.
@@ -782,7 +729,7 @@ test("no logging out while a match starts", async () => {
 
 test("going back while a match is asked for, to play on, doesn't open it", async () => {
   const match = later();
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary()]),
@@ -811,7 +758,7 @@ test("going back while a match is asked for, to play on, doesn't open it", async
 });
 
 test("the end of a match puts the top of the page out of reach too", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "POST /api/matches": newMatch(
       view({ match_over: true, winner: 0, legal_actions: [] }),
@@ -838,7 +785,7 @@ test("stats that didn't come can be asked for again", async () => {
     ...RUI,
     "GET /api/matches": page([WON]),
   };
-  renderApp(answers);
+  showApp(answers);
   await openMatches();
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Could not reach the server.",
@@ -856,7 +803,7 @@ test("stats that didn't come can be asked for again", async () => {
 });
 
 test("a match the player comes back to says how its last round went", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary()]),
@@ -880,7 +827,7 @@ test("a match the player comes back to says how its last round went", async () =
 
 test("opening the list while a match starts doesn't open the match over it", async () => {
   const match = later();
-  renderApp({
+  showApp({
     ...NO_MATCHES,
     "POST /api/matches": match.response,
   });
@@ -904,7 +851,7 @@ test("a match gone because the player logged out in another tab is left, saying 
     ...RUI,
     "POST /api/matches": newMatch(),
   };
-  const requests = renderApp(answers);
+  const requests = showApp(answers);
   fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
   const keep = await screen.findByRole("button", { name: "Keep this hand" });
 
@@ -927,7 +874,9 @@ test("a match gone because the player logged out in another tab is left, saying 
     ).toHaveFocus();
   });
   expect(screen.getByRole("button", { name: "Log in" })).toBeInTheDocument();
-  expect(requests.filter((to) => to === "GET /api/session")).toHaveLength(2);
+  expect(
+    requests.map(to).filter((where) => where === "GET /api/session"),
+  ).toHaveLength(2);
 
   // Gone once another match starts, and so after it too.
   const over = view({ match_over: true, winner: 0, legal_actions: [] });
@@ -954,7 +903,7 @@ test("a match gone because the player logged out in another tab is left, saying 
 });
 
 test("a match the server doesn't know says so, with the focus", async () => {
-  renderApp({
+  showApp({
     ...RUI,
     "POST /api/matches": newMatch(),
     "POST /api/matches/a-match/actions": {
@@ -985,7 +934,7 @@ test("who is logged in stays when asking again doesn't work", async () => {
     "GET /api/stats": stats([]),
     "GET /api/matches": page([summary()]),
   };
-  const requests = renderApp(answers);
+  const requests = showApp(answers);
   await openMatches();
   await screen.findByRole("listitem");
   onTestFinished(() => {
@@ -1004,7 +953,9 @@ test("who is logged in stays when asking again doesn't work", async () => {
   delete answers["GET /api/session"];
   backToTab();
   await waitFor(() => {
-    expect(requests.filter((to) => to === "GET /api/session")).toHaveLength(2);
+    expect(
+      requests.map(to).filter((where) => where === "GET /api/session"),
+    ).toHaveLength(2);
   });
   await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
   expect(screen.getByText("rui")).toBeInTheDocument();
@@ -1019,12 +970,14 @@ test("who is logged in stays when asking again doesn't work", async () => {
   expect(
     await screen.findByText("No match yet: choose a deck to play one."),
   ).toBeInTheDocument();
-  expect(requests.filter((to) => to === "GET /api/matches")).toHaveLength(2);
+  expect(
+    requests.map(to).filter((where) => where === "GET /api/matches"),
+  ).toHaveLength(2);
 });
 
 test("resuming a match that ended in another tab asks for the list again", async () => {
   const over = view({ match_over: true, winner: 0, legal_actions: [] });
-  const requests = renderApp({
+  const requests = showApp({
     ...NO_MATCHES,
     // The list says it isn't over: it came before it ended.
     "GET /api/matches": page([summary()]),

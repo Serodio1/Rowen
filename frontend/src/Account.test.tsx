@@ -1,55 +1,7 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect, test } from "vitest";
-import { App } from "./App.tsx";
-import { createApi } from "./api/client.ts";
-import { createQueryClient } from "./api/requests.ts";
+import { sent, showApp, type Answer } from "./fake-api.tsx";
 import { DECKS } from "./test-data.ts";
-
-/** An answer of the fake API: a status and a JSON body, or any `Response`. */
-type Answer = { status: number; body: unknown } | Response | Promise<Response>;
-
-/**
- * Show the page with a fake API, which answers each request with the answer
- * for its method and path, such as `"GET /api/session"`, and return the
- * requests it got. The answers may change during a test.
- */
-function renderApp(answers: Record<string, Answer>) {
-  const requests: Request[] = [];
-  const api = createApi((request) => {
-    requests.push(request);
-    const answer =
-      answers[`${request.method} ${new URL(request.url).pathname}`];
-    if (answer === undefined) {
-      return Promise.reject(new TypeError("Failed to fetch"));
-    }
-    if (answer instanceof Response || answer instanceof Promise) {
-      return Promise.resolve(answer).then((response) => response.clone());
-    }
-    return Promise.resolve(
-      Response.json(answer.body, { status: answer.status }),
-    );
-  });
-  render(
-    <QueryClientProvider client={createQueryClient()}>
-      <App api={api} />
-    </QueryClientProvider>,
-  );
-  return requests;
-}
-
-/** Return the requests for one method and path. */
-function sent(requests: Request[], to: string) {
-  return requests.filter(
-    (request) => `${request.method} ${new URL(request.url).pathname}` === to,
-  );
-}
 
 const DECKS_ANSWER = { status: 200, body: { decks: DECKS } };
 const GUEST = {
@@ -75,7 +27,7 @@ async function logInWith(username: string, password: string) {
 }
 
 test("a guest is asked to log in, and can play without", async () => {
-  renderApp(GUEST);
+  showApp(GUEST);
 
   expect(
     await screen.findByRole("button", { name: "Log in" }),
@@ -86,7 +38,7 @@ test("a guest is asked to log in, and can play without", async () => {
 });
 
 test("a player who is logged in sees their username", async () => {
-  renderApp({ "GET /api/decks": DECKS_ANSWER, "GET /api/session": RUI });
+  showApp({ "GET /api/decks": DECKS_ANSWER, "GET /api/session": RUI });
 
   expect(await screen.findByText("rui")).toBeInTheDocument();
   expect(screen.getByText(/Logged in as/)).toBeInTheDocument();
@@ -95,7 +47,7 @@ test("a player who is logged in sees their username", async () => {
 });
 
 test("when the page can't ask, the player is taken for a guest", async () => {
-  renderApp({ "GET /api/decks": DECKS_ANSWER });
+  showApp({ "GET /api/decks": DECKS_ANSWER });
 
   expect(
     await screen.findByRole("button", { name: "Log in" }),
@@ -103,7 +55,7 @@ test("when the page can't ask, the player is taken for a guest", async () => {
 });
 
 test("nothing shows until the page knows who is logged in", async () => {
-  const requests = renderApp({
+  const requests = showApp({
     "GET /api/decks": DECKS_ANSWER,
     "GET /api/session": new Promise<Response>(() => {}),
   });
@@ -115,7 +67,7 @@ test("nothing shows until the page knows who is logged in", async () => {
 
 test("logging in sends the username in lower case, and closes the dialog", async () => {
   const answers: Record<string, Answer> = { ...GUEST };
-  const requests = renderApp(answers);
+  const requests = showApp(answers);
   answers["POST /api/session"] = RUI;
 
   await logInWith("Rui", "dragon123");
@@ -135,7 +87,7 @@ test("logging in sends the username in lower case, and closes the dialog", async
 });
 
 test("the dialog keeps the rest of the page out of reach", async () => {
-  renderApp(GUEST);
+  showApp(GUEST);
 
   fireEvent.click(await screen.findByRole("button", { name: "Log in" }));
 
@@ -145,7 +97,7 @@ test("the dialog keeps the rest of the page out of reach", async () => {
 });
 
 test("a wrong password is said in the dialog, which stays open", async () => {
-  renderApp({
+  showApp({
     ...GUEST,
     "POST /api/session": {
       status: 401,
@@ -165,7 +117,7 @@ test("a wrong password is said in the dialog, which stays open", async () => {
 });
 
 test("making an account sends it to /accounts, with the rules shown", async () => {
-  const requests = renderApp({ ...GUEST, "POST /api/accounts": RUI });
+  const requests = showApp({ ...GUEST, "POST /api/accounts": RUI });
 
   fireEvent.click(await screen.findByRole("button", { name: "Log in" }));
   fireEvent.click(
@@ -202,7 +154,7 @@ test("making an account sends it to /accounts, with the rules shown", async () =
 });
 
 test("a taken username is said, and switching back clears it", async () => {
-  renderApp({
+  showApp({
     ...GUEST,
     "POST /api/accounts": {
       status: 409,
@@ -237,7 +189,7 @@ test("a taken username is said, and switching back clears it", async () => {
 test.each(["Cancel", "Escape"])(
   "%s closes the dialog, and the focus goes back to Log in",
   async (how) => {
-    const requests = renderApp(GUEST);
+    const requests = showApp(GUEST);
 
     fireEvent.click(await screen.findByRole("button", { name: "Log in" }));
     if (how === "Escape") {
@@ -254,7 +206,7 @@ test.each(["Cancel", "Escape"])(
 );
 
 test("a second submit while the first is on its way sends nothing", async () => {
-  const requests = renderApp({
+  const requests = showApp({
     ...GUEST,
     "POST /api/session": new Promise<Response>(() => {}),
   });
@@ -275,7 +227,7 @@ test("a second submit while the first is on its way sends nothing", async () => 
 });
 
 test("the fields ask the browser for the API's rules", async () => {
-  renderApp(GUEST);
+  showApp(GUEST);
 
   fireEvent.click(await screen.findByRole("button", { name: "Log in" }));
 
@@ -291,7 +243,7 @@ test("the fields ask the browser for the API's rules", async () => {
 });
 
 test("a password is counted in characters, as the API counts them", async () => {
-  renderApp(GUEST);
+  showApp(GUEST);
   fireEvent.click(await screen.findByRole("button", { name: "Log in" }));
   const password = screen.getByLabelText<HTMLInputElement>("Password");
   const type = (value: string) => {
@@ -310,7 +262,7 @@ test("a password is counted in characters, as the API counts them", async () => 
 });
 
 test("logging out ends the session, and the page shows Log in", async () => {
-  const requests = renderApp({
+  const requests = showApp({
     "GET /api/decks": DECKS_ANSWER,
     "GET /api/session": RUI,
     "DELETE /api/session": new Response(null, { status: 204 }),
@@ -328,7 +280,7 @@ test("logging out ends the session, and the page shows Log in", async () => {
 });
 
 test("a log out that didn't work says so, and the player stays in", async () => {
-  renderApp({
+  showApp({
     "GET /api/decks": DECKS_ANSWER,
     "GET /api/session": RUI,
     // Asked for on the decks to play: none, so they show no alert.
@@ -348,7 +300,7 @@ test("a log out that didn't work says so, and the player stays in", async () => 
 });
 
 test("a log out with no answer says the server couldn't be reached", async () => {
-  renderApp({ "GET /api/decks": DECKS_ANSWER, "GET /api/session": RUI });
+  showApp({ "GET /api/decks": DECKS_ANSWER, "GET /api/session": RUI });
 
   fireEvent.click(await screen.findByRole("button", { name: "Log out" }));
 
