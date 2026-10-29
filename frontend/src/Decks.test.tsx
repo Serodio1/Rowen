@@ -286,6 +286,18 @@ test("a deck is changed in place, with its copies to start from", async () => {
   });
 });
 
+test("a deck with a name of only spaces can't be saved", async () => {
+  showApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
+  await openDecks();
+  fireEvent.click(await screen.findByRole("button", { name: "Change Mine" }));
+  await screen.findByRole("list", { name: "Cards" });
+
+  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "   " } });
+
+  // Enter doesn't send the form either: a browser doesn't, with its Save off.
+  expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+});
+
 test("Cancel leaves the deck as it was", async () => {
   const requests = showApp({ ...RUI, "GET /api/my-decks": decks([MINE]) });
   await openDecks();
