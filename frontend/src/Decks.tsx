@@ -408,7 +408,9 @@ function DeckEditor({
               <button
                 type="submit"
                 className={BUTTON}
-                disabled={!valid || name.trim() === "" || save.isPending}
+                disabled={!valid || name.trim() === ""}
+                // Keeps the focus while it saves; onSubmit sends it once.
+                aria-disabled={save.isPending}
               >
                 Save
               </button>

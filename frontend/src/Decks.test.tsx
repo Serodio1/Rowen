@@ -395,7 +395,10 @@ test("a deck is saved once, however fast Save is pressed", async () => {
   fireEvent.submit(form);
 
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
   expect(
     requests.filter((request) => to(request).startsWith("PUT")),
@@ -565,6 +568,26 @@ test("logging out from the player's decks asks for them no more", async () => {
   await settle();
   // A guest's request would only get a 401.
   expect(sent(requests, "GET /api/my-decks")).toHaveLength(before);
+});
+
+test("logging out after Back puts the focus on the decks to play", async () => {
+  showApp({
+    ...RUI,
+    "GET /api/my-decks": decks([MINE]),
+    "DELETE /api/session": { status: 204, body: null },
+  });
+  await openDecks();
+  fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+  const logOut = screen.getByRole("button", { name: "Log out" });
+  logOut.focus();
+
+  fireEvent.click(logOut);
+
+  await waitFor(() => {
+    expect(
+      screen.getByRole("heading", { name: "Choose your deck" }),
+    ).toHaveFocus();
+  });
 });
 
 /** Return the part of the decks to play with the player's own. */

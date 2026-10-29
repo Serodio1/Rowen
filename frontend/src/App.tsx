@@ -92,8 +92,10 @@ export function App({ api }: { api: Api }) {
   // What is shown in the decks' place while no match is played: the
   // player's matches, the decks they built, or neither.
   const [showing, setShowing] = useState<"matches" | "decks" | null>(null);
-  // Whether the player left a match: the focus then goes to the decks.
-  const [left, setLeft] = useState(false);
+  // How many times the player left a match, their matches or their decks:
+  // each time, the focus goes to the decks to play, even when they show
+  // already (a count, not a boolean, so that a second time is a change).
+  const [left, setLeft] = useState(0);
   // The level of the AI for the next match. It is kept here, so the player
   // finds it as they chose it when they play again.
   const [level, setLevel] = useState<Level>("normal");
@@ -139,7 +141,7 @@ export function App({ api }: { api: Api }) {
     setLoggedOut(owner === before);
     setMatch((match) => (match?.owner === before ? null : match));
     setShowing(null);
-    setLeft(true);
+    setLeft((times) => times + 1);
   }, [username, queryClient, owner]);
   const top = useRef<HTMLDivElement>(null);
   const wasLoggingIn = useRef(false);
@@ -193,7 +195,7 @@ export function App({ api }: { api: Api }) {
               api={api}
               onBack={() => {
                 setShowing(null);
-                setLeft(true);
+                setLeft((times) => times + 1);
               }}
             />
           ) : showing === "matches" ? (
@@ -213,7 +215,7 @@ export function App({ api }: { api: Api }) {
               }}
               onBack={() => {
                 setShowing(null);
-                setLeft(true);
+                setLeft((times) => times + 1);
               }}
             />
           ) : (
@@ -240,7 +242,7 @@ export function App({ api }: { api: Api }) {
             onEnded={setEnded}
             onLeave={() => {
               setMatch(null);
-              setLeft(true);
+              setLeft((times) => times + 1);
             }}
           />
         )}
@@ -262,8 +264,9 @@ export function App({ api }: { api: Api }) {
  * A player who is logged in can also choose one of the decks they built.
  *
  * @param onStart - Called with the match once it has started.
- * @param focus - Whether to put the focus on the heading, as when the player
- *   left a match: the button they pressed is gone.
+ * @param focus - How many times the player left something for the decks:
+ *   each new time (above 0), the focus goes to the heading, as the button
+ *   they pressed is gone.
  * @param loggedIn - Whether the player is logged in, and so has decks of
  *   their own.
  * @param loggedOut - Whether the page left a match because its account
@@ -283,7 +286,7 @@ function ChooseDeck({
 }: {
   api: Api;
   onStart: (match: Played) => void;
-  focus: boolean;
+  focus: number;
   loggedIn: boolean;
   // Whether the page doesn't know yet who is logged in: a match started
   // then wouldn't know whose it is.
@@ -295,7 +298,7 @@ function ChooseDeck({
   const queryClient = useQueryClient();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    if (focus) {
+    if (focus > 0) {
       heading.current?.focus();
     }
   }, [focus]);
@@ -813,9 +816,13 @@ function PlayMatch({
               ref={tryAgain}
               type="button"
               className={BUTTON}
-              disabled={match.isFetching}
+              // Keeps the focus while the match comes, so the keyboard
+              // stays here.
+              aria-disabled={match.isFetching}
               onClick={() => {
-                void match.refetch();
+                if (!match.isFetching) {
+                  void match.refetch();
+                }
               }}
             >
               Try again

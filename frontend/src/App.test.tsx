@@ -652,8 +652,13 @@ test("when the match can't be asked for again, no move can be made until it can"
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: "Try again" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Try again" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
+  // It keeps the focus, so the keyboard stays where it was.
+  expect(screen.getByRole("button", { name: "Try again" })).toHaveFocus();
   expect(sent(requests, "GET /api/matches/a-match")).toHaveLength(2);
   expect(sent(requests, PLAY)).toHaveLength(1);
 
