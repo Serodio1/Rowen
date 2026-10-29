@@ -18,6 +18,7 @@ dependencies = [
 # The commands the package installs: "uv run rowen" plays a match in the terminal.
 [project.scripts]
 rowen = "rowen.cli.play:main"
+rowen-arena = "rowen.cli.arena:main"
 
 [dependency-groups]
 dev = [
@@ -139,6 +140,7 @@ forbidden_modules = ["rowen.engine"]
 ignore_imports = [
     "rowen.cli.** -> rowen.engine.public",
     "rowen.cli.** -> rowen.ai.baseline",
+    "rowen.cli.** -> rowen.ai.montecarlo",
     "rowen.cli.** -> rowen.data",
 ]
 broken_contract_guidance = """

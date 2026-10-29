@@ -89,6 +89,16 @@ Each turn shows the board and a numbered list of what you can do: type a number
 to choose. When the match ends, the seed is shown: the same seed and the same
 choices always give the same match.
 
+To see how well one level of the AI plays against another, let them play each
+other:
+
+```sh
+uv run rowen-arena hard easy --matches 400   # Hard against Easy, 400 matches
+```
+
+It shows the share of the decisive matches the first AI won, with a 95% margin
+of error, and how long each AI takes per move.
+
 ## Run the web API
 
 The web API is what the browser plays through. It also lets you play a whole
