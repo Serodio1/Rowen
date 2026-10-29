@@ -345,11 +345,13 @@ Never go back to a revision older than the database's newest migration
 (`git log -- backend/migrations/versions` gives its commit). The migrations
 only add, so the older code still starts, but it does not know what they
 added, and it breaks the matches that use it. The newest one came with
-`rowen-3b8f05f` (a match keeps a copy of its built deck): a revision older
-than it replays such a match from the faction's own deck instead (an error,
-or, worse, new moves from the wrong cards, kept for good), and older ones
-also let anyone read a player's match and finish a match without keeping
-its result. A page left open keeps sending moves to whichever revision
+`rowen-d727e8d` (a match keeps the level of its AI): a revision older than it
+plays every match with the easy AI, whatever level the player chose. The one
+before came with `rowen-3b8f05f` (a match keeps a copy of its built deck): a
+revision older than that replays such a match from the faction's own deck
+instead (an error, or, worse, new moves from the wrong cards, kept for good),
+and older ones also let anyone read a player's match and finish a match
+without keeping its result. A page left open keeps sending moves to whichever revision
 answers. If the newest revision that knows the database is the broken one,
 fix it forward: revert the change on `main` and let CI deploy the revert.
 Going down a migration (`alembic downgrade`) is no way back either: it
