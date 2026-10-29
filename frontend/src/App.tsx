@@ -216,6 +216,7 @@ export function App({ api }: { api: Api }) {
               focus={left}
               loggedOut={loggedOut}
               loggedIn={username !== undefined && username !== null}
+              waiting={session.isPending}
               level={level}
               onLevel={setLevel}
             />
@@ -266,6 +267,7 @@ function ChooseDeck({
   focus,
   loggedIn,
   loggedOut,
+  waiting,
   level,
   onLevel,
 }: {
@@ -273,6 +275,9 @@ function ChooseDeck({
   onStart: (match: Played) => void;
   focus: boolean;
   loggedIn: boolean;
+  // Whether the page doesn't know yet who is logged in: a match started
+  // then wouldn't know whose it is.
+  waiting: boolean;
   loggedOut: boolean;
   level: Level;
   onLevel: (level: Level) => void;
@@ -365,7 +370,7 @@ function ChooseDeck({
               key={deck.id}
               type="button"
               className={`${BUTTON} px-8 py-4 text-xl`}
-              disabled={start.isPending}
+              disabled={start.isPending || waiting}
               onClick={startWith({ deck: deck.id, level })}
             >
               {deck.name}
@@ -598,6 +603,8 @@ function PlayMatch({
   }
   // The player whose discard pile is listed, if one is.
   const [pile, setPile] = useState<number | null>(null);
+  // The pile's button that listed it: the focus goes back to it on Close.
+  const pileButton = useRef<HTMLElement | null>(null);
   // Whether the player is using the keyboard: the page moves the focus by
   // itself after each move, which must not show a card then.
   const typing = useRef(false);
@@ -876,7 +883,13 @@ function PlayMatch({
           view={board}
           playing={view.match_over ? undefined : playing}
           stage={stageOf(steps, progress)}
-          onPile={setPile}
+          onPile={(side) => {
+            pileButton.current =
+              document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+            setPile(side);
+          }}
         />
         {showing?.kind === "announce" && <Banner text={showing.text} />}
         {showing?.kind === "play" ? (
@@ -947,6 +960,7 @@ function PlayMatch({
             }
             onClose={() => {
               setPile(null);
+              pileButton.current?.focus();
             }}
           />
         )}
