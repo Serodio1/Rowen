@@ -8,7 +8,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from rowen.ai import baseline
-from rowen.ai.montecarlo import _next, choose_action, guess
+from rowen.ai.montecarlo import _next, _play_out, choose_action, guess
 from rowen.data import deck_ids, load_deck
 from rowen.engine.actions import Action, EndRedraw, Pass, PlayUnit, Revive
 from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
@@ -310,13 +310,14 @@ def test_leaves_the_choice_to_the_baseline(
 
 
 def test_adds_up_every_sample() -> None:
-    # The AI leads by 10. The opponent holds three of a Knight and four
-    # Scouts: with the Knight, they catch up, and with three Scouts (9
-    # points) they don't. With seed 1, the first two samples give them the
-    # Knight and the last one doesn't: on their own, the last one would pass.
+    # The last round: the AI leads by 10. The opponent holds three of a
+    # Knight and four Scouts: with the Knight, they catch up and win the
+    # match, and with three Scouts (9 points) they don't. With seed 1, the
+    # first two samples give them the Knight and the last one doesn't: on
+    # their own, the last one would pass, to win with a card more.
     state = match(
-        player((KNIGHT, KNIGHT), siege=(wall(10),)),
-        player((SCOUT,) * 3),
+        player((KNIGHT, KNIGHT), siege=(wall(10),), lives=1),
+        player((SCOUT,) * 3, lives=1),
     )
     decks = ((KNIGHT, KNIGHT, wall(10)), (KNIGHT, SCOUT, SCOUT, SCOUT, SCOUT))
 
@@ -348,6 +349,15 @@ def test_play_out_passes_once_ahead_after_the_opponent_passed() -> None:
     opponent = replace(player((SCOUT,)), passed=True)
     state = match(player((KNIGHT,), siege=(wall(1),)), opponent)
     assert _next(state) == Pass()
+
+
+def test_play_out_goes_on_to_the_end_of_the_match() -> None:
+    # Passing wins round 1 by a point, and the match goes on: in round 2, the
+    # AI's Knight (5) beats the opponent's Scout (3). So the score is a won
+    # match, not the life round 1 won (7).
+    opponent = replace(player((SCOUT,)), passed=True)
+    state = match(player((KNIGHT,), siege=(wall(1),)), opponent)
+    assert _play_out(state, Pass()) == baseline.WIN
 
 
 def test_the_same_seed_gives_the_same_action() -> None:

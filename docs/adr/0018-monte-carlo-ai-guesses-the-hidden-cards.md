@@ -1,7 +1,8 @@
 # ADR 0018: Let a Monte Carlo AI guess the hidden cards
 
-- **Status:** Accepted; the AI skips the legality check and may import
-  `dataclasses` (see the end)
+- **Status:** Accepted; the AI skips the legality check, may import
+  `dataclasses`, and plays each sample out to the end of the match (see the
+  updates at the end)
 - **Date:** 2026-10-28
 
 ## Context
@@ -21,9 +22,10 @@ replay doesn't run the AI again: the AI may use randomness of its own.
 1. **Guess the hidden cards, many times.** Each guess, a *sample*, fills the
    opponent's hand and both decks with real cards, in a random order. In each
    sample, the AI tries every legal action. Both players then play the rest
-   of the round, and the AI scores the end of it with the baseline's score
-   (cards 5 points, lives 7). It plays the action with the best total over
-   all the samples.
+   of the match, and the AI scores the end of it with the baseline's score
+   (who won, then the cards left). It plays the action with the best total
+   over all the samples. (Until 2026-10-29, the rest of the round only: see
+   the second update.)
 2. **The cards come from two lists.** The AI knows its own deck. For the
    opponent, it guesses their faction's own deck, which anyone can look up,
    not the deck they built. From each list, it takes away the cards the view
@@ -48,6 +50,8 @@ replay doesn't run the AI again: the AI may use randomness of its own.
 - **Play each sample out to the end of the match.** The score is then only
   who won. With 4 samples it won 46% of the decisive matches against the
   baseline, against 49% for playing out the round, and took 40% longer.
+  Measured again with more samples and more matches, it won clearly: it is
+  the decision now (second update).
 - **Use the baseline itself in the play-outs.** It plays better after a pass,
   but a decision with 4 samples took 276 ms on average, against 60 ms.
 - **A time limit for each decision.** The time is easier to predict, but the
@@ -89,3 +93,27 @@ replay doesn't run the AI again: the AI may use randomness of its own.
   `dataclasses.replace`, which changes the hidden cards and keeps every other
   field. The AI's import contract allows `dataclasses` and still nothing else
   outside the engine.
+
+## Update (2026-10-29, later): play each sample out to the end of the match
+
+`rowen-arena` (#153) plays two levels of the AI against each other with both
+decks in both seats. Against the baseline, Hard (16 samples) played the
+rounds out as before, and then the whole match, in 400 matches each with the
+same two seeds:
+
+| Play-out | Seed 0 | Seed 1 | Both | Time per move |
+| --- | --- | --- | --- | --- |
+| To the end of the round | 56.6% ± 5.1% | 62.9% ± 5.0% | 59.8% ± 3.5% | 0.14 s |
+| To the end of the match | 65.6% ± 4.8% | 69.6% ± 4.6% | 67.6% ± 3.3% | 0.19 s |
+
+The difference, 8 points, is larger than both margins. Normal (8 samples)
+won 56.7% ± 5.0% with the whole match, in 0.10 s per move. Why the first
+measurement above disagreed is not known: it used 4 samples, fewer matches
+and a one-off script.
+
+- Each sample is now played out until the match ends, and scored with the
+  baseline's score: who won the match, and then the cards left.
+- A move takes about 1.4 times as long, under the limit of twice the time
+  set for this change. Normal and Hard keep 8 and 16 samples.
+- Giving up a round in the play-outs when far behind was measured too: 58.4%
+  ± 5.0% with seed 0, no clear gain, so it was left out.
