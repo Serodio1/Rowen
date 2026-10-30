@@ -70,6 +70,18 @@ test("the match fits a laptop's screen, and nothing sticks out on a phone", asyn
     await expect(shown).toBeInViewport({ ratio: 1 });
   }
 
+  // On a 2K screen everything grows, 1.6 times, and still fits.
+  const card = hand.getByRole("listitem").first();
+  const cardWidth = async () => (await card.boundingBox())?.width ?? 0;
+  const laptop = await cardWidth();
+  await page.setViewportSize({ width: 2560, height: 1440 });
+  expect((await cardWidth()) / laptop).toBeCloseTo(1.6, 1);
+  expect(await scrolls(page)).toEqual({ across: 0, down: 0 });
+  // A wide screen that is not as high: it grows only as far as the height
+  // lets it.
+  await page.setViewportSize({ width: 2560, height: 1080 });
+  expect(await scrolls(page)).toEqual({ across: 0, down: 0 });
+
   for (const [width, height] of [
     [390, 844],
     [320, 640],
