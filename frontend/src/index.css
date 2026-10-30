@@ -83,6 +83,14 @@
 }
 
 @layer base {
+  /* Every size is in rem, so the whole page grows with the screen: as on a
+     1440×900 screen (the user's own font size), up to 1.6 times that on a
+     2560×1440 one, by whichever of the width and height is shorter, so it
+     still fits. */
+  html {
+    font-size: clamp(100%, min(1.111vw, 1.778vh), 160%);
+  }
+
   body {
     min-height: 100vh;
     background-color: var(--color-wood-950);
