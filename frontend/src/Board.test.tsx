@@ -472,6 +472,27 @@ test("the same weather, played by both players, is shown twice", () => {
   ]);
 });
 
+test("more than two weather cards overlap on one line, so the board doesn't grow", () => {
+  const items = (players: View["players"]) => {
+    const { unmount } = render(<Board view={view({ players })} />);
+    const shown = within(screen.getByRole("group", { name: "Weather" }))
+      .getAllByRole("listitem")
+      .map((item) => item.classList.contains("not-first:-ml-11"));
+    unmount();
+    return shown;
+  };
+
+  expect(
+    items([side({ weather: [HOARFROST] }), side({ weather: [DOWNPOUR] })]),
+  ).toEqual([false, false]);
+  expect(
+    items([
+      side({ weather: [HOARFROST, DOWNPOUR] }),
+      side({ weather: [HOARFROST] }),
+    ]),
+  ).toEqual([true, true, true]);
+});
+
 test("while a move plays out, its cards are held back and the units destroyed burn in their rows", () => {
   render(
     <Board

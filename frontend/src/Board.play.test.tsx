@@ -290,6 +290,45 @@ test("a Scarecrow goes over one of the player's units, which become buttons", ()
   ]);
 });
 
+test("with two copies of a unit in a row, a Scarecrow offers the first, which it takes back", () => {
+  const units = [
+    { card: SNIPER, strength: 6 },
+    { card: SNIPER, strength: 6 },
+  ];
+  renderPlaying(
+    view({
+      hand: [SCARECROW],
+      players: [
+        side({
+          rows: { ...side().rows, ranged: { ...side().rows.ranged, units } },
+        }),
+        side(),
+      ],
+      legal_actions: [
+        {
+          type: "play_scarecrow",
+          card: "scarecrow",
+          row: "ranged",
+          unit: "sniper",
+        },
+        { type: "pass" },
+      ],
+    }),
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: /^Scarecrow/ }));
+
+  // One button, not two alike: the second copy is dimmed, as it isn't offered.
+  const target = screen.getByRole("button", {
+    name: "Play Scarecrow in the ranged row, taking back Sniper",
+  });
+  const [first, second] = within(
+    target.closest("ul") as HTMLElement,
+  ).getAllByRole("listitem");
+  expect(first).toContainElement(target);
+  expect(second).toHaveClass("opacity-45");
+});
+
 test("after a Medic, the units to revive are chosen from the discard pile, not the hand", () => {
   const played = renderPlaying(
     view({
