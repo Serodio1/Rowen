@@ -17,8 +17,8 @@ test("plays a whole match against the AI", async ({ page }) => {
 
   await playOn(page);
 
-  const playAgain = page.getByRole("button", { name: "Play again" });
-  await expect(playAgain).toBeFocused();
+  const toMenu = page.getByRole("button", { name: "Return to main menu" });
+  await expect(toMenu).toBeFocused();
   await expect(
     page.getByText(
       /^(You won the match!|The AI won the match\.|The match is a draw\.)$/,
@@ -27,7 +27,7 @@ test("plays a whole match against the AI", async ({ page }) => {
   // No move was turned down on the way.
   await expect(page.getByRole("alert")).toHaveCount(0);
 
-  await playAgain.click();
+  await toMenu.click();
   await expect(
     page.getByRole("heading", { name: "Choose your deck" }),
   ).toBeVisible();

@@ -65,7 +65,7 @@ test("lists a player's matches, plays on one and counts how it ended", async ({
   await expect(rounds.getByRole("row").nth(1).getByRole("cell")).toHaveText(
     expected ?? [],
   );
-  await end.getByRole("button", { name: "Play again" }).click();
+  await end.getByRole("button", { name: "Return to main menu" }).click();
 
   await page.getByRole("button", { name: "My matches" }).click();
   await expect(match).toContainText(/^.*(Won|Lost|Drawn): \d+ to \d+/);
