@@ -40,15 +40,15 @@ so with no passive on either side; it is not a way the game can be played.
 
 - **Robots win more, with both AIs.** Neither margin reaches 50%: this is not
   luck.
-- **The cards give Robots about 4 percentage points.** Without the passives they still
-  win 54.3%. The decks are mirrors except for three cards: the Drone (5) is
+- **The cards give Robots about 4 percentage points.** Without the passives
+  they still win 54.3%. The decks are mirrors except for three cards: the Drone (5) is
   weaker than the Sniper (6), but the AI (5) is stronger than the Smart Guy
   (3), and the Computer Spy gives the opponent 2 points where the Informant
   gives 3. Leaving the Spies out, Robots' units add up to 80 and Humans' to
   77, and Robots' two Spies give the opponent 2 points fewer in all.
-- **The passives add about 10 more**, with the Easy AI (64.0% against 54.3%): Robots' (one unit
-  stays on the board after a round) is worth more than Humans' (a card after
-  winning a round). With them, draws are much rarer (137 against 780).
+- **The passives add about 10 more**, with the Easy AI (64.0% against
+  54.3%): Robots' (one unit stays on the board after a round) is worth more
+  than Humans' (a card after winning a round). With them, draws are much rarer (137 against 780).
 - **The Normal AI's gap is smaller** (57% against 64%). Why was not measured.
 
 ## Next
