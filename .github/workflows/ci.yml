@@ -327,6 +327,25 @@ jobs:
           docker build --platform=linux/amd64 --provenance=false --tag "$REGISTRY/api:$tag" backend
           docker build --platform=linux/amd64 --provenance=false --tag "$REGISTRY/web:$tag" frontend
 
+      # Brings the database's tables up to date, as the database's owner (a
+      # secret of the environment), before the new revision starts: if a
+      # migration fails, nothing is deployed. It needs no access to Google,
+      # so it comes before signing in: a failed migration pushes nothing.
+      # The revision still running meets the new tables for a moment, so a
+      # migration must not break it (add, then remove in a later deployment).
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          # The same uv as the Docker image (backend/Dockerfile).
+          version: "0.12.22"
+          working-directory: backend
+          enable-cache: true
+
+      - name: Migrate the database
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+        run: uv run --locked --no-dev alembic upgrade head
+
       # Trades GitHub's token for an hour of access as the account
       # rowen-deploy, which may only push images and update the service.
       # gcloud, already on the runner, uses it in the next steps.
@@ -341,24 +360,6 @@ jobs:
           gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
           docker push "$REGISTRY/api:$TAG"
           docker push "$REGISTRY/web:$TAG"
-
-      # Brings the database's tables up to date, as the database's owner (a
-      # secret of the environment), before the new revision starts: if a
-      # migration fails, nothing is deployed. The revision still running
-      # meets the new tables for a moment, so a migration must not break it
-      # (add, then remove in a later deployment).
-      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
-        with:
-          # The same uv as the Docker image (backend/Dockerfile).
-          version: "0.12.22"
-          working-directory: backend
-          enable-cache: true
-
-      - name: Migrate the database
-        working-directory: backend
-        env:
-          DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
-        run: uv run --locked --no-dev alembic upgrade head
 
       # Starts the new revision beside the one that answers now, which keeps
       # all the requests (ADR 0016). Fails if its containers do not start.

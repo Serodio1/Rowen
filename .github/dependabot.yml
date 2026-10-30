@@ -1,0 +1,36 @@
+# Dependabot opens a pull request when a new version comes out of an action
+# the workflows use, or of an image the Dockerfiles start from. Both are
+# pinned by SHA or digest, so nothing changes until such a pull request is
+# merged, after CI has tested it.
+#
+# Once a month, with one pull request for each kind, and only versions out
+# for 14 days, as for npm (frontend/.npmrc, min-release-age): a version
+# that was broken or malicious has usually been found and pulled by then.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 14
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /frontend
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 14
+    groups:
+      images:
+        patterns: ["*"]
+    ignore:
+      # A new major version (Node 26, say) is a choice of its own, with the
+      # rest of the project (frontend/.nvmrc, backend/pyproject.toml).
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

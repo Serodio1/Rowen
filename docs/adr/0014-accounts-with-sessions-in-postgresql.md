@@ -36,7 +36,8 @@ behind Vite in development ([ADR 0009](0009-docker-images-behind-nginx.md)).
   token of 32 random bytes and sends it in a cookie; the table keeps only its
   SHA-256 hash, the account and when it expires. Logging out deletes the
   row. The API's role, `rowen_app`, may delete sessions (the migration grants
-  it), and still no other rows.
+  it), and, since the decks players build (ADR 0017), those decks too: still
+  no other rows.
 - **The cookie** is `__Host-session`: `HttpOnly`, `Secure`, `SameSite=Lax`,
   `Path=/`. A session lasts 30 days after the player was last seen, renewed
   at most once a day (`GET /session`), so not every request writes to the
