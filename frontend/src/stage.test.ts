@@ -5,6 +5,7 @@ import {
   newIndexes,
   nextOf,
   stageOf,
+  startOf,
   stepsOf,
   stepsOfMoves,
   TIMES,
@@ -289,6 +290,20 @@ test("once both players are done swapping, round 1 begins, and its message says 
   expect(stepsOf([ended], view(), view({ players: [side(), done] }))).toEqual(
     [],
   );
+});
+
+test("a new match starts with a message: the player swaps as many cards as the server says", () => {
+  const first = view();
+
+  expect(startOf(first)).toEqual<Step>({
+    kind: "announce",
+    text: "Swap up to 2 cards.",
+    view: first,
+  });
+  // The AI's swaps are not the player's.
+  expect(
+    startOf(view({ players: [side({ redraws_left: 1 }), side()] })).text,
+  ).toBe("Swap up to 1 card.");
 });
 
 const BEFORE = view();

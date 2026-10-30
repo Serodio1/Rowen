@@ -6,7 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { expect, onTestFinished, test } from "vitest";
+import { expect, onTestFinished, test, vi } from "vitest";
 import {
   type Match,
   type Matches,
@@ -344,6 +344,28 @@ test("resuming a match gets it as it is now, and its end shows every round", asy
   ).toEqual(["RoundYouThe AIWon by", "11012The AI", "294You", "373You"]);
 });
 
+test("a match resumed while the cards are still swapped doesn't start again with a message", async () => {
+  // Things move, as for a player who didn't ask for reduced motion.
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  onTestFinished(() => {
+    vi.unstubAllGlobals();
+  });
+  showApp({
+    ...RUI,
+    "GET /api/stats": stats([]),
+    "GET /api/matches": page([summary()]),
+    "GET /api/matches/a-match": {
+      status: 200,
+      body: { id: "a-match", version: 0, view: view(), rounds: [] },
+    },
+  });
+  await openMatches();
+  fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+
+  await screen.findByRole("button", { name: "Keep this hand" });
+  expect(document.querySelector("[data-banner]")).toBeNull();
+});
+
 test("while a match is asked for, to play on, no other one can be", async () => {
   const match = later();
   showApp({
@@ -538,7 +560,9 @@ test("the list comes from the cache, until a match starts", async () => {
   expect(asked(requests)).toEqual([1, 1]);
 
   fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Play again" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Return to main menu" }),
+  );
   await openAndBack();
 
   expect(asked(requests)).toEqual([2, 2]);
@@ -573,7 +597,9 @@ test("once a match ends, the list and the stats are asked for again", async () =
   // Coming back to a match doesn't change the list.
   fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
   fireEvent.click(await screen.findByRole("button", { name: "Pass" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Play again" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Return to main menu" }),
+  );
   await openMatches();
   await screen.findByRole("button", { name: "Resume" });
 
@@ -765,7 +791,7 @@ test("the end of a match puts the top of the page out of reach too", async () =>
     ),
   });
   fireEvent.click(await screen.findByRole("button", { name: "Humans" }));
-  await screen.findByRole("button", { name: "Play again" });
+  await screen.findByRole("button", { name: "Return to main menu" });
 
   // The dialog is modal: Tab must not reach "Log out" behind it.
   expect(
@@ -774,7 +800,7 @@ test("the end of a match puts the top of the page out of reach too", async () =>
       .closest("[inert]"),
   ).not.toBeNull();
 
-  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  fireEvent.click(screen.getByRole("button", { name: "Return to main menu" }));
   expect(
     screen.getByRole("button", { name: "Log out" }).closest("[inert]"),
   ).toBeNull();
@@ -895,9 +921,12 @@ test("a match gone because the player logged out in another tab is left, saying 
     await screen.findByRole("button", { name: "Keep this hand" }),
     { detail: 1 },
   );
-  fireEvent.click(await screen.findByRole("button", { name: "Play again" }), {
-    detail: 1,
-  });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Return to main menu" }),
+    {
+      detail: 1,
+    },
+  );
   await screen.findByRole("heading", { name: "Choose your deck" });
   expect(screen.queryByText(/You were logged out/)).not.toBeInTheDocument();
 });
@@ -993,9 +1022,12 @@ test("resuming a match that ended in another tab asks for the list again", async
   });
   await openMatches();
   fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Play again" }), {
-    detail: 1,
-  });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Return to main menu" }),
+    {
+      detail: 1,
+    },
+  );
   await openMatches();
   await screen.findByRole("listitem");
 

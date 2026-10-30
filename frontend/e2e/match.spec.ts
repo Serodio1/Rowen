@@ -17,7 +17,7 @@ test("plays a whole match against the AI", async ({ page }) => {
 
   await playOn(page);
 
-  const playAgain = page.getByRole("button", { name: "Play again" });
+  const playAgain = page.getByRole("button", { name: "Return to main menu" });
   await expect(playAgain).toBeFocused();
   await expect(
     page.getByText(

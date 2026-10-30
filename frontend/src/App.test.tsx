@@ -480,7 +480,9 @@ test.each<[number | null, string]>([
       ),
     ).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Return to main menu" }),
+    );
 
     expect(
       screen.getByRole("heading", { name: "Choose your deck" }),
@@ -562,7 +564,9 @@ test("the player chooses the AI's level before the deck, and finds it as chosen 
   expect(await started?.json()).toEqual({ deck: "humans", level: "hard" });
 
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Play again" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Return to main menu" }),
+  );
 
   expect(screen.getByRole("radio", { name: "Hard" })).toBeChecked();
 });
@@ -1022,7 +1026,9 @@ test("once the match is over, the focus is on playing again, and the rest of the
 
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
 
-  const again = await screen.findByRole("button", { name: "Play again" });
+  const again = await screen.findByRole("button", {
+    name: "Return to main menu",
+  });
   expect(again).toHaveFocus();
   // Behind the end of the match, Tab can't reach the log or the board.
   for (const behind of [
@@ -1115,9 +1121,12 @@ test("the second click of a double click on playing again doesn't start a match"
   await startMatch();
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
 
-  fireEvent.click(await screen.findByRole("button", { name: "Play again" }), {
-    detail: 1,
-  });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Return to main menu" }),
+    {
+      detail: 1,
+    },
+  );
   // The decks are in the cache, so the second click lands on one.
   fireEvent.click(screen.getByRole("button", { name: "Humans" }), {
     detail: 2,
@@ -1186,10 +1195,13 @@ test("the second click of a double click on the last move doesn't leave the end 
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }), {
     detail: 1,
   });
-  // The answer came first, so the second click lands on "Play again".
-  fireEvent.click(await screen.findByRole("button", { name: "Play again" }), {
-    detail: 2,
-  });
+  // The answer came first, so the second click lands on "Return to main menu".
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Return to main menu" }),
+    {
+      detail: 2,
+    },
+  );
 
   await settle();
   expect(screen.getByText("You won the match!")).toBeInTheDocument();
@@ -1334,6 +1346,21 @@ const AI_PLAYED = played(
 function showcase() {
   return document.querySelector("[data-showcase]");
 }
+
+test("a new match starts with a message over the screen: the player swaps cards", async () => {
+  withMotion();
+  const { api } = fakeApi(A_MATCH);
+  renderApp(api);
+  await startMatch();
+
+  const banner = () => document.querySelector("[data-banner]");
+  expect(banner()).toHaveTextContent("Swap up to 2 cards.");
+  // Only a picture: the moves can be made meanwhile.
+  expect(screen.getByRole("button", { name: "Keep this hand" })).toBeEnabled();
+
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.announce));
+  expect(banner()).toBeNull();
+});
 
 test("a card played shows on the right, then goes to its place, which shows it only then", async () => {
   withMotion();
@@ -1564,7 +1591,9 @@ test("once the last move has played out, the end of the match shows each round a
       .getAllByRole("row")
       .map((row) => row.textContent),
   ).toEqual(["RoundYouThe AIWon by", "11012The AI", "294You", "377Tie"]);
-  expect(within(end).getByRole("button", { name: "Play again" })).toHaveFocus();
+  expect(
+    within(end).getByRole("button", { name: "Return to main menu" }),
+  ).toHaveFocus();
 });
 
 test("pointing at a row or a pile, and not at a card in it, shows no card", async () => {

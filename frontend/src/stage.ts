@@ -311,6 +311,19 @@ export function stepsOf(
 }
 
 /**
+ * Return the big message a new match starts with, in its first `view`: the
+ * player swaps cards, as many as the server says they may.
+ */
+export function startOf(view: View): Announcement {
+  const swaps = view.players[view.player]?.redraws_left ?? 0;
+  return {
+    kind: "announce",
+    text: `Swap up to ${String(swaps)} card${swaps === 1 ? "" : "s"}.`,
+    view,
+  };
+}
+
+/**
  * Return the steps of the animation of `moves`, one after the other, from the
  * view `before` the first one (none at the start of the match).
  */

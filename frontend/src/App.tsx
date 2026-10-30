@@ -37,6 +37,7 @@ import { Banner, CardPreview, Showcase } from "./Showcase.tsx";
 import {
   mayMove,
   NO_STEPS,
+  startOf,
   stageOf,
   stepsOfMoves,
   usePlayOut,
@@ -80,10 +81,11 @@ import {
 export function App({ api }: { api: Api }) {
   const queryClient = useQueryClient();
   // The match being played, as it started or as the player came back to it,
-  // and the account it is played with (null for a guest), or null while
-  // there is none.
+  // whether it is new, and the account it is played with (null for a guest),
+  // or null while there is none.
   const [match, setMatch] = useState<{
     played: Played;
+    fresh: boolean;
     owner: string | null;
   } | null>(null);
   // Whether the end of the match is shown, over the whole page: the top of
@@ -209,6 +211,7 @@ export function App({ api }: { api: Api }) {
                 setLoggedOut(false);
                 setMatch({
                   played: { ...resumed, moves: [] },
+                  fresh: false,
                   owner: username ?? null,
                 });
                 setShowing(null);
@@ -223,7 +226,7 @@ export function App({ api }: { api: Api }) {
               api={api}
               onStart={(played) => {
                 setLoggedOut(false);
-                setMatch({ played, owner: username ?? null });
+                setMatch({ played, fresh: true, owner: username ?? null });
               }}
               focus={left}
               loggedOut={loggedOut}
@@ -239,6 +242,7 @@ export function App({ api }: { api: Api }) {
             key={match.played.id}
             api={api}
             started={match.played}
+            fresh={match.fresh}
             onEnded={setEnded}
             onLeave={() => {
               setMatch(null);
@@ -558,6 +562,7 @@ function namesOf(played: Played): [string, string][] {
  *
  * @param started - The match as it started, with what the AI did if it
  *   started, or as the player came back to it, with no moves.
+ * @param fresh - Whether the match just started: it begins with a message.
  * @param onEnded - Called with whether the end of the match is shown over
  *   the whole page.
  * @param onLeave - Called when the player is done with the match.
@@ -565,11 +570,13 @@ function namesOf(played: Played): [string, string][] {
 function PlayMatch({
   api,
   started,
+  fresh,
   onEnded,
   onLeave,
 }: {
   api: Api;
   started: Played;
+  fresh: boolean;
   onEnded: (ended: boolean) => void;
   onLeave: () => void;
 }) {
@@ -596,10 +603,17 @@ function PlayMatch({
           },
         ],
   );
-  // The animation of the last move, or of the AI's first one: none with
-  // reduced motion.
+  // The animation of the last move, or of the start of a new match and the
+  // AI's first moves: none with reduced motion.
   const [steps, setSteps] = useState<readonly Step[]>(() =>
-    mayMove() ? stepsOfMoves(started.moves, undefined) : NO_STEPS,
+    mayMove()
+      ? [
+          // The board before any move is as after the AI's first: it only
+          // swapped cards.
+          ...(fresh ? [startOf(started.moves[0]?.view ?? started.view)] : []),
+          ...stepsOfMoves(started.moves, undefined),
+        ]
+      : NO_STEPS,
   );
   const progress = usePlayOut(steps);
   const showing = steps[progress.step];
@@ -949,7 +963,7 @@ function PlayMatch({
                   // could land here, and skip who won.
                   onClick={onFirstClick(onLeave)}
                 >
-                  Play again
+                  Return to main menu
                 </button>
               </div>
             </div>
