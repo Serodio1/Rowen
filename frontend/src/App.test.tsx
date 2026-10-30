@@ -155,7 +155,7 @@ test("the player can choose any of the API's decks", async () => {
   expect(
     screen.getByRole("button", { name: "Humans" }),
   ).toHaveAccessibleDescription(
-    "The Commander: Draws a card after winning a round.",
+    "The Commander: Draws 2 cards after winning a round.",
   );
   expect(screen.queryByText("Loading the decks…")).not.toBeInTheDocument();
   // Once, even though StrictMode shows the page twice, as in development.

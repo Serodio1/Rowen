@@ -78,3 +78,11 @@ name and art of its own (`docs/art.md`).
 - More leaders, each with another passive, can come later: a faction's deck
   names one, and a player would choose among them when building a deck.
 
+
+## Update (2026-10-30): the Humans draw 2 cards
+
+The balance report (`docs/balance.md`) found that Robots won 64% of the
+decisive matches with the Easy AI on both sides, and 57% with the Normal AI,
+about 10 percentage points of it from the passives. The Humans now draw **2
+cards** after winning a round (`passives.ROUND_WIN_DRAWS`). A match saved
+before this change, still being played, may no longer replay, as above.

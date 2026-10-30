@@ -148,14 +148,24 @@ def test_each_player_starts_with_their_decks_leader() -> None:
 # Humans: draw a card after winning a round
 
 
-def test_the_winner_draws_the_first_card_of_their_deck() -> None:
+def test_the_winner_draws_the_first_2_cards_of_their_deck() -> None:
     state, events = end_round(
-        player(SNIPER, passive=DRAW, deck=(SCOUT, KNIGHT)), player(KNIGHT)
+        player(SNIPER, passive=DRAW, deck=(SCOUT, KNIGHT, SNIPER)), player(KNIGHT)
     )
 
     humans = state.players[0]
-    assert humans.hand == (KNIGHT, SCOUT)
-    assert humans.deck == (KNIGHT,)
+    assert humans.hand == (KNIGHT, SCOUT, KNIGHT)
+    assert humans.deck == (SNIPER,)
+    assert after_round(events) == (CardsDrawn(player=0, cards=("scout", "knight")),)
+
+
+def test_a_deck_with_1_card_left_gives_that_one() -> None:
+    state, events = end_round(
+        player(SNIPER, passive=DRAW, deck=(SCOUT,)), player(KNIGHT)
+    )
+
+    assert state.players[0].hand == (KNIGHT, SCOUT)
+    assert state.players[0].deck == ()
     assert after_round(events) == (CardsDrawn(player=0, cards=("scout",)),)
 
 
@@ -186,9 +196,11 @@ def test_no_card_is_drawn_once_the_match_is_over() -> None:
 
 
 def test_the_opponent_sees_only_how_many_cards_were_drawn() -> None:
-    _, events = end_round(player(SNIPER, passive=DRAW, deck=(SCOUT,)), player(KNIGHT))
+    _, events = end_round(
+        player(SNIPER, passive=DRAW, deck=(SCOUT, KNIGHT)), player(KNIGHT)
+    )
 
-    assert player_events(after_round(events), 1) == (OpponentDrew(player=0, count=1),)
+    assert player_events(after_round(events), 1) == (OpponentDrew(player=0, count=2),)
 
 
 # Robots: one random unit stays on the board
