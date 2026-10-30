@@ -470,6 +470,27 @@ def test_a_scarecrow_comes_after_one_that_was_before_its_unit() -> None:
     )
 
 
+def test_a_scarecrow_before_another_one_comes_first() -> None:
+    # The first Scarecrow takes the Champion's place, at the end; the second
+    # the Knight's, at the start: it comes first, with the lower place. The
+    # page puts the Scarecrows in the row by their places, in this order.
+    scarecrow = replace(SCARECROW, id="scarecrow-2")
+    board = {Row.MELEE: (KNIGHT, SCOUT, CHAMPION), Row.RANGED: (), Row.SIEGE: ()}
+    state = make_state(player((SCARECROW, scarecrow, KNIGHT), board=board))
+    state, _ = apply(
+        state, PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="champion")
+    )
+    state = replace(state, current=0)
+
+    state, _ = apply(
+        state, PlayScarecrow(card="scarecrow-2", row=Row.MELEE, unit="knight")
+    )
+
+    assert state.players[0].rows[Row.MELEE] == RowState(
+        units=(SCOUT,), scarecrows=(scarecrow, SCARECROW), scarecrow_places=(0, 1)
+    )
+
+
 def test_a_scarecrow_moves_up_when_a_unit_before_it_is_destroyed() -> None:
     board = {Row.MELEE: (CHAMPION, KNIGHT), Row.RANGED: (), Row.SIEGE: ()}
     row = RowState(
