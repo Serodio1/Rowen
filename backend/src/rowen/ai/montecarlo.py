@@ -107,7 +107,7 @@ def guess(
     for index in (0, 1):
         player = players[index]
         hidden = len(player.deck) + (0 if index == view.player else len(player.hand))
-        pool = _unseen(view, decks[index], index)
+        pool = _unseen(view, decks, index)
         cards, rng = rng.shuffled(pool)
         cards = cards[:hidden] + (baseline.UNKNOWN,) * (hidden - len(cards))
         if index == view.player:
@@ -118,19 +118,33 @@ def guess(
     return replace(imagined, players=(players[0], players[1])), rng
 
 
-def _unseen(view: PlayerView, deck: tuple[Card, ...], index: int) -> tuple[Card, ...]:
-    """Return the cards of a player's deck list that the view doesn't show.
+def _unseen(
+    view: PlayerView, decks: tuple[tuple[Card, ...], tuple[Card, ...]], index: int
+) -> tuple[Card, ...]:
+    """Return the cards of player ``index``'s deck list that the view doesn't show.
 
     A player's cards are on their side of the board, in their weather and in
-    their discard pile, except their Spies, which are on the other side: so
-    the Spies on a side belong to the other player.
+    their discard pile, except their Spies. A Spy is the player's whose deck
+    list has it, wherever it is: a Medic can revive the opponent's Spy onto
+    its owner's side, and a Scarecrow take it back into a hand. When both
+    lists have it, where it is tells: a Spy on a side was played by the other
+    player, and one in the hand is the viewer's.
     """
     mine, theirs = view.players[index], view.players[1 - index]
+    own, other = decks[index], decks[1 - index]
     seen = [card for card in _cards(mine) if not _spy(card)]
-    seen += [card for card in _cards(theirs) if _spy(card)]
     if index == view.player:
-        seen += view.hand
-    unseen = list(deck)
+        seen += [card for card in view.hand if not _spy(card)]
+    # Each Spy shown, and whose it would be by where it is.
+    spies = [(card, 1 - index) for card in _cards(mine) if _spy(card)]
+    spies += [(card, index) for card in _cards(theirs) if _spy(card)]
+    spies += [(card, view.player) for card in view.hand if _spy(card)]
+    seen += [
+        card
+        for card, by_place in spies
+        if card in own and (card not in other or by_place == index)
+    ]
+    unseen = list(own)
     for card in seen:
         # A card the list doesn't have is a wrong guess: nothing to take away.
         if card in unseen:

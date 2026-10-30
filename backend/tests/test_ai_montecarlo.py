@@ -121,6 +121,44 @@ def test_guess_counts_a_spy_for_the_player_who_played_it() -> None:
     assert guessed.players[1].hand == (SCOUT,)
 
 
+@pytest.mark.parametrize(
+    "ai",
+    [
+        # The AI's Medic revived the opponent's Informant from its discard
+        # pile, onto the opponent's side.
+        pytest.param(player(), id="revived onto its owner's side"),
+        # The AI's Scarecrow took the opponent's Informant back.
+        pytest.param(player((INFORMANT,)), id="taken back into the AI's hand"),
+    ],
+)
+def test_guess_counts_a_spy_for_the_player_whose_deck_has_it(
+    ai: PlayerState,
+) -> None:
+    # Only the opponent's list has an Informant, so it is seen, and their
+    # hidden card is the Scout, whatever the guess.
+    opponent = player((SCOUT,))
+    if not ai.hand:
+        opponent = player((SCOUT,), melee=(INFORMANT,))
+    state = match(ai, opponent)
+    decks = ((KNIGHT,), (INFORMANT, SCOUT))
+
+    for seed in range(10):
+        guessed, _ = guess(player_view(state, 0), decks, Rng(seed=seed))
+
+        assert guessed.players[1].hand == (SCOUT,)
+
+
+def test_guess_keeps_its_list_when_a_card_seen_is_not_in_it() -> None:
+    # The opponent plays a deck they built, with a Knight the AI's list of
+    # their deck doesn't have: the guess still draws from the list.
+    state = match(player(), player((SCOUT,), melee=(KNIGHT,)))
+    decks = ((), (SCOUT,))
+
+    guessed, _ = guess(player_view(state, 0), decks, Rng(seed=1))
+
+    assert guessed.players[1].hand == (SCOUT,)
+
+
 def test_guess_fills_the_rest_with_unknown_cards() -> None:
     # The guess of the opponent's deck is wrong: it has fewer cards left than
     # they hold.
