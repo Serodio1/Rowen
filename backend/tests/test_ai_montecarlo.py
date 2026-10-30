@@ -148,6 +148,17 @@ def test_guess_counts_a_spy_for_the_player_whose_deck_has_it(
         assert guessed.players[1].hand == (SCOUT,)
 
 
+def test_guess_keeps_its_list_when_a_card_seen_is_not_in_it() -> None:
+    # The opponent plays a deck they built, with a Knight the AI's list of
+    # their deck doesn't have: the guess still draws from the list.
+    state = match(player(), player((SCOUT,), melee=(KNIGHT,)))
+    decks = ((), (SCOUT,))
+
+    guessed, _ = guess(player_view(state, 0), decks, Rng(seed=1))
+
+    assert guessed.players[1].hand == (SCOUT,)
+
+
 def test_guess_fills_the_rest_with_unknown_cards() -> None:
     # The guess of the opponent's deck is wrong: it has fewer cards left than
     # they hold.
