@@ -173,7 +173,17 @@ def _should_pass(view: PlayerView) -> bool:
     """
     mine = view.players[view.player]
     theirs = view.players[1 - view.player]
-    return mine.total - theirs.total >= PASS_LEAD and mine.lives > 1
+    return passes_first(mine.total - theirs.total, mine.lives)
+
+
+def passes_first(lead: int, lives: int) -> bool:
+    """Return whether a player passes first, while the opponent still plays.
+
+    They pass when ahead by ``PASS_LEAD`` points or more, unless they are on
+    their last life, where losing the round would lose the match. The
+    Monte Carlo AI's play-outs pass by the same rule.
+    """
+    return lead >= PASS_LEAD and lives > 1
 
 
 def best(state: GameState, actions: tuple[Action, ...]) -> Action:
@@ -237,7 +247,7 @@ def next_play(state: GameState, player: int) -> Action:
     actions = legal_actions(state)
     if state.reviving:
         return best(state, actions)
-    lead = _lead(state, player)
+    lead = player_lead(state, player)
     if lead > 0:
         return Pass()
     closer = tuple(
@@ -261,10 +271,10 @@ def _lead_after(state: GameState, action: Action, player: int) -> int:
     for event in events:
         if isinstance(event, RoundEnded):
             return event.scores[player] - event.scores[1 - player]
-    return _lead(after, player)
+    return player_lead(after, player)
 
 
-def _lead(state: GameState, player: int) -> int:
+def player_lead(state: GameState, player: int) -> int:
     """Return how many points ``player`` is ahead of the opponent, below 0 if behind."""
     return player_total(state, player) - player_total(state, 1 - player)
 
@@ -289,4 +299,4 @@ def score(state: GameState, player: int) -> int:
         return WIN + cards if winner == player else -WIN - cards
 
     lives = LIFE_VALUE * (mine.lives - theirs.lives)
-    return _lead(state, player) + cards + lives
+    return player_lead(state, player) + cards + lives

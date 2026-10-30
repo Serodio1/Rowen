@@ -27,11 +27,11 @@ same action, which keeps the tests repeatable.
 from dataclasses import replace
 
 from rowen.ai import baseline
+from rowen.engine.abilities import on_opponent_side
 from rowen.engine.actions import Action, EndRedraw, Pass
-from rowen.engine.cards import Ability, Card, UnitCard
+from rowen.engine.cards import Card, UnitCard
 from rowen.engine.game import apply_legal, legal_actions, match_over
 from rowen.engine.rng import Rng
-from rowen.engine.scoring import player_total
 from rowen.engine.state import GameState
 from rowen.engine.view import PlayerView, SideView
 
@@ -150,7 +150,7 @@ def _cards(side: SideView) -> tuple[Card, ...]:
 
 
 def _spy(card: Card) -> bool:
-    return isinstance(card, UnitCard) and card.ability is Ability.SPY
+    return isinstance(card, UnitCard) and on_opponent_side(card)
 
 
 def _play_out(state: GameState, action: Action) -> int:
@@ -173,8 +173,8 @@ def _next(state: GameState) -> Action:
     They play as the baseline AI does, in a quicker way: on the guessed match
     as it is, with each action scored only by the board right after it. Once
     the opponent has passed, they play on as ``baseline.next_play`` says.
-    Before, they pass when ahead by ``baseline.PASS_LEAD`` and not on their
-    last life, as the baseline does, and otherwise play the best card.
+    Before, they pass as ``baseline.passes_first`` says, as the baseline does,
+    and otherwise play the best card.
     """
     player = state.current
     actions = legal_actions(state)
@@ -183,8 +183,7 @@ def _next(state: GameState) -> Action:
     if state.players[1 - player].passed:
         return baseline.next_play(state, player)
     plays = tuple(action for action in actions if action != Pass())
-    lead = player_total(state, player) - player_total(state, 1 - player)
-    ahead = lead >= baseline.PASS_LEAD
-    if not plays or (ahead and state.players[player].lives > 1):
+    lead = baseline.player_lead(state, player)
+    if not plays or baseline.passes_first(lead, state.players[player].lives):
         return Pass()
     return baseline.best(state, plays)

@@ -107,6 +107,12 @@ class GameState:
     rng: Rng
 
 
+def without[T](cards: tuple[T, ...], card: T) -> tuple[T, ...]:
+    """Return the cards with one copy of ``card`` taken out."""
+    index = cards.index(card)
+    return cards[:index] + cards[index + 1 :]
+
+
 def with_player(state: GameState, index: int, player: PlayerState) -> GameState:
     """Return the state with player ``index`` replaced by ``player``."""
     if index == 0:
@@ -131,7 +137,7 @@ def without_unit(state: GameState, side: int, row: Row, unit: UnitCard) -> GameS
     player = state.players[side]
     units = player.rows[row].units
     index = units.index(unit)
-    units = units[:index] + units[index + 1 :]
+    units = without(units, unit)
     places = tuple(
         place - 1 if place > index else place
         for place in player.rows[row].scarecrow_places
