@@ -217,6 +217,14 @@ git switch main
 git pull
 git status --short    # must print nothing
 
+# If the deployment brings a migration, run it first, with the address for
+# the migrations: if it fails, nothing is deployed.
+Set-Location backend
+$env:DATABASE_URL = Read-Host "The address for the migrations"
+uv run alembic upgrade head
+Remove-Item Env:DATABASE_URL
+Set-Location ..
+
 $project = gcloud config get-value project
 $project                       # the project's ID: if empty, run gcloud init
 $tag = git rev-parse --short HEAD
@@ -256,14 +264,7 @@ commit, and starts it beside the one that answers now, which keeps all the
 requests ([ADR 0016](adr/0016-check-a-revision-before-it-gets-the-requests.md)).
 The new one gets the tag `candidate`, an address of its own; `update-traffic`
 then sends it the requests. Adding `--dry-run` to `services replace` checks
-the file without deploying. CI runs the same commands. If the deployment brings a migration, run it first, in `backend`,
-with the address for the migrations:
-
-```powershell
-$env:DATABASE_URL = Read-Host "The address for the migrations"
-uv run alembic upgrade head
-Remove-Item Env:DATABASE_URL
-```
+the file without deploying. CI runs the same commands.
 
 ## The first time only: open it to everyone
 
