@@ -714,7 +714,10 @@ function PlayMatch({
           "[data-choosable]:not(:disabled)",
         ) ??
         movesArea.current?.querySelector<HTMLElement>("button:not(:disabled)")
-      )?.focus();
+      )
+        // From nowhere, as when a match starts, the page stays where it is:
+        // on a phone it would scroll down past the AI's rows to the hand.
+        ?.focus({ preventScroll: focused === document.body });
       focusing.current = false;
     }
   }, [version, ready]);

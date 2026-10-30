@@ -966,6 +966,10 @@ function firstCardButton() {
 }
 
 test("once a match starts, the focus is on the first card the player may choose", async () => {
+  const focus = vi.spyOn(HTMLElement.prototype, "focus");
+  onTestFinished(() => {
+    focus.mockRestore();
+  });
   renderApp(fakeApi(A_MATCH).api);
 
   await startMatch();
@@ -977,6 +981,10 @@ test("once a match starts, the focus is on the first card the player may choose"
   expect(firstCardButton()).toHaveAccessibleName(
     "Soldier (4 melee/ranged, agile)",
   );
+  // From nowhere, without scrolling the page down to the hand, as on a phone.
+  // (Then once more, on the card it is already on: the browser does
+  // nothing.)
+  expect(focus.mock.calls[0]).toEqual([{ preventScroll: true }]);
 });
 
 test("after a move, the focus goes to the first card of the new view", async () => {

@@ -414,14 +414,21 @@ function Weather({
       {cards.length === 0 ? (
         <p className="text-xs italic opacity-70">None</p>
       ) : (
-        <ul role="list" className="flex flex-wrap justify-center gap-1">
+        // Two fit side by side; more overlap on one line, so the panel, and
+        // the board, never grow.
+        <ul
+          role="list"
+          className={`flex justify-center ${cards.length > 2 ? "" : "gap-1"}`}
+        >
           {cards.map(({ card, cell }) => (
             // Two players may play the same weather card, with the same id:
             // each has its own place.
             <li
               key={cell}
               data-cell={cell}
-              className={hidden.has(cell) ? HELD : SHOWN}
+              className={`${hidden.has(cell) ? HELD : SHOWN} ${
+                cards.length > 2 ? "not-first:-ml-11" : ""
+              }`}
             >
               <CardFace card={card} name={cardText(card)} />
             </li>
@@ -526,7 +533,13 @@ function BoardRow({
                   name={unitText(unit)}
                 />
               );
-              const play = targets?.unit(unit.card.id);
+              // A Scarecrow takes back the first copy of a unit in a row:
+              // only that one is offered, so it lands where it is clicked.
+              const first =
+                row.units.findIndex(
+                  (other) => other.card.id === unit.card.id,
+                ) === index;
+              const play = first ? targets?.unit(unit.card.id) : undefined;
               const cell = cellOf.unit(side, kind, index);
               return (
                 // Copies of a unit share its id, so the place in the row is the key.
