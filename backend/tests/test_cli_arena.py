@@ -78,6 +78,23 @@ def test_the_ais_swap_seats_and_play_each_pair_of_decks_both_ways(
     )
 
 
+def test_each_match_counts_for_the_deck_that_won_whichever_seat_it_had(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first, second = (deck.id for deck in DECKS)
+
+    def first_deck_wins(
+        decks: tuple[Deck, Deck], levels: tuple[Level, Level], seed: int, ai_seed: int
+    ) -> tuple[int | None, tuple[float, float], tuple[int, int]]:
+        return (0 if decks[0].id == first else 1), (1.0, 1.0), (1, 1)
+
+    monkeypatch.setattr(arena, "play_match", first_deck_wins)
+
+    tally = run("easy", "easy", 4, 0, lambda line: None)
+
+    assert tally.deck_wins == {first: 4}
+
+
 def test_a_match_counts_each_players_moves() -> None:
     winner, seconds, moves = play_match((DECKS[0], DECKS[1]), ("easy", "easy"), 3, 4)
 
