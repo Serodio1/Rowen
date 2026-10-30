@@ -310,14 +310,14 @@ def test_leaves_the_choice_to_the_baseline(
 ) -> None:
     # Once the opponent has passed, or after a Medic, the hidden cards change
     # nothing: whatever the baseline chooses is played, without a sample. The
-    # baseline is made to choose what the samples wouldn't: passing with a
-    # card left, or, after a Medic, an action that isn't even legal.
+    # baseline is made to choose what no sample could: an action that isn't
+    # even legal.
     opponent = replace(player((SCOUT,)), passed=opponent_passed)
     state = replace(
         match(player((KNIGHT,), discard=(SCOUT,)), opponent), reviving=reviving
     )
     view = player_view(state, 0)
-    chosen = Pass() if reviving else view.legal_actions[-1]
+    chosen = PlayUnit(card="scout", row=Row.SIEGE)
     monkeypatch.setattr(baseline, "choose_action", lambda _: chosen)
 
     action = choose_action(view, decks=((KNIGHT, SCOUT), (SCOUT,)), samples=4, seed=0)

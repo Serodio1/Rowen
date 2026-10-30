@@ -169,6 +169,17 @@ def test_a_deck_with_1_card_left_gives_that_one() -> None:
     assert after_round(events) == (CardsDrawn(player=0, cards=("scout",)),)
 
 
+def test_a_winner_with_an_empty_hand_draws_before_passing() -> None:
+    # A player with no card left passes at once, but only after drawing: the
+    # 2 cards let them play the next round.
+    winner = replace(player(KNIGHT, passive=DRAW, deck=(SCOUT, SNIPER)), hand=())
+
+    state, _ = end_round(winner, player())
+
+    assert state.players[0].hand == (SCOUT, SNIPER)
+    assert not state.players[0].passed
+
+
 @pytest.mark.parametrize(
     ("board", "deck"),
     [
@@ -241,8 +252,11 @@ def test_keeping_a_unit_uses_the_matchs_randomness_once() -> None:
     # So the next random choice of the match isn't the same one again.
     state, _ = end_round(player(KNIGHT, passive=KEEP), player(SNIPER))
     without, _ = end_round(player(KNIGHT), player(SNIPER))
+    # The same for the second player, as the AI is on the site.
+    second, _ = end_round(player(KNIGHT), player(SNIPER, passive=KEEP))
 
     assert state.rng.uses == without.rng.uses + 1
+    assert second.rng.uses == without.rng.uses + 1
 
 
 @pytest.mark.parametrize(
