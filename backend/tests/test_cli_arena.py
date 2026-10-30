@@ -30,7 +30,7 @@ def test_easy_matches_end_with_a_winner_or_a_draw() -> None:
     assert min(tally.moves) > 0
     assert min(tally.seconds) > 0
     assert lines[0] == "4 matches: easy against easy."
-    assert lines[2].startswith("Time per move: easy ")
+    assert lines[-1].startswith("Time per move: easy ")
 
 
 def test_the_same_seed_gives_the_same_matches() -> None:
@@ -67,7 +67,32 @@ def test_the_ais_swap_seats_and_play_each_pair_of_decks_both_ways(
     ]
     # Back from seats to AIs: the hard AI won as player 0 and lost as player 1,
     # and its figures come first.
-    assert tally == Tally(wins=2, draws=0, losses=2, seconds=(6.0, 6.0), moves=(60, 60))
+    # Player 0 won each match: each deck once as player 0, so twice.
+    assert tally == Tally(
+        wins=2,
+        draws=0,
+        losses=2,
+        seconds=(6.0, 6.0),
+        moves=(60, 60),
+        deck_wins={first: 2, second: 2},
+    )
+
+
+def test_each_match_counts_for_the_deck_that_won_whichever_seat_it_had(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = DECKS[0].id
+
+    def first_deck_wins(
+        decks: tuple[Deck, Deck], levels: tuple[Level, Level], seed: int, ai_seed: int
+    ) -> tuple[int | None, tuple[float, float], tuple[int, int]]:
+        return (0 if decks[0].id == first else 1), (1.0, 1.0), (1, 1)
+
+    monkeypatch.setattr(arena, "play_match", first_deck_wins)
+
+    tally = run("easy", "easy", 4, 0, lambda line: None)
+
+    assert tally.deck_wins == {first: 4}
 
 
 def test_a_match_counts_each_players_moves() -> None:
@@ -142,6 +167,16 @@ def test_the_report_shows_the_share_of_decisive_matches_and_its_margin() -> None
         "6 matches: hard against easy.",
         "hard won 75.0% ± 42.4% of the decisive matches (3 won, 1 lost, 2 drawn).",
         "Time per move: hard 0.120 s, easy 0.003 s.",
+    ]
+
+
+def test_the_report_shows_the_share_each_deck_won() -> None:
+    tally = Tally(wins=3, losses=1, deck_wins={"robots": 1, "humans": 3})
+
+    # The same margin as the AIs': 3 of 4 decisive matches, and 1 of 4.
+    assert report("easy", "easy", tally)[2:4] == [
+        "humans won 75.0% ± 42.4% of the decisive matches.",
+        "robots won 25.0% ± 42.4% of the decisive matches.",
     ]
 
 

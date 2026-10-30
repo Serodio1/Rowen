@@ -1,9 +1,10 @@
 """Let two AIs play many matches against each other: the ``rowen-arena`` command.
 
 It measures how well one level of the AI plays against another, for example
-before and after a change to the Monte Carlo AI (ADR 0018). Each AI chooses
-from its own player view, as in a match on the site, and the engine applies
-the action.
+before and after a change to the Monte Carlo AI (ADR 0018), and, with the
+same level on both sides, whether the decks are fair (``docs/balance.md``).
+Each AI chooses from its own player view, as in a match on the site, and the
+engine applies the action.
 
 The matches take turns: the two AIs swap seats from one match to the next,
 and the decks change every two matches. So both AIs play each deck as often, and
@@ -11,7 +12,8 @@ the coin flip in ``start_match`` decides who starts, as in any match.
 
 The result is the share of the decisive matches the first AI won, as ADR 0018
 counts it, with a 95% margin of error: a change smaller than the margin may be
-luck. Draws are shown apart. It also shows how long each AI takes per move,
+luck, and the share each deck won, counted the same way. Draws are shown
+apart. It also shows how long each AI takes per move,
 since a better AI that is too slow is no good on the site.
 
 The same seed gives the same matches, so a run can be repeated. Printing is
@@ -23,8 +25,8 @@ import argparse
 import math
 import random
 import time
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from itertools import cycle, islice, permutations
 from typing import Literal
 
@@ -64,6 +66,7 @@ class Tally:
         losses: The matches the second AI won.
         seconds: The time each AI took to choose its moves, in all, by AI.
         moves: The moves each AI chose, by AI.
+        deck_wins: The matches each deck won, by the deck's id.
     """
 
     wins: int = 0
@@ -71,6 +74,7 @@ class Tally:
     losses: int = 0
     seconds: tuple[float, float] = (0.0, 0.0)
     moves: tuple[int, int] = (0, 0)
+    deck_wins: Mapping[str, int] = field(default_factory=dict)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -121,6 +125,9 @@ def run(first: Level, second: Level, matches: int, seed: int, write: Write) -> T
         winner, seconds, moves = play_match(
             pair, levels, rng.randrange(MAX_SEED), rng.randrange(MAX_SEED)
         )
+        deck_wins = dict(tally.deck_wins)
+        if winner is not None:
+            deck_wins[pair[winner].id] = deck_wins.get(pair[winner].id, 0) + 1
         # Back from seats to AIs: the first AI's figures come first.
         if seat == 1:
             seconds, moves = seconds[::-1], moves[::-1]
@@ -131,6 +138,7 @@ def run(first: Level, second: Level, matches: int, seed: int, write: Write) -> T
             losses=tally.losses + (winner == 1),
             seconds=(tally.seconds[0] + seconds[0], tally.seconds[1] + seconds[1]),
             moves=(tally.moves[0] + moves[0], tally.moves[1] + moves[1]),
+            deck_wins=deck_wins,
         )
     for line in report(first, second, tally):
         write(line)
@@ -194,11 +202,15 @@ def report(first: Level, second: Level, tally: Tally) -> list[str]:
     lines = [f"{played} matches: {first} against {second}."]
     decisive = tally.wins + tally.losses
     if decisive:
-        share = tally.wins / decisive
-        margin = Z_95 * math.sqrt(share * (1 - share) / decisive)
         lines.append(
-            f"{first} won {share:.1%} ± {margin:.1%} of the decisive matches"
+            f"{first} won {_share(tally.wins, decisive)} of the decisive matches"
             f" ({tally.wins} won, {tally.losses} lost, {tally.draws} drawn)."
+        )
+        # Every match is between two different decks, so each decisive match
+        # counts for both.
+        lines.extend(
+            f"{deck} won {_share(wins, decisive)} of the decisive matches."
+            for deck, wins in sorted(tally.deck_wins.items())
         )
     else:
         lines.append(f"No match was decisive ({tally.draws} drawn).")
@@ -210,3 +222,10 @@ def report(first: Level, second: Level, tally: Tally) -> list[str]:
     )
     lines.append(f"Time per move: {', '.join(times)}.")
     return lines
+
+
+def _share(wins: int, decisive: int) -> str:
+    """Return the share of the decisive matches won, with its 95% margin."""
+    share = wins / decisive
+    margin = Z_95 * math.sqrt(share * (1 - share) / decisive)
+    return f"{share:.1%} ± {margin:.1%}"
