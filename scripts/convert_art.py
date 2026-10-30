@@ -76,6 +76,12 @@ def main(folder: Path) -> int:
     if unknown:
         print(f"Not a card's id: {', '.join(unknown)}", file=sys.stderr)
         return 1
+    # human.png and human.jpg would both be saved as human.webp: one lost.
+    stems = [p.stem for p in pictures]
+    twice = sorted({stem for stem in stems if stems.count(stem) > 1})
+    if twice:
+        print(f"More than one picture for: {', '.join(twice)}", file=sys.stderr)
+        return 1
     ART.mkdir(exist_ok=True)
     for picture in pictures:
         convert(picture, ART / f"{picture.stem}.webp")

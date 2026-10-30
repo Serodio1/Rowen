@@ -467,14 +467,15 @@ def play(
     actions = (played, *answer)
     moves = (first, *answer_moves)
     rounds += _rounds(moves)
-    result = _result(state, rounds, now) if _over(state) else None
+    view = player_view(state, HUMAN)
+    result = _result(view, rounds, now) if view.match_over else None
     new = store.add_actions(match_id, old.version, actions, result)
     if new is None:
         raise _match_changed()
     return Played(
         id=new.id,
         version=new.version,
-        view=from_view(player_view(state, HUMAN)),
+        view=from_view(view),
         rounds=rounds,
         moves=moves,
     )
@@ -762,13 +763,7 @@ def _check_deck(choice: DeckChoice) -> None:
     if choice.deck not in deck_ids():
         raise _unknown_deck(status.HTTP_422_UNPROCESSABLE_CONTENT)
     try:
-        build_deck(
-            id=choice.deck,
-            name=choice.name,
-            faction=load_deck(choice.deck),
-            specials=load_specials(),
-            copies=choice.copies,
-        )
+        _deck(choice.deck, DeckCopy(name=choice.name, copies=choice.copies))
     except ValueError:
         raise _invalid_deck() from None
 
@@ -973,16 +968,13 @@ def _rounds(moves: Iterable[MovePlayed]) -> tuple[RoundEndedJson, ...]:
     )
 
 
-def _over(state: GameState) -> bool:
-    """Return whether a match is over."""
-    return player_view(state, HUMAN).match_over
-
-
 def _result(
-    state: GameState, rounds: tuple[RoundEndedJson, ...], now: datetime
+    view: PlayerView, rounds: tuple[RoundEndedJson, ...], now: datetime
 ) -> MatchResult:
-    """Return how a match ended: ``state`` is the end, ``rounds`` its rounds."""
-    winner = player_view(state, HUMAN).winner
+    """Return how a match ended: ``view`` is the player's at the end, ``rounds``
+    its rounds.
+    """
+    winner = view.winner
     return MatchResult(
         outcome="drawn" if winner is None else "won" if winner == HUMAN else "lost",
         rounds=tuple(round_.scores for round_ in rounds),

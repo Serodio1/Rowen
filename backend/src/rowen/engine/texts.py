@@ -9,7 +9,7 @@ every one has one.
 
 from collections.abc import Mapping
 
-from rowen.engine.cards import Ability, Card, SpecialKind, UnitCard
+from rowen.engine.cards import WEATHER_ROWS, Ability, Card, SpecialKind, UnitCard
 from rowen.engine.decks import Passive
 
 # What each ability does (rules, section 7).
@@ -37,20 +37,16 @@ LEGEND_TEXT = (
     "Legend: immune to weather, War Horn, Inspire, Wildfire, Scarecrow and Medic."
 )
 
-# What each special card does (rules, section 8).
+# What each special card does (rules, section 8). A weather card's text
+# names the rows it hits, as the rules do (WEATHER_ROWS).
 SPECIAL_TEXTS: Mapping[SpecialKind, str] = {
-    SpecialKind.HOARFROST: (
-        "Weather: every unit in the melee rows, on both sides, has strength 1, "
-        "but not a Legend. A second copy changes nothing."
-    ),
-    SpecialKind.THICK_FOG: (
-        "Weather: every unit in the ranged rows, on both sides, has strength 1, "
-        "but not a Legend. A second copy changes nothing."
-    ),
-    SpecialKind.DOWNPOUR: (
-        "Weather: every unit in the siege rows, on both sides, has strength 1, "
-        "but not a Legend. A second copy changes nothing."
-    ),
+    **{
+        kind: (
+            f"Weather: every unit in the {row} rows, on both sides, has strength "
+            "1, but not a Legend. A second copy changes nothing."
+        )
+        for kind, row in WEATHER_ROWS.items()
+    },
     SpecialKind.CLEAR_SKIES: "Removes every weather card in play.",
     SpecialKind.WAR_HORN: (
         "Goes in the horn slot of one of your rows, and doubles the strength of "
