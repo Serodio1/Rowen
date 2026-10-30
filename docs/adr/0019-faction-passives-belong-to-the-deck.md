@@ -1,4 +1,4 @@
-# ADR 0019: Give each faction a passive, kept with its deck and carried out by the engine
+# ADR 0019: Give each faction a passive, brought by its leader and carried out by the engine
 
 - **Status:** Accepted; the passive comes with the faction's leader (see the
   update at the end)
@@ -73,11 +73,11 @@ name and art of its own (`docs/art.md`).
   player's state, and each side of the view, keeps the leader.
   `rowen.engine.passives` reads the passive from it.
 - The API sends the leader (id, name and the passive's text) in each side
-  and in the list of decks. The page shows the leader's art, name and
-  passive in each player's panel, and under each deck to choose.
+  and in the list of decks. The board shows the leader's art beside each
+  player's panel (the name and passive on hover and for screen readers), and
+  the screen to choose a deck shows the art, name and passive under each deck.
 - More leaders, each with another passive, can come later: a faction's deck
   names one, and a player would choose among them when building a deck.
-
 
 ## Update (2026-10-30): the Humans draw 2 cards
 
