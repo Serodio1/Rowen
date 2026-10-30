@@ -258,7 +258,7 @@ def test_a_view_is_sent_field_by_field() -> None:
                     "leader": {
                         "id": "humans-leader",
                         "name": "The Commander",
-                        "passive": "Draws a card after winning a round.",
+                        "passive": "Draws 2 cards after winning a round.",
                     },
                     "redraws_left": 0,
                     "hand_size": 2,

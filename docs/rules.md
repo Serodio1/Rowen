@@ -197,9 +197,9 @@ works by itself, with no action, at the end of each round that doesn't end the
 match. A built deck has its faction's leader. (Later, a faction may have more
 leaders, each with a passive of their own.)
 
-- **Humans**, led by **The Commander:** after winning a round, they draw a card
-  from their deck. A tie is not a win, and with an empty deck there is nothing
-  to draw.
+- **Humans**, led by **The Commander:** after winning a round, they draw 2
+  cards from their deck. A tie is not a win; a deck with 1 card left gives
+  that one, and an empty deck nothing.
 - **Robots**, led by **The Overseer:** after each round, a tie included, one of
   their units chosen at random stays in its row for the next round, at its base
   strength. It is never a Legend, nor a Spy, which the opponent played on their
@@ -228,5 +228,5 @@ leaders, each with a passive of their own.)
 | D6 | Can a Legend also have an ability? | Yes: Spy, Medic or Inspire, and it stays immune to everything else (section 7.3) |
 | D7 | Does Muster also play the cards of its group from the hand? | Yes: from the deck and the hand, so one card plays the whole group (section 7.2) |
 | D8 | What does Wildfire destroy when the strongest unit is a Legend? | The strongest units that aren't Legends: Legends are left out of the count (section 8) |
-| D9 | Which passive does each faction have? | Humans draw a card after winning a round; Robots keep one random unit, not a Legend or a Spy, after each round (section 12) |
+| D9 | Which passive does each faction have? | Humans draw 2 cards after winning a round (1 until the balance report, `docs/balance.md`); Robots keep one random unit, not a Legend or a Spy, after each round (section 12) |
 | D10 | What does a leader do? | Brings the faction's passive; no ability to use during the match. One leader per faction for now (section 12) |

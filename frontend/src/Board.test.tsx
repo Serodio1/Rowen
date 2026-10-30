@@ -243,19 +243,19 @@ test("a player's leader has a slot of their own, with what their passive does", 
   const leader = {
     id: "humans-leader",
     name: "The Commander",
-    passive: "Draws a card after winning a round.",
+    passive: "Draws 2 cards after winning a round.",
   };
   render(<Board view={view({ players: [side({ leader }), side()] })} />);
 
   // Only the player has a leader here; the AI has none.
   const figure = screen.getByRole("figure");
   expect(figure).toHaveAccessibleName(
-    "Your leader, The Commander: Draws a card after winning a round.",
+    "Your leader, The Commander: Draws 2 cards after winning a round.",
   );
   // Shown on hover.
   expect(figure).toHaveAttribute(
     "title",
-    "The Commander: Draws a card after winning a round.",
+    "The Commander: Draws 2 cards after winning a round.",
   );
 });
 

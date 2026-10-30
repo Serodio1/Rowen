@@ -65,7 +65,7 @@ SPECIAL_TEXTS: Mapping[SpecialKind, str] = {
 
 # What each faction's passive does (rules, section 12).
 PASSIVE_TEXTS: Mapping[Passive, str] = {
-    Passive.DRAW_ON_ROUND_WIN: "Draws a card after winning a round.",
+    Passive.DRAW_ON_ROUND_WIN: "Draws 2 cards after winning a round.",
     Passive.KEEP_A_UNIT: (
         "After each round, one random unit stays on the board, but not a "
         "Legend or a Spy."

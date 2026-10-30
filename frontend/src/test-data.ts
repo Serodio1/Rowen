@@ -11,7 +11,7 @@ export const DECKS: Deck[] = [
     leader: {
       id: "humans-leader",
       name: "The Commander",
-      passive: "Draws a card after winning a round.",
+      passive: "Draws 2 cards after winning a round.",
     },
   },
   {

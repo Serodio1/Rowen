@@ -95,6 +95,19 @@ def test_each_match_counts_for_the_deck_that_won_whichever_seat_it_had(
     assert tally.deck_wins == {first: 4}
 
 
+def test_a_draw_counts_for_no_deck(monkeypatch: pytest.MonkeyPatch) -> None:
+    def draw(
+        decks: tuple[Deck, Deck], levels: tuple[Level, Level], seed: int, ai_seed: int
+    ) -> tuple[int | None, tuple[float, float], tuple[int, int]]:
+        return None, (1.0, 1.0), (1, 1)
+
+    monkeypatch.setattr(arena, "play_match", draw)
+
+    tally = run("easy", "easy", 2, 0, lambda line: None)
+
+    assert (tally.draws, tally.deck_wins) == (2, {})
+
+
 def test_a_match_counts_each_players_moves() -> None:
     winner, seconds, moves = play_match((DECKS[0], DECKS[1]), ("easy", "easy"), 3, 4)
 

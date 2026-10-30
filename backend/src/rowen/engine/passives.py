@@ -17,6 +17,10 @@ from rowen.engine.state import GameState, PlayerState, with_player
 # A unit a player keeps on the board for the next round: its row and the unit.
 type Kept = tuple[Row, UnitCard]
 
+# The cards the winner of a round draws, with ``Passive.DRAW_ON_ROUND_WIN``:
+# 2, not 1, so the two factions win as often (docs/balance.md).
+ROUND_WIN_DRAWS = 2
+
 
 def unit_to_keep(state: GameState, index: int) -> tuple[Kept | None, GameState]:
     """Return the unit player ``index`` keeps for the next round, if any.
@@ -49,19 +53,23 @@ def kept_event(index: int, kept: Kept) -> UnitKept:
 def draw_for_winner(
     state: GameState, winner: int | None
 ) -> tuple[GameState, tuple[Event, ...]]:
-    """Let the round's winner draw a card, with ``Passive.DRAW_ON_ROUND_WIN``.
+    """Let the round's winner draw ``ROUND_WIN_DRAWS`` cards, with
+    ``Passive.DRAW_ON_ROUND_WIN``.
 
-    A tie has no winner, and an empty deck has nothing to draw.
+    A tie has no winner. A deck with fewer cards gives what it has, and an
+    empty one nothing.
     """
     if winner is None:
         return state, ()
     player = state.players[winner]
     if _passive(player) is not Passive.DRAW_ON_ROUND_WIN or not player.deck:
         return state, ()
-    card, *deck = player.deck
-    player = replace(player, hand=(*player.hand, card), deck=tuple(deck))
+    cards = player.deck[:ROUND_WIN_DRAWS]
+    player = replace(
+        player, hand=(*player.hand, *cards), deck=player.deck[ROUND_WIN_DRAWS:]
+    )
     return with_player(state, winner, player), (
-        CardsDrawn(player=winner, cards=(card.id,)),
+        CardsDrawn(player=winner, cards=tuple(card.id for card in cards)),
     )
 
 
