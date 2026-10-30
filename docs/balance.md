@@ -1,9 +1,9 @@
 # Balance report
 
 Whether the two decks, Humans and Robots, are fair: how often each one wins
-when the same AI plays both sides. Measured on 30 October 2026, at commit
-`9811e2d` (v0.5.0 in progress), with the faction decks and their leaders'
-passives ([ADR 0019](adr/0019-faction-passives-belong-to-the-deck.md)).
+when the same AI plays both sides. First measured on 30 October 2026, at
+commit `9811e2d` (v0.5.0 in progress), with the faction decks and their
+leaders' passives ([ADR 0019](adr/0019-faction-passives-belong-to-the-deck.md)).
 
 ## How it is measured
 
@@ -25,7 +25,7 @@ uv run rowen-arena normal normal --matches 250 --seed 1   # and seeds 2, 3, 4
 The Normal AI takes about 3.5 seconds a match, so its 1000 matches ran as
 four runs of 250, side by side, added up below.
 
-## Results
+## Results, before the change
 
 | AI on both sides | Matches | Decisive | Draws | Robots won | Humans won |
 |---|---|---|---|---|---|
@@ -53,8 +53,27 @@ so with no passive on either side; it is not a way the game can be played.
   against 780).
 - **The Normal AI's gap is smaller** (57% against 64%). Why was not measured.
 
-## Next
+## After the change: the Humans draw 2 cards
 
-Changing the cards or the passives is a choice of rules, made apart from this
-report: then the same commands are run again, and this report is updated with
-the new figures.
+To even them out, The Commander's passive changed from 1 card to 2 after
+winning a round (rules, section 12; ADR 0019). Of the changes tried on copies
+of the decks with the Easy AI, it was the only one to reach a fair game:
+
+| Change tried (Easy AI, 4000 matches) | Robots won |
+|---|---|
+| Smart Guy 3 → 4 and AI 5 → 4 | 57.5% ± 1.6% |
+| **Humans draw 2 cards** | **51.4% ± 1.6%** |
+| Both of the above | 44.7% ± 1.6% |
+| Smart Guy 3 → 5, and Humans draw 2 cards | 45.5% ± 1.6% |
+
+Measured again, on the game as it now is (the same commands):
+
+| AI on both sides | Matches | Decisive | Draws | Robots won | Humans won |
+|---|---|---|---|---|---|
+| Easy | 4000 | 3901 | 99 | **51.4% ± 1.6%** | 48.6% |
+| Normal | 1000 | 973 | 27 | **46.9% ± 3.1%** | 53.1% |
+
+Both margins reach 50%, the Normal one only just (43.8% to 50.0%): close to
+fair, with Robots a little ahead against the Easy AI and Humans a little
+ahead against the Normal one. A change to the cards or the passives should be
+measured again the same way, and this report updated.
