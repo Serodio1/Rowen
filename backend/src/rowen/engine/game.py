@@ -35,6 +35,7 @@ from rowen.engine.state import (
     empty_rows,
     with_player,
     with_unit,
+    without,
 )
 
 # Cards each player draws at the start of the match (rules, section 3).
@@ -287,7 +288,7 @@ def _play_unit(
         for card in player.hand
         if isinstance(card, UnitCard) and card.id == action.card
     )
-    player = replace(player, hand=_without(player.hand, unit))
+    player = replace(player, hand=without(player.hand, unit))
     state = with_player(state, state.current, player)
 
     state, side, ability_events = _put_on_board(state, unit, action.row)
@@ -333,7 +334,7 @@ def _take_special(state: GameState, card_id: str) -> tuple[GameState, SpecialCar
         for card in player.hand
         if isinstance(card, SpecialCard) and card.id == card_id
     )
-    player = replace(player, hand=_without(player.hand, card))
+    player = replace(player, hand=without(player.hand, card))
     return with_player(state, state.current, player), card
 
 
@@ -345,7 +346,7 @@ def _revive(state: GameState, action: Revive) -> tuple[GameState, tuple[Event, .
     """
     player = state.players[state.current]
     unit = next(card for card in abilities.revivable(player) if card.id == action.card)
-    player = replace(player, discard=_without(player.discard, unit))
+    player = replace(player, discard=without(player.discard, unit))
     state = replace(with_player(state, state.current, player), reviving=False)
 
     state, side, ability_events = _put_on_board(state, unit, action.row)
@@ -490,9 +491,3 @@ def _clear_board(player: PlayerState, kept: passives.Kept | None) -> PlayerState
         discard=(*player.discard, *in_play),
         passed=False,
     )
-
-
-def _without(cards: tuple[Card, ...], card: Card) -> tuple[Card, ...]:
-    """Return the cards with one copy of ``card`` taken out."""
-    index = cards.index(card)
-    return cards[:index] + cards[index + 1 :]
