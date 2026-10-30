@@ -145,7 +145,7 @@ def test_each_player_starts_with_their_decks_leader() -> None:
     assert [side.leader for side in player_view(state, 0).players] == leaders
 
 
-# Humans: draw a card after winning a round
+# Humans: draw 2 cards after winning a round
 
 
 def test_the_winner_draws_the_first_2_cards_of_their_deck() -> None:

@@ -43,9 +43,10 @@ UNKNOWN = UnitCard(
 )
 
 # What a card in the hand is worth, in points: about what a card adds to the
-# board. No cards are drawn between rounds, so the cards left are all a player
-# has for the rest of the match. Counting them, the AI plays a Spy for the
-# cards it draws, and a Medic for the unit it brings back.
+# board. Apart from a passive, no cards are drawn between rounds, so the cards
+# left are about all a player has for the rest of the match. Counting them,
+# the AI plays a Spy for the cards it draws, and a Medic for the unit it
+# brings back.
 CARD_VALUE = 5
 
 # What a life is worth, in points. Once the opponent has passed, winning the

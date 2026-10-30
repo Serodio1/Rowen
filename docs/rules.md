@@ -155,11 +155,13 @@ The round ends when **both players have passed**.
 1. **Result:** the player with the higher total wins the round and the other
    player loses 1 life. On a **tie**, both players lose 1 life.
 2. **Cleanup:** every card on the board (units, War Horns, Scarecrows) goes to
-   the discard pile of the side it is on. A Spy therefore ends up in the
+   the discard pile of the side it is on, except the unit a passive keeps
+   (section 12). A Spy therefore ends up in the
    opponent's discard pile, where that player's Medic can revive it and use it
    against its original owner. Weather cards go to the discard pile of the player
    who played them.
-3. Hands and decks carry over. **No cards are drawn.**
+3. Hands and decks carry over. **No cards are drawn**, except by a passive
+   (section 12).
 4. **Next round:** the **winner** of the round plays first. Playing first is a
    disadvantage, because you reveal your plan first, so this helps the player
    who is behind. After a tie, the player who played first in that round plays

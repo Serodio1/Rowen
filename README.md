@@ -6,16 +6,19 @@ A turn-based card game inspired by the Gwent minigame from *The Witcher 3*, buil
 as a full-stack web application: a pure Python rules engine behind a FastAPI API,
 PostgreSQL, and a React + TypeScript frontend.
 
-> **Status:** Phase 4 is done and released as
-> [`v0.4.0`](https://github.com/Serodio1/Rowen/releases): a match against the
+> **Status:** Phase 5 is done and released as
+> [`v0.5.0`](https://github.com/Serodio1/Rowen/releases): a match against the
 > AI can be played online, on a board with card art, animations and the
-> keyboard, as a guest or with an account. A player with an account finds
-> their matches under "My matches", resumes an unfinished one, sees how many
-> they won, lost and drew with each deck, and builds decks of their own under
-> "My decks". Phase 5, a smarter AI and the rest of the rules, comes next.
+> keyboard, as a guest or with an account, against an Easy, Normal or Hard AI
+> (the last two guess the cards they can't see). Each faction has a leader
+> with a passive of its own, and the two decks win about as often
+> ([balance report](docs/balance.md)). A player with an account finds their
+> matches under "My matches", resumes an unfinished one, and builds decks of
+> their own under "My decks". v1.0.0, the polish, comes next.
 
-![A match in Rowen: the AI's rows above, the player's below, Hoarfrost on both
-melee rows, and a Plane shown large with what it does](docs/screenshot.webp)
+![A match in Rowen: the AI's rows above, the player's below, each side's
+leader beside its panel, Downpour on both siege rows, a Scarecrow in the AI's
+melee row, and what happened in the log](docs/screenshot.webp)
 
 ## Play online
 
@@ -34,6 +37,8 @@ online.
 - [Architecture decision records](docs/adr/README.md): why the main
   technical decisions were made.
 - [Deploying to Google Cloud Run](docs/deploy.md)
+- [Balance report](docs/balance.md): whether the two decks win as often, and
+  how it is measured.
 - [The cards' art](docs/art.md): where it comes from, and how to add more.
 - [Phase 1 retrospective](docs/retrospectives/phase-1.md): what the game
   engine release built, and what it taught.
@@ -96,8 +101,10 @@ other:
 uv run rowen-arena hard easy --matches 400   # Hard against Easy, 400 matches
 ```
 
-It shows the share of the decisive matches the first AI won, with a 95% margin
-of error, and how long each AI takes per move.
+It shows the share of the decisive matches the first AI won, and each deck's,
+with a 95% margin of error, and how long each AI takes per move. With the
+same level on both sides, it says whether the decks are fair
+([balance report](docs/balance.md)).
 
 ## Run the web API
 
@@ -111,7 +118,8 @@ uv run uvicorn rowen.api.app:app --reload --reload-dir src
 
 Then open <http://127.0.0.1:8000/docs>: it lists the endpoints and lets you
 try them. `GET /decks` lists the decks, and `POST /matches` with
-`{"deck": "humans"}` starts a match (if the AI starts, it swaps its cards first,
+`{"deck": "humans", "level": "normal"}` starts a match against the Normal AI
+(`easy`, the default, `normal` or `hard`) (if the AI starts, it swaps its cards first,
 and the response says so). To play, send one of the `legal_actions`
 of the view, as it is, with the match's `version`, to
 `POST /matches/{id}/actions`: `{"version": 1, "action": {"type": "pass"}}`.

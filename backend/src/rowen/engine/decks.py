@@ -22,7 +22,7 @@ class Passive(StrEnum):
     section 12). ``rowen.engine.passives`` carries each one out.
     """
 
-    # After winning a round, draw a card (not on a tie).
+    # After winning a round, draw passives.ROUND_WIN_DRAWS cards (not on a tie).
     DRAW_ON_ROUND_WIN = "draw_on_round_win"
     # After each round, one random unit stays on the board.
     KEEP_A_UNIT = "keep_a_unit"
