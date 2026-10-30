@@ -300,10 +300,12 @@ test("a new match starts with a message: the player swaps as many cards as the s
     text: "Swap up to 2 cards.",
     view: first,
   });
-  // The AI's swaps are not the player's.
-  expect(
-    startOf(view({ players: [side({ redraws_left: 1 }), side()] })).text,
-  ).toBe("Swap up to 1 card.");
+  // The player's swaps, wherever their side is, not the AI's.
+  const second = view({
+    player: 1,
+    players: [side(), side({ redraws_left: 1 })],
+  });
+  expect(startOf(second).text).toBe("Swap up to 1 card.");
 });
 
 const BEFORE = view();
