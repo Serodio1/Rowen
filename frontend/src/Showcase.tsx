@@ -16,7 +16,8 @@ export function Showcase({
   step,
   flying,
 }: {
-  step: CardStep;
+  // Only these: the player's card shows here too, before its move's steps.
+  step: Pick<CardStep, "card" | "cell">;
   flying: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);

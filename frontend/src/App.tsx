@@ -50,6 +50,7 @@ import { MyDecks } from "./Decks.tsx";
 import { MyMatches } from "./Matches.tsx";
 import { ALERT, BUTTON, PANEL } from "./styles.ts";
 import {
+  isCardAction,
   otherActions,
   playsOf,
   selfPlay,
@@ -788,6 +789,18 @@ function PlayMatch({
       : { ...view, round: then.round, players: then.players };
   const shown =
     pointed === null ? undefined : cardsById([board, view]).get(pointed.id);
+  // The player's card on its way to the server shows at once, while the AI
+  // thinks, once the last move has played out. It goes to its place only
+  // with the answer, whose first step shows it in the same element.
+  const sending = play.isPending ? play.variables.action : undefined;
+  const sendingCard =
+    sending !== undefined &&
+    isCardAction(sending) &&
+    sending.type !== "redraw" &&
+    showing === undefined &&
+    mayMove()
+      ? cardsById([view]).get(sending.card)
+      : undefined;
   const playing: Playing = {
     actions: view.legal_actions,
     chosen: chosen?.version === match.data.version ? chosen.chosen : null,
@@ -931,6 +944,12 @@ function PlayMatch({
             step={showing}
             flying={progress.flying}
           />
+        ) : sendingCard !== undefined ? (
+          <Showcase
+            key={0}
+            step={{ card: sendingCard, cell: undefined }}
+            flying={false}
+          />
         ) : (
           // A card played comes first.
           shown !== undefined && (
@@ -972,7 +991,7 @@ function PlayMatch({
             </div>
           )
         ) : (
-          <Controls view={view} playing={playing} />
+          <Controls view={view} playing={playing} thinking={play.isPending} />
         )}
       </div>
       {/* Out of sight while a card is shown on the right, which it would
@@ -998,7 +1017,11 @@ function PlayMatch({
         )}
         <Log
           entries={log}
-          faded={showing?.kind === "play" || shown !== undefined}
+          faded={
+            showing?.kind === "play" ||
+            sendingCard !== undefined ||
+            shown !== undefined
+          }
         />
       </div>
     </section>
@@ -1008,14 +1031,26 @@ function PlayMatch({
 /**
  * What the player is to do now, in words, and the moves that are no card:
  * passing, or keeping the hand before round 1. While a card is chosen, a
- * button lets it go (as Escape does on the board).
+ * button lets it go (as Escape does on the board). While a move is on its
+ * way (`thinking`), that the AI is thinking.
  */
-function Controls({ view, playing }: { view: View; playing: Playing }) {
+function Controls({
+  view,
+  playing,
+  thinking,
+}: {
+  view: View;
+  playing: Playing;
+  thinking: boolean;
+}) {
   const names = cardNames(view);
   const chosen = playing.chosen;
   const name = chosen === null ? "" : (names.get(chosen.card) ?? chosen.card);
   let hint = "Choose a card to play, or pass.";
-  if (view.reviving) {
+  if (thinking) {
+    // The answer comes once the AI has made its moves.
+    hint = "The AI is thinking…";
+  } else if (view.reviving) {
     hint =
       chosen === null
         ? "Choose a unit to revive."
