@@ -40,6 +40,14 @@
       "copies": 2
     },
     {
+      "id": "watch-man",
+      "name": "Watch Man",
+      "rows": ["melee"],
+      "strength": 5,
+      "ability": "ward",
+      "copies": 2
+    },
+    {
       "id": "medic",
       "name": "Medic",
       "rows": ["siege"],

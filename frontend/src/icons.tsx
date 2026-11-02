@@ -75,6 +75,13 @@ const ICONS = {
       <path d="M6 4h12l-3 4.5 3 4.5H6" />
     </>
   ),
+  ward: (
+    // A shield, barred.
+    <>
+      <path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z" />
+      <path d="M8.5 12h7" />
+    </>
+  ),
 
   // The special cards.
   hoarfrost: (

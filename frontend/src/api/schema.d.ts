@@ -306,7 +306,7 @@ export interface components {
      * @description A unit ability (rules, section 7). A unit has at most one.
      * @enum {string}
      */
-    Ability: "agile" | "spy" | "medic" | "muster" | "bond" | "inspire";
+    Ability: "agile" | "spy" | "medic" | "muster" | "bond" | "inspire" | "ward";
     /**
      * Account
      * @description The account of the player who is logged in: never its password's hash.

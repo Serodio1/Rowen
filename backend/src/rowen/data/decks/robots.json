@@ -40,6 +40,14 @@
       "copies": 2
     },
     {
+      "id": "firewall",
+      "name": "Firewall",
+      "rows": ["melee"],
+      "strength": 5,
+      "ability": "ward",
+      "copies": 2
+    },
+    {
       "id": "mechanic",
       "name": "Mechanic",
       "rows": ["siege"],

@@ -5,7 +5,8 @@ implemented once, in the part of the engine that matches its kind:
 
 - **Placement**, where the unit goes. Agile needs no code: an Agile unit has
   two rows, so ``legal_actions`` offers both. A Spy goes on the opponent's
-  side, as ``on_opponent_side`` and ``side`` say.
+  side, as ``on_opponent_side`` and ``side`` say, but not in a row with a
+  Ward unit, as ``can_go`` says.
 - **On play**, once, when the unit is played: Spy, Medic and Muster. Each one
   is a function in the ``ON_PLAY`` table, which ``on_play`` looks up. The
   Medic only starts a choice: the unit to revive is the player's next action,
@@ -20,7 +21,7 @@ one entry in ``ON_PLAY``.
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 
-from rowen.engine.cards import Ability, Card, UnitCard
+from rowen.engine.cards import Ability, Card, Row, UnitCard
 from rowen.engine.events import CardsDrawn, Event, NothingToRevive, UnitMustered
 from rowen.engine.state import GameState, PlayerState, with_player, with_unit
 
@@ -49,6 +50,19 @@ def side(unit: UnitCard, player: int) -> int:
     if on_opponent_side(unit):
         return 1 - player
     return player
+
+
+def can_go(state: GameState, player: int, unit: UnitCard, row: Row) -> bool:
+    """Return whether the unit can go in the row when ``player`` plays it or
+    revives it.
+
+    A Spy can't go in a row with a Ward unit (rules, section 7.4); so a row
+    opens again as soon as its Ward units leave it, burnt or taken back.
+    """
+    if unit.ability is not Ability.SPY:
+        return True
+    units = state.players[side(unit, player)].rows[row].units
+    return not any(other.ability is Ability.WARD for other in units)
 
 
 def on_play(
@@ -89,8 +103,11 @@ def muster_group(cards: tuple[Card, ...], unit: UnitCard) -> tuple[UnitCard, ...
 def _medic(
     state: GameState, player: int, unit: UnitCard
 ) -> tuple[GameState, tuple[Event, ...]]:
-    """The player must choose a unit to revive, if there is one."""
-    if not revivable(state.players[player]):
+    """The player must choose a unit to revive, if there is one that can go
+    on the board.
+    """
+    units = revivable(state.players[player])
+    if not any(can_go(state, player, unit, row) for unit in units for row in unit.rows):
         return state, (NothingToRevive(player=player),)
     return replace(state, reviving=True), ()
 
