@@ -1403,6 +1403,192 @@ test("a card played shows on the right, then goes to its place, which shows it o
   expect(log.closest("section")).not.toHaveClass("opacity-0");
 });
 
+test("the player's card shows at once while the AI thinks, and goes to its place with the answer", async () => {
+  withMotion();
+  const answer = later();
+  const { api } = fakeApi({
+    ...A_MATCH,
+    "POST /api/matches": {
+      ...A_MATCH["POST /api/matches"],
+      body: { ...A_MATCH["POST /api/matches"].body, view: ROUND_1 },
+    },
+    [PLAY]: answer.response,
+  });
+  renderApp(api);
+  await startMatch();
+  // The start of the match plays out first.
+  await act(() => vi.advanceTimersByTimeAsync(10_000));
+
+  const [soldier] = screen.getAllByRole("button", { name: /^Soldier/ });
+  fireEvent.click(soldier as HTMLElement);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Play Soldier in the melee row" }),
+  );
+
+  await waitFor(() => {
+    expect(showcase()).toHaveAttribute("data-showcase", "soldier");
+  });
+  const card = showcase();
+  expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
+  // The log is out of sight under it, as for any card played.
+  expect(
+    screen.getByRole("log", { name: "What happened" }).closest("section"),
+  ).toHaveClass("opacity-0");
+
+  answer.answer(
+    Response.json(
+      played(
+        view({
+          players: [
+            side({
+              rows: {
+                ...side().rows,
+                melee: {
+                  ...side().rows.melee,
+                  units: [{ card: SOLDIER, strength: 4 }],
+                },
+              },
+            }),
+            side(),
+          ],
+          legal_actions: [{ type: "pass" }],
+        }),
+        [
+          {
+            type: "unit_played",
+            player: 0,
+            card: "soldier",
+            row: "melee",
+            side: 0,
+          },
+        ],
+      ).body,
+    ),
+  );
+  await screen.findByText("You played Soldier in the melee row.");
+
+  // The same card: it doesn't come up from nothing again.
+  expect(showcase()).toBe(card);
+  expect(screen.queryByText("The AI is thinking…")).toBeNull();
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.show));
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.fly));
+  expect(showcase()).toBeNull();
+});
+
+test("a card swapped before round 1 isn't shown as played", async () => {
+  withMotion();
+  const answer = later();
+  const { api } = fakeApi({ ...A_MATCH, [PLAY]: answer.response });
+  renderApp(api);
+  await startMatch();
+  await act(() => vi.advanceTimersByTimeAsync(10_000));
+
+  swapSoldier();
+
+  await waitFor(() => {
+    expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
+  });
+  expect(showcase()).toBeNull();
+});
+
+test("a card played while a message is over the screen waits for it", async () => {
+  withMotion();
+  const answer = later();
+  const { api } = fakeApi({
+    ...A_MATCH,
+    "POST /api/matches": {
+      ...A_MATCH["POST /api/matches"],
+      body: { ...A_MATCH["POST /api/matches"].body, view: ROUND_1 },
+    },
+    [PLAY]: answer.response,
+  });
+  renderApp(api);
+  await startMatch();
+  expect(document.querySelector("[data-banner]")).not.toBeNull();
+
+  const [soldier] = screen.getAllByRole("button", { name: /^Soldier/ });
+  fireEvent.click(soldier as HTMLElement);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Play Soldier in the melee row" }),
+  );
+  await waitFor(() => {
+    expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
+  });
+  expect(showcase()).toBeNull();
+
+  await act(() => vi.advanceTimersByTimeAsync(10_000));
+  expect(showcase()).toHaveAttribute("data-showcase", "soldier");
+});
+
+test("with reduced motion, the player's card doesn't show while the AI thinks", async () => {
+  withMotion(true);
+  const answer = later();
+  const { api } = fakeApi({
+    ...A_MATCH,
+    "POST /api/matches": {
+      ...A_MATCH["POST /api/matches"],
+      body: { ...A_MATCH["POST /api/matches"].body, view: ROUND_1 },
+    },
+    [PLAY]: answer.response,
+  });
+  renderApp(api);
+  await startMatch();
+
+  const [soldier] = screen.getAllByRole("button", { name: /^Soldier/ });
+  fireEvent.click(soldier as HTMLElement);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Play Soldier in the melee row" }),
+  );
+  await waitFor(() => {
+    expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
+  });
+  expect(showcase()).toBeNull();
+});
+
+test("a card turned down by the server shows no more, and stays in the hand", async () => {
+  withMotion();
+  const answer = later();
+  const { api } = fakeApi({
+    ...A_MATCH,
+    "POST /api/matches": {
+      ...A_MATCH["POST /api/matches"],
+      body: { ...A_MATCH["POST /api/matches"].body, view: ROUND_1 },
+    },
+    [PLAY]: answer.response,
+    "GET /api/matches/a-match": { status: 200, body: aMatch(ROUND_1, 1) },
+  });
+  renderApp(api);
+  await startMatch();
+  await act(() => vi.advanceTimersByTimeAsync(10_000));
+
+  const [soldier] = screen.getAllByRole("button", { name: /^Soldier/ });
+  fireEvent.click(soldier as HTMLElement);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Play Soldier in the melee row" }),
+  );
+  await waitFor(() => {
+    expect(showcase()).not.toBeNull();
+  });
+
+  answer.answer(
+    Response.json(
+      { code: "match_changed", message: "The API says match_changed." },
+      { status: 409 },
+    ),
+  );
+
+  await waitFor(() => {
+    expect(showcase()).toBeNull();
+  });
+  expect(screen.queryByText("The AI is thinking…")).toBeNull();
+  // Both Soldiers: the one played never left.
+  expect(hand()).toEqual([
+    "Soldier (4 melee/ranged, agile)",
+    "Soldier (4 melee/ranged, agile)",
+    "Hoarfrost (weather on melee)",
+  ]);
+});
+
 test("a move can be made while the last one plays out: the board shows the new one", async () => {
   withMotion();
   const { api } = fakeApi({ ...A_MATCH, [PLAY]: AI_PLAYED });
