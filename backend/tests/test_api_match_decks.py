@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from turns import let_ai_play
 
 from rowen.api.accounts import MemoryAccountStore
 from rowen.api.app import app, get_accounts, get_decks, get_now, get_store, new_seed
@@ -150,7 +151,9 @@ def test_a_match_plays_on_after_its_deck_is_deleted(client: TestClient) -> None:
     assert client.delete(f"/my-decks/{deck_id}").status_code == 204
 
     move = {"version": match["version"], "action": match["view"]["legal_actions"][0]}
-    played = client.post(f"/matches/{match['id']}/actions", json=move)
+    played = let_ai_play(
+        client, client.post(f"/matches/{match['id']}/actions", json=move)
+    )
 
     assert played.status_code == 200
     assert cards(played.json()["view"]) <= NO_PLANES.keys()
@@ -164,7 +167,9 @@ def test_the_stats_count_a_built_deck_with_its_faction(client: TestClient) -> No
         move = {"version": match["version"], "action": {"type": "pass"}}
         if move["action"] not in match["view"]["legal_actions"]:
             move["action"] = match["view"]["legal_actions"][0]
-        match = client.post(f"/matches/{match['id']}/actions", json=move).json()
+        match = let_ai_play(
+            client, client.post(f"/matches/{match['id']}/actions", json=move)
+        ).json()
 
     (stats,) = client.get("/stats").json()["decks"]
 

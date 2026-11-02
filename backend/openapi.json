@@ -243,7 +243,7 @@
     "/matches/{match_id}/actions": {
       "post": {
         "summary": "Play",
-        "description": "Play the player's action, and then let the AI answer, at the match's level.\n\nThe action is one of the legal actions in the player's view, sent back as\nit is, with the version of the match that came with that view. If the\nmatch is at another version, the answer is a 409 and the match doesn't\nchange: get it again to see where it is. That is so also when another\nrequest for the same match is played first, while this one is. If the\naction isn't legal now, the answer is a 409 too.\n\nIf the match ends, the store keeps how it ended with the last actions.",
+        "description": "Play the player's action, and only that: the AI answers in ``ai-turn``.\n\nThe action is one of the legal actions in the player's view, sent back as\nit is, with the version of the match that came with that view. If the\nmatch is at another version, the answer is a 409 and the match doesn't\nchange: get it again to see where it is. That is so also when another\nrequest for the same match is played first, while this one is. If the\naction isn't legal now, the answer is a 409 too.\n\nThe answer comes at once, so the page can show the player's move before\nthe AI thinks. If the match ends, the store keeps how it ended.",
         "operationId": "play",
         "parameters": [
           {
@@ -279,6 +279,93 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Move"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Played"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/matches/{match_id}/ai-turn": {
+      "post": {
+        "summary": "Ai Turn",
+        "description": "Let the AI play, at the match's level, until it is the player's turn.\n\nThe page sends it whenever its view says it is the AI's turn, with the\nversion of the match that came with that view. As for a move, another\nversion is a 409 that changes nothing. When it isn't the AI's turn, or the\nmatch is over, the answer is a 409 too, before the AI thinks: so this\ncosts nothing more than a move, which nginx limits.",
+        "operationId": "ai_turn",
+        "parameters": [
+          {
+            "name": "match_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Match Id"
+            }
+          },
+          {
+            "name": "__Host-session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "  Host-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiTurn"
               }
             }
           }
@@ -1019,6 +1106,21 @@
             "revive": "#/components/schemas/Revive"
           }
         }
+      },
+      "AiTurn": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "AiTurn",
+        "description": "What the page sends to let the AI play: the version of the match it has.\n\nIf the match is at another version by then, the AI doesn't play."
       },
       "Card": {
         "oneOf": [
@@ -1956,7 +2058,7 @@
           "moves"
         ],
         "title": "Played",
-        "description": "A match after actions were played in it, and what happened.\n\n``moves`` holds those actions, in order: in a new match, the AI's first\nones, if it starts (none if the player does); after the player's action,\nthat action and then the AI's answer, one move for each of its actions.\nThe ``view`` of the match is that of the last move, if there is one."
+        "description": "A match after actions were played in it, and what happened.\n\n``moves`` holds those actions, in order: in a new match, the AI's first\nones, if it starts (none if the player does); after the player's action,\nthat action alone; after the AI's turn, one move for each of its actions.\nThe ``view`` of the match is that of the last move, if there is one."
       },
       "PlayerDeck": {
         "properties": {

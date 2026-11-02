@@ -587,7 +587,7 @@ class Played(Match):
 
     ``moves`` holds those actions, in order: in a new match, the AI's first
     ones, if it starts (none if the player does); after the player's action,
-    that action and then the AI's answer, one move for each of its actions.
+    that action alone; after the AI's turn, one move for each of its actions.
     The ``view`` of the match is that of the last move, if there is one.
     """
 
@@ -605,6 +605,16 @@ class Move(Schema):
     # Strict: JSON's true isn't version 1.
     version: StrictInt
     action: Action
+
+
+class AiTurn(Schema):
+    """What the page sends to let the AI play: the version of the match it has.
+
+    If the match is at another version by then, the AI doesn't play.
+    """
+
+    # Strict: JSON's true isn't version 1.
+    version: StrictInt
 
 
 class RoundScores(Schema):

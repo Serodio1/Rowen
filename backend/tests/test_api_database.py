@@ -16,6 +16,7 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
+from turns import let_ai_play
 
 from rowen.api.app import app, get_accounts, get_store, new_seed
 from rowen.api.database import (
@@ -407,7 +408,9 @@ def test_a_match_survives_a_restart_of_the_api(
         "version": started.json()["version"],
         "action": started.json()["view"]["legal_actions"][0],
     }
-    played = client.post(f"/matches/{started.json()['id']}/actions", json=move)
+    played = let_ai_play(
+        client, client.post(f"/matches/{started.json()['id']}/actions", json=move)
+    )
     assert played.status_code == 200
 
     # The API starts again, with a new store on new connections.
@@ -419,7 +422,9 @@ def test_a_match_survives_a_restart_of_the_api(
             "version": seen.json()["version"],
             "action": seen.json()["view"]["legal_actions"][0],
         }
-        again = client.post(f"/matches/{started.json()['id']}/actions", json=move)
+        again = let_ai_play(
+            client, client.post(f"/matches/{started.json()['id']}/actions", json=move)
+        )
     finally:
         engine.dispose()
 

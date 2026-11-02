@@ -64,6 +64,7 @@ from rowen.api.passwords import check_password, hash_password
 from rowen.api.player_decks import MAX_DECKS, DeckStore, MemoryDeckStore, StoredDeck
 from rowen.api.schemas import (
     Account,
+    AiTurn,
     Choices,
     Credentials,
     DeckChoice,
@@ -428,12 +429,11 @@ def play(
     match_id: UUID,
     move: Move,
     store: Store,
-    ai_seed: AiSeed,
     accounts: Accounts,
     now: Now,
     token: Token = None,
 ) -> Played:
-    """Play the player's action, and then let the AI answer, at the match's level.
+    """Play the player's action, and only that: the AI answers in ``ai-turn``.
 
     The action is one of the legal actions in the player's view, sent back as
     it is, with the version of the match that came with that view. If the
@@ -442,7 +442,8 @@ def play(
     request for the same match is played first, while this one is. If the
     action isn't legal now, the answer is a 409 too.
 
-    If the match ends, the store keeps how it ended with the last actions.
+    The answer comes at once, so the page can show the player's move before
+    the AI thinks. If the match ends, the store keeps how it ended.
     """
     old = _match(store, match_id, _logged_in(accounts, token, now))
     # Checked first: an action chosen from an old view may also be legal now,
@@ -462,14 +463,68 @@ def play(
             "the view.",
         )
     state, events = apply(state, played)
-    first = _move(state, events)
-    state, answer, answer_moves = _ai_plays(state, old.level, old.decks, ai_seed)
-    actions = (played, *answer)
-    moves = (first, *answer_moves)
+    return _keep(store, old, state, rounds, (played,), (_move(state, events),), now)
+
+
+@app.post(
+    "/matches/{match_id}/ai-turn",
+    responses=_errors(
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_409_CONFLICT,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ),
+)
+def ai_turn(
+    match_id: UUID,
+    turn: AiTurn,
+    store: Store,
+    ai_seed: AiSeed,
+    accounts: Accounts,
+    now: Now,
+    token: Token = None,
+) -> Played:
+    """Let the AI play, at the match's level, until it is the player's turn.
+
+    The page sends it whenever its view says it is the AI's turn, with the
+    version of the match that came with that view. As for a move, another
+    version is a 409 that changes nothing. When it isn't the AI's turn, or the
+    match is over, the answer is a 409 too, before the AI thinks: so this
+    costs nothing more than a move, which nginx limits.
+    """
+    old = _match(store, match_id, _logged_in(accounts, token, now))
+    if turn.version != old.version:
+        raise _match_changed()
+    state, rounds = _play_again(old)
+    view = player_view(state, AI)
+    if view.current != AI or view.match_over:
+        raise ApiError(
+            status.HTTP_409_CONFLICT,
+            "illegal_action",
+            "It isn't the AI's turn now.",
+        )
+    state, actions, moves = _ai_plays(state, old.level, old.decks, ai_seed)
+    return _keep(store, old, state, rounds, actions, moves, now)
+
+
+def _keep(
+    store: MatchStore,
+    old: StoredMatch,
+    state: GameState,
+    rounds: tuple[RoundEndedJson, ...],
+    actions: tuple[Action, ...],
+    moves: tuple[MovePlayed, ...],
+    now: datetime,
+) -> Played:
+    """Keep ``actions``, played in ``old`` up to ``state``, and return the match.
+
+    ``rounds`` are those that ended before them. If the match is at another
+    version by now, the answer is a 409 and nothing is kept. If it ends, the
+    store keeps how it ended.
+    """
     rounds += _rounds(moves)
     view = player_view(state, HUMAN)
     result = _result(view, rounds, now) if view.match_over else None
-    new = store.add_actions(match_id, old.version, actions, result)
+    new = store.add_actions(old.id, old.version, actions, result)
     if new is None:
         raise _match_changed()
     return Played(
