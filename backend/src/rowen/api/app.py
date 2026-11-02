@@ -3,12 +3,13 @@
 The server keeps each match, as its seed and every action played (``store``),
 and never sends it, nor the state they make: a response holds only the
 player's view, and the moves just played (the AI's first actions in a new
-match, or the player's action and the AI's answer), each with its events and
-the view after it, as the player may see them. So the AI's hand, the order of
-the decks and the seed stay on the server (ADR 0002). The human player is
-player 0 and the AI player 1, as in the CLI. When the AI has a move to make, it
-makes it before the server answers, so the player always gets the match on
-their turn, unless the match is over.
+match, the player's action, or the AI's turn), each with its events and the
+view after it, as the player may see them. So the AI's hand, the order of the
+decks and the seed stay on the server (ADR 0002). The human player is player
+0 and the AI player 1, as in the CLI. A new match starts on the player's
+turn. After the player's action the server answers at once; if it is then
+the AI's turn, the page asks for it (``ai-turn``), and the AI plays until it
+is the player's turn again, unless the match is over.
 
 A player may also make an account and log in (ADR 0014), but needn't: a guest
 plays the same way. A player who is logged in may build decks of their own from
