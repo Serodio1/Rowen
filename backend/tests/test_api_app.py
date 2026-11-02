@@ -542,7 +542,7 @@ def test_the_ai_doesnt_play_once_the_match_is_over() -> None:
         view = player_view(state, HUMAN)
     assert view.current == AI
 
-    decks = ("humans", "robots")
+    decks = (DECKS["humans"], DECKS["robots"])
     assert _ai_plays(state, "easy", decks, 0) == (state, (), ())
     assert _ai_plays(state, "easy", decks, 0)[0] is state
 
@@ -558,7 +558,9 @@ def test_the_ai_finishes_its_turn_after_a_medic() -> None:
     assert view.current == AI
 
     # The AI chooses a unit to revive, and only then does its turn end.
-    view = player_view(_ai_plays(state, "easy", ("humans", "robots"), 0)[0], HUMAN)
+    view = player_view(
+        _ai_plays(state, "easy", (DECKS["humans"], DECKS["robots"]), 0)[0], HUMAN
+    )
 
     assert view.current == HUMAN
     assert not view.reviving

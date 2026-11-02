@@ -136,3 +136,32 @@ Neither is ahead by more than its margin, and the first is 26% slower, over
 the 25% allowed. Both were left out. What makes that deck so strong is the
 deck itself: with the Hard AI on both sides, it won 87.4% ± 5.2% of the
 decisive matches against Robots (`docs/balance.md`).
+
+## Update (2026-11-02, later): guess from the deck the player really built
+
+The Watch Man and the Firewall (rules, section 7.4) took the Spies deck from
+87.4% to 78.1% against the Hard AI. Three ways to make the Hard AI think
+harder, each with 48 samples a move (about 1.3 s a move in the container,
+four times the Hard's), were then measured against the Hard AI as it is,
+400 matches each, with the faction decks:
+
+| Change | New Hard won |
+| --- | --- |
+| 48 samples instead of 16 | 49.0% ± 5.0% |
+| Play-outs that take the lead with the weakest card that does, instead of the strongest | 46.6% ± 4.9% |
+| Successive halving: after a few samples, drop the worse half of the actions and give their samples to the rest | 51.0% ± 4.9% |
+
+None is ahead by more than its margin: none was kept.
+
+Then the alternative turned down above, guessing from the deck the player
+really built, was measured with the Hard AI on both sides and the Spies deck
+against Robots, 320 matches: the Spies deck won **69.4% ± 5.1%** of the
+decisive matches, against 78.1% ± 6.5% with the faction's own deck.
+
+So point 2 of the decision changes: **the AI guesses each player's hidden
+cards from the list of the deck they play, a built one too.** It is what a
+player who knows the opponent's decklist knows: which cards the deck has,
+never which are in the hand or in what order they come. With a faction's own
+deck, nothing changes. The API gives the AI the decks of the match
+(`_ai_choice` in `backend/src/rowen/api/app.py`); `rowen-arena` still guesses
+the faction's own decks, as it measured before.
