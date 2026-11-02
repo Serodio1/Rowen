@@ -104,7 +104,6 @@ from rowen.api.store import (
 from rowen.data import deck_ids, load_deck, load_specials
 from rowen.engine.public import (
     Action,
-    Card,
     Deck,
     Event,
     GameState,
@@ -373,10 +372,9 @@ def create_match(
         # A deck kept before the rules changed may break them now.
         raise _invalid_deck() from None
     ai_deck = next(deck for deck in deck_ids() if deck != faction)
-    state = start_match((player_deck, load_deck(ai_deck)), seed=seed)
-    state, actions, moves = _ai_plays(
-        state, new_match.level, (faction, ai_deck), ai_seed
-    )
+    played = (player_deck, load_deck(ai_deck))
+    state = start_match(played, seed=seed)
+    state, actions, moves = _ai_plays(state, new_match.level, played, ai_seed)
     match = store.create(
         (faction, ai_deck),
         seed,
@@ -503,7 +501,8 @@ def ai_turn(
             "illegal_action",
             "It isn't the AI's turn now.",
         )
-    state, actions, moves = _ai_plays(state, old.level, old.decks, ai_seed)
+    played = (_deck(old.decks[HUMAN], old.built), load_deck(old.decks[AI]))
+    state, actions, moves = _ai_plays(state, old.level, played, ai_seed)
     return _keep(store, old, state, rounds, actions, moves, now)
 
 
@@ -1048,11 +1047,11 @@ def _result_json(result: MatchResult) -> Result:
 
 
 def _ai_plays(
-    state: GameState, level: Level, decks: tuple[str, str], seed: int
+    state: GameState, level: Level, decks: tuple[Deck, Deck], seed: int
 ) -> tuple[GameState, tuple[Action, ...], tuple[MovePlayed, ...]]:
     """Let the AI play at ``level`` until it is the player's turn or the match is over.
 
-    ``decks`` are the match's deck ids, the player's and then the AI's, and
+    ``decks`` are the match's decks, the player's and then the AI's, and
     ``seed`` the seed of the AI's guesses.
 
     Return the new state, the AI's actions and its moves as the player sees
@@ -1073,23 +1072,21 @@ def _ai_plays(
 
 
 def _ai_choice(
-    view: PlayerView, level: Level, decks: tuple[str, str], seed: int
+    view: PlayerView, level: Level, decks: tuple[Deck, Deck], seed: int
 ) -> Action:
     """Return the AI's next action at ``level``: the baseline's, or the Monte Carlo's.
 
-    The Monte Carlo AI guesses the hidden cards from the AI's own deck and,
-    for the player, their faction's own deck, which anyone can look up, even
-    when they play one they built (ADR 0018). It gets them by player index.
+    The Monte Carlo AI guesses the hidden cards from the list of each deck,
+    the player's too, even one they built: as a player who knows the
+    opponent's decklist, never their hand or its order (ADR 0018, update of
+    2 November 2026). It gets them by player index.
     """
     if level == "easy":
         return baseline.choose_action(view)
     samples = (
         montecarlo.NORMAL_SAMPLES if level == "normal" else montecarlo.HARD_SAMPLES
     )
-    guess: tuple[tuple[Card, ...], tuple[Card, ...]] = (
-        load_deck(decks[HUMAN]).cards,
-        load_deck(decks[AI]).cards,
-    )
+    guess = (decks[HUMAN].cards, decks[AI].cards)
     return montecarlo.choose_action(view, decks=guess, samples=samples, seed=seed)
 
 

@@ -262,7 +262,7 @@ def test_a_built_deck_plays_in_place_of_its_factions_own(
     assert robots == {load_deck("robots")}
 
 
-def test_the_ais_guess_the_factions_own_decks_as_on_the_site(
+def test_the_ais_guess_from_the_decks_played_as_on_the_site(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     built = arena.read_deck(str(SPIES))
@@ -283,7 +283,7 @@ def test_the_ais_guess_the_factions_own_decks_as_on_the_site(
 
     play_match((built, robots), ("easy", "easy"), 3, 4)
 
-    assert set(guesses) == {(load_deck("humans").cards, robots.cards)}
+    assert set(guesses) == {(built.cards, robots.cards)}
 
 
 def test_the_command_plays_a_built_deck(capsys: pytest.CaptureFixture[str]) -> None:

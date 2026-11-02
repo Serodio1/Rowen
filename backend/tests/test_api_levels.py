@@ -156,7 +156,7 @@ def test_the_ai_plays_its_later_moves_at_the_matchs_level(
     assert {call.samples for call in calls} == {montecarlo.HARD_SAMPLES}
 
 
-def test_a_guess_never_comes_from_a_deck_the_player_built(
+def test_the_ai_guesses_from_the_list_of_a_deck_the_player_built(
     client: TestClient, calls: list[Call]
 ) -> None:
     # 22 units of the Humans, none of them a Plane: not the faction's own.
@@ -167,10 +167,18 @@ def test_a_guess_never_comes_from_a_deck_the_player_built(
         "/my-decks", json={"name": "No planes", "deck": "humans", "copies": copies}
     ).json()
 
-    start(client, deck=None, my_deck=deck["id"], level="normal")
+    match = start(client, deck=None, my_deck=deck["id"], level="normal")
 
-    # The AI can't know the deck: it guesses the faction's own.
-    assert calls[0].decks[0] == load_deck("humans").cards
+    # The AI knows the list of the deck the player built, as a decklist, on
+    # its first moves and on the later ones.
+    built = calls[0].decks[0]
+    assert sorted(card.id for card in built) == sorted(
+        card_id for card_id, count in copies.items() for _ in range(count)
+    )
+    calls.clear()
+    while not calls:
+        match = play_first(client, match)
+    assert calls[0].decks[0] == built
 
 
 def test_the_list_of_matches_says_each_ones_level(client: TestClient) -> None:
