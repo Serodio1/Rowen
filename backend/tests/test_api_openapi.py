@@ -37,6 +37,7 @@ def test_endpoints_are_named_after_their_functions() -> None:
         "create_match",
         "get_match",
         "play",
+        "ai_turn",
         "list_matches",
         "get_stats",
         "get_choices",

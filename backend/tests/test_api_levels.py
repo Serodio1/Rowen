@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from turns import let_ai_play
 
 from rowen.ai import montecarlo
 from rowen.api.accounts import MemoryAccountStore
@@ -99,7 +100,9 @@ def start(client: TestClient, **new_match: Any) -> dict[str, Any]:
 def play_first(client: TestClient, match: dict[str, Any]) -> dict[str, Any]:
     """Play the first legal action in the match's view, and return the answer."""
     move = {"version": match["version"], "action": match["view"]["legal_actions"][0]}
-    response = client.post(f"/matches/{match['id']}/actions", json=move)
+    response = let_ai_play(
+        client, client.post(f"/matches/{match['id']}/actions", json=move)
+    )
     assert response.status_code == 200
     answer: dict[str, Any] = response.json()
     return answer

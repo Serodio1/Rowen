@@ -94,7 +94,7 @@ export interface paths {
     put?: never;
     /**
      * Play
-     * @description Play the player's action, and then let the AI answer, at the match's level.
+     * @description Play the player's action, and only that: the AI answers in ``ai-turn``.
      *
      *     The action is one of the legal actions in the player's view, sent back as
      *     it is, with the version of the match that came with that view. If the
@@ -103,9 +103,36 @@ export interface paths {
      *     request for the same match is played first, while this one is. If the
      *     action isn't legal now, the answer is a 409 too.
      *
-     *     If the match ends, the store keeps how it ended with the last actions.
+     *     The answer comes at once, so the page can show the player's move before
+     *     the AI thinks. If the match ends, the store keeps how it ended.
      */
     post: operations["play"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/matches/{match_id}/ai-turn": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Ai Turn
+     * @description Let the AI play, at the match's level, until it is the player's turn.
+     *
+     *     The page sends it whenever its view says it is the AI's turn, with the
+     *     version of the match that came with that view. As for a move, another
+     *     version is a 409 that changes nothing. When it isn't the AI's turn, or the
+     *     match is over, the answer is a 409 too, before the AI thinks: so this
+     *     costs nothing more than a move, which nginx limits.
+     */
+    post: operations["ai_turn"];
     delete?: never;
     options?: never;
     head?: never;
@@ -297,6 +324,16 @@ export interface components {
       | components["schemas"]["Revive"]
       | components["schemas"]["Redraw"]
       | components["schemas"]["EndRedraw"];
+    /**
+     * AiTurn
+     * @description What the page sends to let the AI play: the version of the match it has.
+     *
+     *     If the match is at another version by then, the AI doesn't play.
+     */
+    AiTurn: {
+      /** Version */
+      version: number;
+    };
     Card:
       components["schemas"]["UnitCard"] | components["schemas"]["SpecialCard"];
     CardId: string;
@@ -782,7 +819,7 @@ export interface components {
      *
      *     ``moves`` holds those actions, in order: in a new match, the AI's first
      *     ones, if it starts (none if the player does); after the player's action,
-     *     that action and then the AI's answer, one move for each of its actions.
+     *     that action alone; after the AI's turn, one move for each of its actions.
      *     The ``view`` of the match is that of the last move, if there is one.
      */
     Played: {
@@ -1451,6 +1488,61 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["Move"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Played"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  ai_turn: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        match_id: string;
+      };
+      cookie?: {
+        "__Host-session"?: string | null;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AiTurn"];
       };
     };
     responses: {

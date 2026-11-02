@@ -13,6 +13,7 @@ from uuid import uuid4
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
+from turns import let_ai_play
 
 from rowen.api.accounts import MemoryAccountStore
 from rowen.api.app import (
@@ -80,7 +81,9 @@ def start(client: TestClient, deck: str = "humans") -> httpx2.Response:
 def play(client: TestClient, match: Any) -> httpx2.Response:
     """Play the first legal action of a match, as JSON, and return the response."""
     move = {"version": match["version"], "action": match["view"]["legal_actions"][0]}
-    return client.post(f"/matches/{match['id']}/actions", json=move)
+    return let_ai_play(
+        client, client.post(f"/matches/{match['id']}/actions", json=move)
+    )
 
 
 def play_to_the_end(client: TestClient, match: Any) -> list[Any]:
@@ -157,8 +160,11 @@ def test_a_players_match_is_only_theirs(client: TestClient) -> None:
             as_(client, credentials)
         seen = client.get(f"/matches/{match['id']}")
         played = play(client, match)
-        assert seen.status_code == played.status_code == 404
-        assert seen.json() == played.json() == unknown.json()
+        turn = client.post(
+            f"/matches/{match['id']}/ai-turn", json={"version": match["version"]}
+        )
+        assert seen.status_code == played.status_code == turn.status_code == 404
+        assert seen.json() == played.json() == turn.json() == unknown.json()
 
     client.cookies.set(SESSION_COOKIE, cookie)
     assert client.get(f"/matches/{match['id']}").status_code == 200
