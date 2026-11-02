@@ -104,13 +104,15 @@ the Humans' cards with three Informants (Spies) and three Medics, two
 Scarecrows, and no weather. Spies draw cards, Medics bring them back, and the
 Commander's passive draws two more after each round won: the player ends with
 far more cards than the AI. `rowen-arena --deck` plays it in place of the
-Humans' own deck. As on the site, the AIs still guess that the Humans play
-their own deck.
+Humans' own deck. Until 2 November 2026, the AIs guessed that the Humans
+played their own deck; since then, as on the site, they guess from the list
+of the deck played (ADR 0018).
 
 | AI on both sides | Matches | Decisive | Draws | Spies won | Robots won |
 |---|---|---|---|---|---|
 | Hard | 160 | 159 | 1 | **87.4% ± 5.2%** | 12.6% |
 | Hard, with the Watch Man and the Firewall | 160 | 155 | 5 | **78.1% ± 6.5%** | 21.9% |
+| Hard, with the Watch Man and the Firewall, the AIs knowing the deck's list | 320 | 317 | 3 | **69.4% ± 5.1%** | 30.6% |
 
 Even with the Hard AI playing it, and without the player's own tactic
 (taking an opponent's Spy back with a Scarecrow, to play it again), this

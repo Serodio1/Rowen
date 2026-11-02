@@ -163,5 +163,5 @@ cards from the list of the deck they play, a built one too.** It is what a
 player who knows the opponent's decklist knows: which cards the deck has,
 never which are in the hand or in what order they come. With a faction's own
 deck, nothing changes. The API gives the AI the decks of the match
-(`_ai_choice` in `backend/src/rowen/api/app.py`); `rowen-arena` still guesses
-the faction's own decks, as it measured before.
+(`_ai_choice` in `backend/src/rowen/api/app.py`), and `rowen-arena` does the
+same, so it keeps measuring the AI as it plays on the site.

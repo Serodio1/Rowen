@@ -18,7 +18,7 @@ since a better AI that is too slow is no good on the site.
 
 With ``--deck``, one faction plays a deck built from its cards (a JSON file
 such as ``docs/decks/spies.json``) instead of its own. As on the site, the
-AIs still guess that each player plays their faction's own deck.
+AIs guess the hidden cards from the list of each deck played, that one too.
 
 The same seed gives the same matches, so a run can be repeated. Printing is
 passed in as ``write``: ``print`` in the terminal, a list of lines in the
@@ -213,9 +213,9 @@ def play_match(
         choose their moves, and how many moves each chose.
     """
     state = start_match(decks, seed=seed)
-    # As on the site, each AI guesses the faction's own deck, also when a
-    # player plays one they built (ADR 0018).
-    cards = (load_deck(decks[0].id).cards, load_deck(decks[1].id).cards)
+    # As on the site, each AI guesses from the list of each deck played, a
+    # built one too (ADR 0018).
+    cards = (decks[0].cards, decks[1].cards)
     seconds, moves = [0.0, 0.0], [0, 0]
     view = player_view(state, 0)
     while not view.match_over:
@@ -239,7 +239,7 @@ def choose(
     """Return the AI's next action at ``level``, as the web API chooses it.
 
     ``decks`` are the cards the Monte Carlo AI guesses each player's deck
-    holds: their faction's own.
+    holds: the list of the deck they play.
     """
     if level == "easy":
         return baseline.choose_action(view)
