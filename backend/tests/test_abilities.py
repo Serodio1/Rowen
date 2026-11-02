@@ -495,7 +495,8 @@ def test_ward_only_guards_its_own_side() -> None:
 
 
 def test_ward_doesnt_stop_a_unit_that_isnt_a_spy() -> None:
-    state = guarded(make_state((KNIGHT,)))
+    # The Knight goes on its player's own side, where the Watch Man is.
+    state = guarded(make_state((KNIGHT,)), player=0)
 
     assert PlayUnit(card="knight", row=Row.MELEE) in legal_actions(state)
 
