@@ -48,6 +48,8 @@ online.
   interface built, and what it taught.
 - [Phase 4 retrospective](docs/retrospectives/phase-4.md): what accounts,
   match history and the deck builder built, and what they taught.
+- [Phase 5 retrospective](docs/retrospectives/phase-5.md): what the Monte
+  Carlo AI, its levels and the passives built, and what they taught.
 
 ## Play with Docker
 
