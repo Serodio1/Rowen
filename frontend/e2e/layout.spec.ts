@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./test.ts";
+import { yourTurn } from "./moves.ts";
 
 /** Return how far the page scrolls each way, in pixels. */
 function scrolls(page: Page) {
@@ -33,7 +34,9 @@ test("the match fits a laptop's screen, and nothing sticks out on a phone", asyn
     const count = await entries.count();
     await page.locator("[data-choosable]").first().click();
     await page.locator("[data-target]").first().click();
-    await expect(entries).toHaveCount(count + 1);
+    // At least one more: the AI's turn may add its own right after.
+    await expect.poll(() => entries.count()).toBeGreaterThan(count);
+    await yourTurn(page);
   }
   // After a Medic, the units to revive take the hand's place until one is
   // chosen (and a revived Medic revives again): finish, so the hand is back.

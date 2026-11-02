@@ -175,7 +175,9 @@ jobs:
       # its JavaScript with nosniff, a redirect that names only the path (as
       # behind Cloud Run), the API's docs under /api, the decks, then a whole
       # match (at most 100 moves), always playing the first legal move with the
-      # match's version, read back at the end, and then the first move again,
+      # match's version, and then the AI's turn when it is the AI's (a request
+      # of its own, which nginx passes on without the moves' limit), read back
+      # at the end, and then the first move again,
       # which comes too late: 409. The API then restarts (nginx with it), and
       # the match is still there, kept in PostgreSQL. A move a second stays
       # under nginx's limit of 1 move a second. Then, that the API ignores an
@@ -216,6 +218,10 @@ jobs:
             move=$(jq --compact-output '{version, action: .view.legal_actions[0]}' <<< "$match")
             match=$(curl --fail --silent --show-error --header 'Content-Type: application/json' \
               --data "$move" "$url/api/matches/$id/actions")
+            if jq --exit-status '.view.current == 1 and (.view.match_over | not)' <<< "$match" > /dev/null; then
+              match=$(curl --fail --silent --show-error --header 'Content-Type: application/json' \
+                --data "$(jq --compact-output '{version}' <<< "$match")" "$url/api/matches/$id/ai-turn")
+            fi
             sleep 1
           done
           curl --fail --silent --show-error "$url/api/matches/$id" | jq --exit-status .view.match_over

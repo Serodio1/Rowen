@@ -110,3 +110,13 @@ keeps the CPU busy at most about a fifth of the time. A player clicking
 quickly makes about 2.5 moves a second for a few seconds, within the burst.
 This guards the other players, not the bill: that is still the spending cap
 (ADR 0010), which a busy instance would reach days later instead of hours.
+
+## Update (2026-11-02)
+
+A move now answers at once, and the AI plays in a request of its own
+(`POST /api/matches/{id}/ai-turn`), so the page shows the player's move before
+the AI thinks. That request has only the `api` zone, not the moves zone: the
+AI thinks only on its turn, which only a move gives it, and the moves keep
+their limit. On any other turn the API turns it down before the AI thinks.
+So a move still counts once against the moves zone, and the AI still thinks
+at most once for each move.

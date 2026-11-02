@@ -7,9 +7,10 @@ import { expect, type Page } from "@playwright/test";
  * passing). With `moves`, stop after that many moves, if it isn't over by
  * then.
  *
- * Each move adds one entry to what happened (the AI's answer comes with it),
- * so the next move waits until the page has the next view. (The log is out
- * of sight, but there all the same.) The page must play with reduced motion.
+ * Each move adds one entry to what happened, and the AI's turn after it
+ * another, so the next move waits for the move's entry and then for the
+ * AI's turn to end (`yourTurn`). (The log is out of sight, but there all the
+ * same.) The page must play with reduced motion.
  *
  * It first waits for the board: the entries are counted from there. Counted
  * before, the entry of the AI's first moves, when it starts, would come with
@@ -30,6 +31,18 @@ export async function playOn(page: Page, moves = 100) {
     } else {
       await others.first().click();
     }
-    await expect(entries).toHaveCount(count + 1);
+    // At least one more: the AI's turn may add its own right after.
+    await expect.poll(() => entries.count()).toBeGreaterThan(count);
+    await yourTurn(page);
   }
+}
+
+/**
+ * Wait until the AI's turn, if it is the AI's, is over: the page says whose
+ * turn it is above the moves.
+ */
+export async function yourTurn(page: Page) {
+  await expect(page.getByText(/^The AI('s turn\.| is thinking…)$/)).toHaveCount(
+    0,
+  );
 }

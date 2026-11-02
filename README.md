@@ -125,9 +125,10 @@ try them. `GET /decks` lists the decks, and `POST /matches` with
 and the response says so). To play, send one of the `legal_actions`
 of the view, as it is, with the match's `version`, to
 `POST /matches/{id}/actions`: `{"version": 1, "action": {"type": "pass"}}`.
-A move from an old version is turned down (`match_changed`). If it is then the AI's
-turn, the AI plays before the server responds, and the response holds the new
-view and what happened. A player may also make an account: `POST /accounts`
+A move from an old version is turned down (`match_changed`). The response
+holds the new view and what happened. If it is then the AI's turn, send
+`POST /matches/{id}/ai-turn` with the match's `version` (`{"version": 2}`):
+the AI plays until it is the player's turn, and the response says what it did. A player may also make an account: `POST /accounts`
 with `{"username": "rui", "password": "at least 8 characters"}` logs them in
 with a session cookie, `POST /session` logs in again, `GET /session` says who
 is logged in and `DELETE /session` logs out

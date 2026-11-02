@@ -267,14 +267,30 @@ export function startMatch(api: Api, deck: NewMatch) {
 /**
  * Play `move`: one of the legal actions in a view, as the view lists it, with
  * the version of the match that came with the view. The answer has the match
- * after the AI's answer. If the match is at another version by then, the
- * move isn't played: the API answers `match_changed`.
+ * after the player's move alone: the AI answers in `playAiTurn`. If the match
+ * is at another version by then, the move isn't played: the API answers
+ * `match_changed`.
  */
 export function playMove(api: Api, matchId: string, move: Move) {
   return send(
     api.POST("/matches/{match_id}/actions", {
       params: { path: { match_id: matchId } },
       body: move,
+    }),
+  );
+}
+
+/**
+ * Let the AI play its turn in a match at `version`, the version of the view
+ * that says it is the AI's turn. The answer has the match after the AI's
+ * moves. At another version the AI doesn't play (`match_changed`), nor when
+ * it isn't its turn (`illegal_action`).
+ */
+export function playAiTurn(api: Api, matchId: string, version: number) {
+  return send(
+    api.POST("/matches/{match_id}/ai-turn", {
+      params: { path: { match_id: matchId } },
+      body: { version },
     }),
   );
 }

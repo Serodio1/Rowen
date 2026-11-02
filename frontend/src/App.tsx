@@ -25,6 +25,7 @@ import {
   forgetMatches,
   matchQuery,
   playerDecksQuery,
+  playAiTurn,
   playMove,
   sessionQuery,
   startMatch,
@@ -649,50 +650,86 @@ function PlayMatch({
   // Where the cards and the moves are: the board, and the buttons beside it.
   const boardArea = useRef<HTMLDivElement>(null);
   const movesArea = useRef<HTMLDivElement>(null);
+  /** Show the moves of an answer, and keep the match it leads to. */
+  function onPlayed(played: Played) {
+    // The view the move was played from: the events start in its round.
+    // (The cache always has one, from `initialData`: `undefined` is only
+    // for the types.)
+    const before = queryClient.getQueryData(query.queryKey)?.view;
+    // Events name their cards by id. A card can leave the view, such as a
+    // unit a Scarecrow takes back to the AI's hand, but it was in the view
+    // before.
+    const names = new Map([
+      ...(before === undefined ? [] : cardNames(before)),
+      ...namesOf(played),
+    ]);
+    const entry = happened(
+      eventsOf(played),
+      played.view.player,
+      names,
+      before?.round ?? played.view.round,
+    );
+    setLog((log) => [{ number: log.length + 1, ...entry }, ...log]);
+    setSteps(mayMove() ? stepsOfMoves(played.moves, before) : NO_STEPS);
+    queryClient.setQueryData(query.queryKey, matchOf(played));
+    if (played.view.match_over) {
+      // How it ended is in the player's list now.
+      forgetMatches(queryClient);
+    }
+  }
+  /** Ask for the match as it is now, after a request that didn't work. */
+  function onFailed(error: RequestError) {
+    // Unless it is gone. When no answer came, or the server failed, the
+    // move may have been played all the same, and the view on the page is
+    // then out of date: a move chosen from it would be turned down.
+    if (error.code !== "match_not_found") {
+      void queryClient.invalidateQueries({ queryKey: query.queryKey });
+    }
+  }
   const play = useMutation({
     mutationKey: ["play"],
     mutationFn: (move: Move) => playMove(api, started.id, move),
-    onSuccess: (played) => {
-      // The view the move was played from: the events start in its round.
-      // (The cache always has one, from `initialData`: `undefined` is only
-      // for the types.)
-      const before = queryClient.getQueryData(query.queryKey)?.view;
-      // Events name their cards by id. A card can leave the view, such as a
-      // unit a Scarecrow takes back to the AI's hand, but it was in the view
-      // before.
-      const names = new Map([
-        ...(before === undefined ? [] : cardNames(before)),
-        ...namesOf(played),
-      ]);
-      const entry = happened(
-        eventsOf(played),
-        played.view.player,
-        names,
-        before?.round ?? played.view.round,
-      );
-      setLog((log) => [{ number: log.length + 1, ...entry }, ...log]);
-      setSteps(mayMove() ? stepsOfMoves(played.moves, before) : NO_STEPS);
-      queryClient.setQueryData(query.queryKey, matchOf(played));
-      if (played.view.match_over) {
-        // How it ended is in the player's list now.
-        forgetMatches(queryClient);
-      }
-    },
+    onSuccess: onPlayed,
     onError: (error) => {
-      // Ask for the match as it is now, unless it is gone. When no answer
-      // came, or the server failed, the move may have been played all the
-      // same, and the view on the page is then out of date: a move chosen
-      // from it would be turned down.
-      if (error.code !== "match_not_found") {
-        void queryClient.invalidateQueries({ queryKey: query.queryKey });
-      }
+      onFailed(error);
       // The card chosen may not be the player's to play any more.
       setChosen(null);
     },
   });
+  // The version at which the AI's turn didn't work: the page doesn't ask for
+  // it again by itself, which could go on without end, until Try again.
+  const [stuck, setStuck] = useState<number | null>(null);
+  const { mutate: askForAiTurn, ...aiTurn } = useMutation({
+    mutationKey: ["ai-turn"],
+    mutationFn: (version: number) => playAiTurn(api, started.id, version),
+    onSuccess: onPlayed,
+    onError: (error, version) => {
+      setStuck(version);
+      onFailed(error);
+    },
+  });
 
-  const ready = !(play.isPending || match.isFetching || match.isError);
+  const ready = !(
+    play.isPending ||
+    aiTurn.isPending ||
+    match.isFetching ||
+    match.isError
+  );
   const version = match.data.version;
+  // Once the player's move has played out (their card is on the board), the
+  // page asks for the AI's turn, if it is the AI's: also in a match the
+  // player comes back to. The server decides whose turn it is (ADR 0002).
+  const aisTurn =
+    !match.data.view.match_over &&
+    match.data.view.current !== match.data.view.player;
+  const askAi =
+    aisTurn && ready && progress.step >= steps.length && stuck !== version;
+  useEffect(() => {
+    // Two effects in the same instant (React's strict mode) ask once.
+    if (askAi && queryClient.isMutating({ mutationKey: ["ai-turn"] }) === 0) {
+      askForAiTurn(version);
+    }
+  }, [askAi, version, askForAiTurn, queryClient]);
   useEffect(() => {
     // After a move, the focus was on the button played, or on nothing once
     // the button was disabled or gone: the next Tab would go on from a card
@@ -806,7 +843,8 @@ function PlayMatch({
     chosen: chosen?.version === match.data.version ? chosen.chosen : null,
     // No move while one is on its way, or while the moves on the page may be
     // out of date: the page is asking for the match, or couldn't.
-    disabled: play.isPending || match.isFetching || match.isError,
+    disabled:
+      play.isPending || aiTurn.isPending || match.isFetching || match.isError,
     onChoose: (card) => {
       setChosen(
         card === null ? null : { version: match.data.version, chosen: card },
@@ -867,6 +905,22 @@ function PlayMatch({
                 if (!match.isFetching) {
                   void match.refetch();
                 }
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        ) : aiTurn.isError && stuck === version ? (
+          // The AI's turn didn't work, and the match is still at it.
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <p role="alert" className={ALERT}>
+              {aiTurn.error.message}
+            </p>
+            <button
+              type="button"
+              className={BUTTON}
+              onClick={() => {
+                setStuck(null);
               }}
             >
               Try again
@@ -991,7 +1045,7 @@ function PlayMatch({
             </div>
           )
         ) : (
-          <Controls view={view} playing={playing} thinking={play.isPending} />
+          <Controls view={view} playing={playing} thinking={aiTurn.isPending} />
         )}
       </div>
       {/* Out of sight while a card is shown on the right, which it would
@@ -1031,8 +1085,8 @@ function PlayMatch({
 /**
  * What the player is to do now, in words, and the moves that are no card:
  * passing, or keeping the hand before round 1. While a card is chosen, a
- * button lets it go (as Escape does on the board). While a move is on its
- * way (`thinking`), that the AI is thinking.
+ * button lets it go (as Escape does on the board). On the AI's turn, that
+ * it is, and while it plays (`thinking`), that the AI is thinking.
  */
 function Controls({
   view,
@@ -1050,6 +1104,9 @@ function Controls({
   if (thinking) {
     // The answer comes once the AI has made its moves.
     hint = "The AI is thinking…";
+  } else if (view.current !== view.player) {
+    // Until the player's move has played out: the AI thinks after it.
+    hint = "The AI's turn.";
   } else if (view.reviving) {
     hint =
       chosen === null

@@ -1403,7 +1403,7 @@ test("a card played shows on the right, then goes to its place, which shows it o
   expect(log.closest("section")).not.toHaveClass("opacity-0");
 });
 
-test("the player's card shows at once while the AI thinks, and goes to its place with the answer", async () => {
+test("the player's card shows at once while their move is on its way, and goes to its place with the answer", async () => {
   withMotion();
   const answer = later();
   const { api } = fakeApi({
@@ -1429,7 +1429,6 @@ test("the player's card shows at once while the AI thinks, and goes to its place
     expect(showcase()).toHaveAttribute("data-showcase", "soldier");
   });
   const card = showcase();
-  expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
   // The log is out of sight under it, as for any card played.
   expect(
     screen.getByRole("log", { name: "What happened" }).closest("section"),
@@ -1486,7 +1485,9 @@ test("a card swapped before round 1 isn't shown as played", async () => {
   swapSoldier();
 
   await waitFor(() => {
-    expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Keep this hand" }),
+    ).toBeDisabled();
   });
   expect(showcase()).toBeNull();
 });
@@ -1512,7 +1513,7 @@ test("a card played while a message is over the screen waits for it", async () =
     screen.getByRole("button", { name: "Play Soldier in the melee row" }),
   );
   await waitFor(() => {
-    expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pass" })).toBeDisabled();
   });
   expect(showcase()).toBeNull();
 
@@ -1520,7 +1521,7 @@ test("a card played while a message is over the screen waits for it", async () =
   expect(showcase()).toHaveAttribute("data-showcase", "soldier");
 });
 
-test("with reduced motion, the player's card doesn't show while the AI thinks", async () => {
+test("with reduced motion, the player's card doesn't show while their move is on its way", async () => {
   withMotion(true);
   const answer = later();
   const { api } = fakeApi({
@@ -1540,9 +1541,134 @@ test("with reduced motion, the player's card doesn't show while the AI thinks", 
     screen.getByRole("button", { name: "Play Soldier in the melee row" }),
   );
   await waitFor(() => {
-    expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pass" })).toBeDisabled();
   });
   expect(showcase()).toBeNull();
+});
+
+// Where the page asks for the AI's turn in the match "a-match".
+const AI_TURN = "POST /api/matches/a-match/ai-turn";
+
+// Round 1 has begun, and the player played a Soldier in their melee row: it
+// is the AI's turn.
+const PLAYER_PLAYED = played(
+  view({
+    players: [
+      side({
+        rows: {
+          ...side().rows,
+          melee: {
+            ...side().rows.melee,
+            units: [{ card: SOLDIER, strength: 4 }],
+          },
+        },
+      }),
+      side(),
+    ],
+    current: 1,
+    legal_actions: [],
+  }),
+  [{ type: "unit_played", player: 0, card: "soldier", row: "melee", side: 0 }],
+);
+
+// The AI's answer: it passed, and it is the player's turn again.
+const AI_PASSED = played(
+  { ...PLAYER_PLAYED.body.view, current: 0, legal_actions: [{ type: "pass" }] },
+  [{ type: "player_passed", player: 1 }],
+  3,
+);
+
+/** Start a match at round 1, and play a Soldier in the melee row. */
+async function playSoldier() {
+  await startMatch();
+  const [soldier] = screen.getAllByRole("button", { name: /^Soldier/ });
+  fireEvent.click(soldier as HTMLElement);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Play Soldier in the melee row" }),
+  );
+}
+
+// A match that starts at round 1.
+const AT_ROUND_1 = {
+  ...A_MATCH,
+  "POST /api/matches": {
+    ...A_MATCH["POST /api/matches"],
+    body: { ...A_MATCH["POST /api/matches"].body, view: ROUND_1 },
+  },
+};
+
+test("once the player's move has played out, the page asks for the AI's turn, and says the AI is thinking", async () => {
+  withMotion();
+  const answer = later();
+  const { api, requests } = fakeApi({
+    ...AT_ROUND_1,
+    [PLAY]: PLAYER_PLAYED,
+    [AI_TURN]: answer.response,
+  });
+  renderApp(api);
+  await act(() => vi.advanceTimersByTimeAsync(10_000));
+  await playSoldier();
+  await screen.findByText("You played Soldier in the melee row.");
+
+  // The player's card is on its way: the AI waits for it.
+  expect(screen.getByText("The AI's turn.")).toBeInTheDocument();
+  await settle();
+  expect(sent(requests, AI_TURN)).toHaveLength(0);
+
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.show));
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.fly));
+
+  // On the board now: the AI thinks, from the version the move led to.
+  await screen.findByText("The AI is thinking…");
+  const [turn] = sent(requests, AI_TURN);
+  expect(await turn?.json()).toEqual({ version: 2 });
+
+  answer.answer(Response.json(AI_PASSED.body));
+  // In the log, and over the screen.
+  await screen.findAllByText("The AI passed.");
+  expect(screen.queryByText("The AI is thinking…")).toBeNull();
+  expect(sent(requests, AI_TURN)).toHaveLength(1);
+});
+
+test("with reduced motion, the page asks for the AI's turn at once", async () => {
+  withMotion(true);
+  const { api, requests } = fakeApi({
+    ...AT_ROUND_1,
+    [PLAY]: PLAYER_PLAYED,
+    [AI_TURN]: AI_PASSED,
+  });
+  renderApp(api);
+  await playSoldier();
+
+  await screen.findByText("The AI passed.");
+  expect(sent(requests, AI_TURN)).toHaveLength(1);
+});
+
+test("when the AI's turn doesn't work, the page says so, and asks again only on Try again", async () => {
+  const { api, requests } = fakeApi({
+    ...AT_ROUND_1,
+    [PLAY]: PLAYER_PLAYED,
+    [AI_TURN]: turnedDown(500, "server_error"),
+    // The AI didn't play: the match is still at its turn.
+    "GET /api/matches/a-match": {
+      status: 200,
+      body: aMatch(PLAYER_PLAYED.body.view, 2),
+    },
+  });
+  renderApp(api);
+  await playSoldier();
+
+  expect(
+    await screen.findByText("The API says server_error."),
+  ).toBeInTheDocument();
+  await settle();
+  expect(sent(requests, AI_TURN)).toHaveLength(1);
+
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+  await waitFor(() => {
+    expect(sent(requests, AI_TURN)).toHaveLength(2);
+  });
 });
 
 test("a card turned down by the server shows no more, and stays in the hand", async () => {
