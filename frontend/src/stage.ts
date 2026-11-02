@@ -25,7 +25,7 @@ export const TIMES = {
   /** A unit that a Muster brings: it pops up in its place, with no showing. */
   muster: 350,
   /** A unit destroyed, burning away. */
-  burn: 700,
+  burn: 1000,
   /** A big message over the whole screen, such as "The AI passed." */
   announce: 2000,
 } as const;
