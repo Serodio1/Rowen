@@ -54,7 +54,7 @@ export function Showcase({
         ref={ref}
         data-showcase={step.card.id}
         style={{ transitionDuration: `${String(TIMES.fly)}ms` }}
-        className="animate-show transition-[transform,opacity] ease-in"
+        className="animate-show transition-[transform,opacity] ease-in-out"
       >
         {/* The card of the hand, two and a half times as big. */}
         <div className="drop-shadow-2xl [zoom:2.5]">
