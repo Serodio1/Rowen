@@ -78,6 +78,24 @@ fair, with Robots a little ahead against the Easy AI and Humans a little
 ahead against the Normal one. A change to the cards or the passives should be
 measured again the same way, and this report updated.
 
+## After the Watch Man and the Firewall
+
+Each faction's deck then got two Ward units (rules, section 7.4): the Watch
+Man and the Firewall, melee, strength 5, which keep every Spy out of their
+row. Measured again on 2 November 2026, with the same commands:
+
+| AI on both sides | Matches | Decisive | Draws | Robots won | Humans won |
+|---|---|---|---|---|---|
+| Easy | 4000 | 3900 | 100 | **53.5% ± 1.6%** | 46.5% |
+| Normal | 1000 | 972 | 28 | **51.5% ± 3.1%** | 48.5% |
+
+The Normal margin reaches 50%; the Easy one just misses it (51.9% to 55.1%),
+2 points more for Robots than before. Why was not measured. A guess: a Ward
+unit stops the opponent's Spies, and Humans' Informant draws the same 2 cards
+as the Computer Spy but gives Robots 3 points where the Computer Spy gives
+Humans 2. Left as it
+is, close enough to fair; the Normal AI, which the site offers, is even.
+
 ## A deck a player built: Spies
 
 The faction decks are close to fair, but a player builds their own. One who
@@ -92,9 +110,11 @@ their own deck.
 | AI on both sides | Matches | Decisive | Draws | Spies won | Robots won |
 |---|---|---|---|---|---|
 | Hard | 160 | 159 | 1 | **87.4% ± 5.2%** | 12.6% |
+| Hard, with the Watch Man and the Firewall | 160 | 155 | 5 | **78.1% ± 6.5%** | 21.9% |
 
 Even with the Hard AI playing it, and without the player's own tactic
 (taking an opponent's Spy back with a Scarecrow, to play it again), this
 deck wins most matches: a built deck can be much stronger than the faction's
 own. The rules for building a deck (at most 3 copies of a card) don't hold
-it back.
+it back. The Firewall, which keeps the Spies out of the Robots' melee row,
+takes about 9 points from it, but it still wins most matches.
