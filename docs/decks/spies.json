@@ -1,0 +1,18 @@
+{
+  "faction": "humans",
+  "name": "Spies",
+  "copies": {
+    "human": 5,
+    "soldier": 2,
+    "sniper": 3,
+    "informant": 3,
+    "medic": 3,
+    "plane": 4,
+    "prime-minister": 1,
+    "president": 1,
+    "clear-skies": 1,
+    "war-horn": 3,
+    "wildfire": 1,
+    "scarecrow": 2
+  }
+}

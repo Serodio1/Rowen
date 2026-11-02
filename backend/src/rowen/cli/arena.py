@@ -16,12 +16,17 @@ luck, and the share each deck won, counted the same way. Draws are shown
 apart. It also shows how long each AI takes per move,
 since a better AI that is too slow is no good on the site.
 
+With ``--deck``, one faction plays a deck built from its cards (a JSON file
+such as ``docs/decks/spies.json``) instead of its own. As on the site, the
+AIs still guess that each player plays their faction's own deck.
+
 The same seed gives the same matches, so a run can be repeated. Printing is
 passed in as ``write``: ``print`` in the terminal, a list of lines in the
 tests.
 """
 
 import argparse
+import json
 import math
 import random
 import time
@@ -31,13 +36,14 @@ from itertools import cycle, islice, permutations
 from typing import Literal
 
 from rowen.ai import baseline, montecarlo
-from rowen.data import deck_ids, load_deck
+from rowen.data import deck_ids, load_deck, load_specials
 from rowen.engine.public import (
     Action,
     Card,
     Deck,
     PlayerView,
     apply,
+    build_deck,
     player_view,
     start_match,
 )
@@ -95,13 +101,53 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--seed", type=int, default=0, help="the same seed gives the same matches"
     )
+    parser.add_argument(
+        "--deck",
+        help="a JSON file with a deck built from a faction's cards, played instead"
+        ' of its own: {"faction": "humans", "name": "Spies", "copies": {...}}',
+    )
     args = parser.parse_args(argv)
     if args.matches < 1:
         parser.error("--matches must be at least 1")
-    run(args.first, args.second, args.matches, args.seed, print)
+    try:
+        built = None if args.deck is None else read_deck(args.deck)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        parser.error(f"--deck: {error}")
+    run(args.first, args.second, args.matches, args.seed, print, built)
 
 
-def run(first: Level, second: Level, matches: int, seed: int, write: Write) -> Tally:
+def read_deck(path: str) -> Deck:
+    """Return the deck built as the JSON file at ``path`` says.
+
+    The file holds the faction, the deck's name and how many copies of each
+    card it has, as a player builds a deck on the site.
+
+    Raises:
+        OSError: If the file can't be read.
+        ValueError: If it isn't valid JSON, names an unknown faction, or the
+            deck breaks the rules.
+        KeyError, TypeError: If a field is missing or of the wrong kind.
+    """
+    with open(path, encoding="utf-8") as file:
+        data = json.load(file)
+    faction = data["faction"]
+    return build_deck(
+        id=faction,
+        name=data["name"],
+        faction=load_deck(faction),
+        specials=load_specials(),
+        copies=data["copies"],
+    )
+
+
+def run(
+    first: Level,
+    second: Level,
+    matches: int,
+    seed: int,
+    write: Write,
+    built: Deck | None = None,
+) -> Tally:
     """Play ``matches`` matches between two AIs and show the result.
 
     Args:
@@ -110,12 +156,17 @@ def run(first: Level, second: Level, matches: int, seed: int, write: Write) -> T
         matches: How many matches to play.
         seed: Where all the randomness of the run comes from.
         write: Shows a line.
+        built: A deck built from a faction's cards, played instead of that
+            faction's own deck (its id is the faction's).
 
     Returns:
         The tally of the run, for the first AI.
     """
     rng = random.Random(seed)
-    decks = [load_deck(deck_id) for deck_id in deck_ids()]
+    decks = [
+        built if built is not None and built.id == deck_id else load_deck(deck_id)
+        for deck_id in deck_ids()
+    ]
     # Each pair of decks, both ways round, and each twice: the first AI is
     # player 0, then player 1.
     plan = [(pair, seat) for pair in permutations(decks, 2) for seat in (0, 1)]
@@ -162,7 +213,9 @@ def play_match(
         choose their moves, and how many moves each chose.
     """
     state = start_match(decks, seed=seed)
-    cards = (decks[0].cards, decks[1].cards)
+    # As on the site, each AI guesses the faction's own deck, also when a
+    # player plays one they built (ADR 0018).
+    cards = (load_deck(decks[0].id).cards, load_deck(decks[1].id).cards)
     seconds, moves = [0.0, 0.0], [0, 0]
     view = player_view(state, 0)
     while not view.match_over:
@@ -185,8 +238,8 @@ def choose(
 ) -> Action:
     """Return the AI's next action at ``level``, as the web API chooses it.
 
-    The Monte Carlo AI guesses the opponent plays their faction's own deck,
-    which here is the deck they do play.
+    ``decks`` are the cards the Monte Carlo AI guesses each player's deck
+    holds: their faction's own.
     """
     if level == "easy":
         return baseline.choose_action(view)

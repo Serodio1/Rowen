@@ -117,3 +117,22 @@ and a one-off script.
   set for this change. Normal and Hard keep 8 and 16 samples.
 - Giving up a round in the play-outs when far behind was measured too: 58.4%
   ± 5.0% with seed 0, no clear gain, so it was left out.
+
+## Update (2026-11-02): two changes measured, neither kept
+
+A player beat the Hard AI in every match with a deck they built
+(`docs/decks/spies.json`: more Spies and Medics, two Scarecrows, no
+weather), ending each match with many more cards in hand. Two changes that
+could make the AI care more about its cards were measured against the Hard
+AI as it is, with `rowen-arena` and the faction decks, 160 matches each
+(the same seeds):
+
+| Change | New Hard won | Time per move, new / old |
+| --- | --- | --- |
+| Play the match out also once the opponent has passed, instead of the baseline's choice, which spends up to two cards to win a round | 49.7% ± 7.8% | 0.49 s / 0.39 s |
+| A card in hand worth 8 points instead of 5 (`baseline.CARD_VALUE`) | 49.1% ± 7.8% | 0.42 s / 0.41 s |
+
+Neither is ahead by more than its margin, and the first is 26% slower, over
+the 25% allowed. Both were left out. What makes that deck so strong is the
+deck itself: with the Hard AI on both sides, it won 87.4% ± 5.2% of the
+decisive matches against Robots (`docs/balance.md`).

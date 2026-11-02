@@ -77,3 +77,24 @@ Both margins reach 50%, the Normal one only just (43.8% to 50.0%): close to
 fair, with Robots a little ahead against the Easy AI and Humans a little
 ahead against the Normal one. A change to the cards or the passives should be
 measured again the same way, and this report updated.
+
+## A deck a player built: Spies
+
+The faction decks are close to fair, but a player builds their own. One who
+beat the Hard AI in every match played [`docs/decks/spies.json`](decks/spies.json):
+the Humans' cards with three Informants (Spies) and three Medics, two
+Scarecrows, and no weather. Spies draw cards, Medics bring them back, and the
+Commander's passive draws two more after each round won: the player ends with
+far more cards than the AI. `rowen-arena --deck` plays it in place of the
+Humans' own deck. As on the site, the AIs still guess that the Humans play
+their own deck.
+
+| AI on both sides | Matches | Decisive | Draws | Spies won | Robots won |
+|---|---|---|---|---|---|
+| Hard | 160 | 159 | 1 | **87.4% ± 5.2%** | 12.6% |
+
+Even with the Hard AI playing it, and without the player's own tactic
+(taking an opponent's Spy back with a Scarecrow, to play it again), this
+deck wins most matches: a built deck can be much stronger than the faction's
+own. The rules for building a deck (at most 3 copies of a card) don't hold
+it back.

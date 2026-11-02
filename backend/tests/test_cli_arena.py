@@ -1,6 +1,7 @@
 """Tests for letting two AIs play each other: the rowen-arena command."""
 
 from importlib.metadata import entry_points
+from pathlib import Path
 
 import pytest
 
@@ -223,3 +224,95 @@ def test_the_command_is_installed() -> None:
     assert commands, "no rowen-arena command: run uv sync"
     (command,) = commands
     assert command.load() is main
+
+
+SPIES = Path(__file__).parents[2] / "docs" / "decks" / "spies.json"
+
+
+def test_a_deck_file_builds_the_deck_a_player_could_build() -> None:
+    deck = arena.read_deck(str(SPIES))
+
+    # The faction's id, as for a deck built on the site.
+    assert (deck.id, deck.name) == ("humans", "Spies")
+    assert len(deck.cards) == 29
+    assert sum(card.id == "informant" for card in deck.cards) == 3
+
+
+def test_a_built_deck_plays_in_place_of_its_factions_own(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    built = arena.read_deck(str(SPIES))
+    played: list[tuple[Deck, Deck]] = []
+
+    def fake_match(
+        decks: tuple[Deck, Deck], levels: tuple[Level, Level], seed: int, ai_seed: int
+    ) -> tuple[int | None, tuple[float, float], tuple[int, int]]:
+        played.append(decks)
+        return 0, (1.0, 1.0), (1, 1)
+
+    monkeypatch.setattr(arena, "play_match", fake_match)
+
+    run("easy", "easy", 4, 0, lambda line: None, built)
+
+    humans = [deck for decks in played for deck in decks if deck.id == "humans"]
+    assert humans
+    assert all(deck is built for deck in humans)
+    # The other faction plays its own deck.
+    robots = {deck for decks in played for deck in decks if deck.id != "humans"}
+    assert robots == {load_deck("robots")}
+
+
+def test_the_ais_guess_the_factions_own_decks_as_on_the_site(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    built = arena.read_deck(str(SPIES))
+    guesses: list[tuple[tuple[Card, ...], tuple[Card, ...]]] = []
+    real_choose = arena.choose
+
+    def spy(
+        view: PlayerView,
+        level: Level,
+        decks: tuple[tuple[Card, ...], tuple[Card, ...]],
+        seed: int,
+    ) -> Action:
+        guesses.append(decks)
+        return real_choose(view, level, decks, seed)
+
+    monkeypatch.setattr(arena, "choose", spy)
+    robots = load_deck("robots")
+
+    play_match((built, robots), ("easy", "easy"), 3, 4)
+
+    assert set(guesses) == {(load_deck("humans").cards, robots.cards)}
+
+
+def test_the_command_plays_a_built_deck(capsys: pytest.CaptureFixture[str]) -> None:
+    main(["easy", "easy", "--matches", "2", "--deck", str(SPIES)])
+
+    assert capsys.readouterr().out.startswith("2 matches: easy against easy.\n")
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "not json",
+        '{"faction": "elves", "name": "x", "copies": {}}',
+        '{"faction": "humans", "name": "Few", "copies": {"human": 1}}',
+        '{"name": "x", "copies": {}}',
+    ],
+)
+def test_the_command_rejects_a_bad_deck_file(tmp_path: Path, content: str) -> None:
+    deck = tmp_path / "deck.json"
+    deck.write_text(content, encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exit_info:
+        main(["easy", "easy", "--deck", str(deck)])
+
+    assert exit_info.value.code == 2
+
+
+def test_the_command_rejects_a_missing_deck_file(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        main(["easy", "easy", "--deck", str(tmp_path / "none.json")])
+
+    assert exit_info.value.code == 2
