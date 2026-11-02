@@ -360,7 +360,8 @@ test("a Spy revived after a Medic goes on the AI's side too", () => {
   const played = renderPlaying(
     view({
       reviving: true,
-      players: [side({ discard: [INFORMANT] }), side()],
+      // A Legend before it, which can't be revived: the list skips it.
+      players: [side({ discard: [CAPTAIN, INFORMANT] }), side()],
       legal_actions: [{ type: "revive", card: "informant", row: "melee" }],
     }),
   );

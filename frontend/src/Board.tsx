@@ -112,10 +112,14 @@ export function Board({
     playing === undefined || chosen === null
       ? []
       : playsOf(playing.actions, chosen.card);
+  // The list to revive from skips cards and copies, so its places aren't the
+  // discard pile's: there the card is found by its id, as copies are alike.
   const card =
     chosen === null
       ? undefined
-      : (chosen.from === "hand" ? view.hand : you.discard)[chosen.index];
+      : chosen.from === "hand"
+        ? view.hand[chosen.index]
+        : you.discard.find(({ id }) => id === chosen.card);
   // A Spy goes on the AI's side: the API says which units do (ADR 0002).
   const theirs = card?.type === "unit" && card.opponent_side;
   const board = useRef<HTMLElement>(null);
