@@ -96,8 +96,9 @@ export function otherActions(actions: readonly Action[]): Action[] {
 
 /**
  * The card the player chose, before choosing where it goes: its id, where
- * it is (the hand, or the discard pile while reviving), and its place there,
- * so the page lifts the copy clicked.
+ * it is (the hand, or the discard pile while reviving), and its place in the
+ * list clicked (the hand, or the units to revive), so the page lifts the copy
+ * clicked.
  */
 export interface Chosen {
   card: string;
