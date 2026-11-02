@@ -28,7 +28,7 @@ from dataclasses import replace
 
 from rowen.ai import baseline
 from rowen.engine.abilities import on_opponent_side
-from rowen.engine.actions import Action, EndRedraw, Pass
+from rowen.engine.actions import Action, EndRedraw, Pass, PlayScarecrow, PlayUnit
 from rowen.engine.cards import Card, UnitCard
 from rowen.engine.game import apply_legal, legal_actions, match_over
 from rowen.engine.rng import Rng
@@ -200,4 +200,27 @@ def _next(state: GameState) -> Action:
     lead = baseline.player_lead(state, player)
     if not plays or baseline.passes_first(lead, state.players[player].lives):
         return Pass()
-    return baseline.best(state, plays)
+    return _spy_play(state, plays) or baseline.best(state, plays)
+
+
+def _spy_play(state: GameState, plays: tuple[Action, ...]) -> Action | None:
+    """Return the play that brings more cards with a Spy, if there is one.
+
+    A Spy on the player's own side, which the opponent played, goes back to
+    the hand with a Scarecrow; a Spy in the hand is played, and draws two
+    cards. A player who keeps the most cards in hand does both, so the
+    play-outs do too: the AI then sees what its own Spies give a player with
+    a Scarecrow, and what it can get from theirs.
+    """
+    me = state.players[state.current]
+    for action in plays:
+        if isinstance(action, PlayScarecrow) and any(
+            unit.id == action.unit and _spy(unit) for unit in me.rows[action.row].units
+        ):
+            return action
+    for action in plays:
+        if isinstance(action, PlayUnit) and any(
+            card.id == action.card and _spy(card) for card in me.hand
+        ):
+            return action
+    return None
