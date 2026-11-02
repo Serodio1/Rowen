@@ -13,7 +13,7 @@ from rowen.cli.play import MAX_SEED, main, play
 
 # A seed where the AI swaps two cards before round 1 and later draws with a
 # Spy, while the player always picks the first choice.
-AI_SWAPS_AND_DRAWS = 19
+AI_SWAPS_AND_DRAWS = 32
 
 # Far more prompts than any match needs, so a test whose answers are never
 # accepted fails instead of asking forever.
@@ -80,8 +80,8 @@ def test_the_player_gets_the_deck_of_the_faction_they_choose() -> None:
 
     assert "You play Robots and the AI plays Humans." in player.lines
     first_board = next(line for line in player.lines if BOARD.match(line))
-    assert "  Sentry (10 melee, legend, inspire)" in first_board
-    assert "President" not in first_board
+    assert "  Machine (4 melee/ranged, agile)" in first_board
+    assert "Soldier" not in first_board
 
 
 def test_a_board_and_a_menu_come_before_each_choice() -> None:
@@ -101,19 +101,19 @@ def test_a_board_and_a_menu_come_before_each_choice() -> None:
 
     # The first menu is the redraw.
     first = boards[0]
-    assert player.lines[first + 2] == "   1. Swap Downpour"
-    assert player.lines[first + 11] == "  10. Keep this hand"
-    assert player.prompts[:2] == ["Choose 1-2: ", "Choose 1-10: "]
+    assert player.lines[first + 2] == "   1. Swap Medic"
+    assert player.lines[first + 10] == "   9. Keep this hand"
+    assert player.prompts[:2] == ["Choose 1-2: ", "Choose 1-9: "]
 
 
 def test_the_chosen_action_is_the_one_played() -> None:
-    # In the redraw, choice 3 is Wildfire, and then choice 1 is Downpour.
+    # In the redraw, choice 3 is War Horn, and then choice 1 is Medic.
     player = Player("1", "3")
 
     play(1, player.read, player.write)
 
-    assert "You swapped Wildfire for Soldier." in player.lines
-    assert "You swapped Downpour for War Horn." in player.lines
+    assert "You swapped War Horn for Scarecrow." in player.lines
+    assert "You swapped Medic for Smart Guy." in player.lines
 
 
 def test_a_player_who_always_passes_loses() -> None:

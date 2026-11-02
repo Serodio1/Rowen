@@ -1046,7 +1046,8 @@
           "medic",
           "muster",
           "bond",
-          "inspire"
+          "inspire",
+          "ward"
         ],
         "title": "Ability",
         "description": "A unit ability (rules, section 7). A unit has at most one."

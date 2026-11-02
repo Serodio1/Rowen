@@ -93,6 +93,7 @@ def legal_actions(state: GameState) -> tuple[Action, ...]:
             Revive(card=unit.id, row=row)
             for unit in abilities.revivable(player)
             for row in unit.rows
+            if abilities.can_go(state, state.current, unit, row)
         )
         return tuple(revives)
     if _redrawing(state):
@@ -104,7 +105,7 @@ def legal_actions(state: GameState) -> tuple[Action, ...]:
 
     # Copies of a card give the same actions. A dict keeps one of each, in order.
     plays = dict.fromkeys(
-        action for card in player.hand for action in _plays(player, card)
+        action for card in player.hand for action in _plays(state, card)
     )
     return (*plays, Pass())
 
@@ -209,15 +210,22 @@ def _deal(cards: tuple[Card, ...], deck: Deck) -> PlayerState:
     )
 
 
-def _plays(player: PlayerState, card: Card) -> tuple[Action, ...]:
-    """Return the ways to play a card from the hand, one action per choice.
+def _plays(state: GameState, card: Card) -> tuple[Action, ...]:
+    """Return the ways the player whose turn it is can play a card from their
+    hand, one action per choice.
 
-    A unit goes on any of its rows; a War Horn in any row with an empty horn
-    slot; a Scarecrow in place of any unit it can swap with. Every other
-    special card needs no choice: its effect is in ``specials.EFFECTS``.
+    A unit goes on any of its rows that ``abilities.can_go`` allows; a War
+    Horn in any row with an empty horn slot; a Scarecrow in place of any unit
+    it can swap with. Every other special card needs no choice: its effect is
+    in ``specials.EFFECTS``.
     """
+    player = state.players[state.current]
     if isinstance(card, UnitCard):
-        return tuple(PlayUnit(card=card.id, row=row) for row in card.rows)
+        return tuple(
+            PlayUnit(card=card.id, row=row)
+            for row in card.rows
+            if abilities.can_go(state, state.current, card, row)
+        )
     if card.kind is SpecialKind.WAR_HORN:
         rows = specials.free_horn_rows(player)
         return tuple(PlayHorn(card=card.id, row=row) for row in rows)

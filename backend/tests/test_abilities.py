@@ -4,12 +4,21 @@ Agile, which only changes where a unit can go, is tested with the turns, in
 test_turns.py.
 """
 
+from dataclasses import replace
+
 import pytest
 from cards import KNIGHT, SCOUT, SNIPER, WAR_HORN
 
 from rowen.engine.abilities import on_opponent_side
-from rowen.engine.actions import Action, Pass, PlayUnit, Revive
-from rowen.engine.cards import Ability, Card, Row, UnitCard
+from rowen.engine.actions import (
+    Action,
+    Pass,
+    PlayScarecrow,
+    PlaySpecial,
+    PlayUnit,
+    Revive,
+)
+from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.events import (
     CardsDrawn,
     NothingToRevive,
@@ -21,7 +30,7 @@ from rowen.engine.events import (
 from rowen.engine.game import IllegalActionError, apply, legal_actions
 from rowen.engine.rng import Rng
 from rowen.engine.scoring import player_total
-from rowen.engine.state import GameState, PlayerState
+from rowen.engine.state import GameState, PlayerState, with_player, with_unit
 
 INFORMANT = UnitCard(
     id="informant",
@@ -451,3 +460,84 @@ def test_medic_as_the_last_card_passes_only_after_the_choice() -> None:
         UnitRevived(player=0, card="sniper", row=Row.RANGED, side=0),
         PlayerPassed(player=0),
     )
+
+
+# Ward
+
+WATCH_MAN = UnitCard(
+    id="watch-man",
+    name="Watch Man",
+    rows=(Row.MELEE,),
+    strength=5,
+    ability=Ability.WARD,
+)
+WILDFIRE = SpecialCard(id="wildfire", name="Wildfire", kind=SpecialKind.WILDFIRE)
+SCARECROW = SpecialCard(id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW)
+
+
+def guarded(state: GameState, player: int = 1) -> GameState:
+    """Put a Watch Man in the player's melee row."""
+    return with_unit(state, player, Row.MELEE, WATCH_MAN)
+
+
+def test_spy_cant_be_played_into_a_row_with_a_ward() -> None:
+    state = guarded(make_state((INFORMANT, KNIGHT)))
+
+    assert PLAY_INFORMANT not in legal_actions(state)
+    with pytest.raises(IllegalActionError):
+        apply(state, PLAY_INFORMANT)
+
+
+def test_ward_only_guards_its_own_side() -> None:
+    state = guarded(make_state((INFORMANT, KNIGHT)), player=0)
+
+    assert PLAY_INFORMANT in legal_actions(state)
+
+
+def test_ward_doesnt_stop_a_unit_that_isnt_a_spy() -> None:
+    state = guarded(make_state((KNIGHT,)))
+
+    assert PlayUnit(card="knight", row=Row.MELEE) in legal_actions(state)
+
+
+def test_legend_spy_cant_be_played_into_a_row_with_a_ward() -> None:
+    state = guarded(make_state((DOUBLE_AGENT, KNIGHT)))
+
+    assert PlayUnit(card="double-agent", row=Row.MELEE) not in legal_actions(state)
+
+
+def test_spy_cant_be_revived_into_a_row_with_a_ward() -> None:
+    state = make_state((MEDIC, KNIGHT), discard=(INFORMANT, SNIPER))
+    state, _ = apply(guarded(state), PLAY_MEDIC)
+
+    assert legal_actions(state) == (REVIVE_SNIPER,)
+
+
+def test_medic_with_only_a_spy_to_revive_into_a_ward_ends_the_turn() -> None:
+    state = make_state((MEDIC, KNIGHT), discard=(INFORMANT,))
+
+    state, events = apply(guarded(state), PLAY_MEDIC)
+
+    assert events == (MEDIC_PLAYED, NothingToRevive(player=0))
+    assert not state.reviving
+    assert state.current == 1
+
+
+def test_row_opens_once_wildfire_burns_the_ward() -> None:
+    state = guarded(make_state((WILDFIRE, INFORMANT, KNIGHT)))
+    state, _ = apply(state, PlaySpecial(card="wildfire"))
+    state, _ = apply(state, Pass())  # The opponent passes; player 0 plays on.
+
+    assert PLAY_INFORMANT in legal_actions(state)
+
+
+def test_row_opens_once_a_scarecrow_takes_the_ward_back() -> None:
+    state = guarded(make_state((INFORMANT, KNIGHT)))
+    state = replace(state, current=1)
+    opponent = replace(state.players[1], hand=(SCARECROW,))
+    state = with_player(state, 1, opponent)
+    swap = PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="watch-man")
+
+    state, _ = apply(state, swap)
+
+    assert PLAY_INFORMANT in legal_actions(state)

@@ -27,6 +27,7 @@ class Ability(StrEnum):
     MUSTER = "muster"
     BOND = "bond"
     INSPIRE = "inspire"
+    WARD = "ward"
 
 
 class SpecialKind(StrEnum):

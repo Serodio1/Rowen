@@ -70,7 +70,8 @@ A player with no cards in hand passes automatically.
 - A unit is placed on its row, on the side of the player who plays it.
 - An **Agile** unit can be placed in the Melee or the Ranged row; the player
   chooses.
-- A **Spy** is placed on the opponent's side (section 7.2).
+- A **Spy** is placed on the opponent's side (section 7.2), but never into a
+  row with a **Ward** unit (section 7.4).
 
 ## 6. Strength and score
 
@@ -122,6 +123,12 @@ A Legend can also have **Spy**, **Medic** or **Inspire** (no other ability).
 The ability works as usual and the Legend stays immune: a Legend with Inspire
 gives +1 to the other units in its row but never receives it, and a Legend Spy
 can't be taken back with a Scarecrow.
+
+### 7.4 Guard (active while the card is on the board)
+
+| Ability | Effect |
+|---|---|
+| **Ward** | No **Spy** can go into its row: an opponent can't play one there from their hand, nor revive one there with a Medic. When the Ward unit leaves the row (burnt by Wildfire, taken back with a Scarecrow, or at the end of the round), the row opens again. A Medic whose only units to revive are Spies that can't go anywhere does nothing, as with no valid target. |
 
 Bond groups and muster groups are defined in the card data (usually, cards with
 the same name share a group).
@@ -232,3 +239,4 @@ leaders, each with a passive of their own.)
 | D8 | What does Wildfire destroy when the strongest unit is a Legend? | The strongest units that aren't Legends: Legends are left out of the count (section 8) |
 | D9 | Which passive does each faction have? | Humans draw 2 cards after winning a round (1 until the balance report, `docs/balance.md`); Robots keep one random unit, not a Legend or a Spy, after each round (section 12) |
 | D10 | What does a leader do? | Brings the faction's passive; no ability to use during the match. One leader per faction for now (section 12) |
+| D11 | Can anything stop a Spy? | Yes: a Ward unit (Watch Man, Firewall: melee, strength 5, 2 in each faction's deck) keeps every Spy, played or revived, out of its row while it is there (section 7.4) |

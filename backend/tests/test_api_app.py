@@ -535,7 +535,7 @@ def test_the_app_keeps_its_matches_in_a_store_of_its_own() -> None:
 def test_the_ai_doesnt_play_once_the_match_is_over() -> None:
     # Each player plays the first legal action in their own view, to the end.
     # With this seed, the match ends with the AI as the current player.
-    state = start_match((DECKS["humans"], DECKS["robots"]), seed=103)
+    state = start_match((DECKS["humans"], DECKS["robots"]), seed=115)
     view = player_view(state, HUMAN)
     while not view.match_over:
         state, _ = apply(state, player_view(state, view.current).legal_actions[0])

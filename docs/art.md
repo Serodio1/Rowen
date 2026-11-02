@@ -7,8 +7,8 @@ and the name are drawn by the page, from the card's data
 ## Where it comes from
 
 Rui Vasconcelos generated the 25 pictures of the cards with AI tools on
-21 October 2026, and the 2 of the leaders on 29 October 2026, from prompts
-written for Rowen:
+21 October 2026, the 2 of the leaders on 29 October 2026 and the 2 of the
+Watch Man and the Firewall on 2 November 2026, from prompts written for Rowen:
 
 | Tool | Cards |
 | --- | --- |

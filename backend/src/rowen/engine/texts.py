@@ -31,6 +31,7 @@ ABILITY_TEXTS: Mapping[Ability, str] = {
         "that share its bond."
     ),
     Ability.INSPIRE: "Inspire: gives +1 to every other unit in its row.",
+    Ability.WARD: "Ward: no Spy can be played or revived into its row.",
 }
 
 # What a Legend is (rules, section 7.3).
