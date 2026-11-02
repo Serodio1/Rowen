@@ -257,6 +257,9 @@ def test_a_built_deck_plays_in_place_of_its_factions_own(
     humans = [deck for decks in played for deck in decks if deck.id == "humans"]
     assert humans
     assert all(deck is built for deck in humans)
+    # The other faction plays its own deck.
+    robots = {deck for decks in played for deck in decks if deck.id != "humans"}
+    assert robots == {load_deck("robots")}
 
 
 def test_the_ais_guess_the_factions_own_decks_as_on_the_site(

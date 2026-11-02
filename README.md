@@ -106,7 +106,8 @@ uv run rowen-arena hard easy --matches 400   # Hard against Easy, 400 matches
 It shows the share of the decisive matches the first AI won, and each deck's,
 with a 95% margin of error, and how long each AI takes per move. With the
 same level on both sides, it says whether the decks are fair
-([balance report](docs/balance.md)).
+([balance report](docs/balance.md)). `--deck docs/decks/spies.json` plays a
+deck built from a faction's cards in place of that faction's own.
 
 ## Run the web API
 
