@@ -29,43 +29,35 @@ ones new factions bring).
 
 ## The script
 
-The match uses a fixed seed, chosen so that the player starts and their hand
-holds what the script needs. The cards named below are an example; the seed
-decides them. The texts are in English, as the game is.
+The match uses a fixed seed (`SEED = 59`), chosen so that the player starts
+and their hand holds what the script needs. The texts are in English, as the
+game is. The script has 15 steps (Next = the step only explains); the exact
+texts are `SCRIPT` in `rowen.api.tutorial`:
 
 Round 1:
 
-1. **The board** (Next). On the player's rows: "Your rows are at the bottom:
-   melee, ranged and siege. The AI's are at the top."
-2. **The hand** (Next). On the hand: "These are your cards. A unit's number
-   is its strength."
-3. **A unit.** On the Soldier: "Play the Soldier in your melee row." The AI
-   answers with a unit.
-4. **Totals** (Next). On the player's total: "Each row adds up its units.
-   Your total is the sum of your rows."
-5. **Another row.** "Play the Sniper in your ranged row." The AI answers.
-6. **A Spy.** "Play the Informant. It goes on the AI's side and gives it 3
-   points, but you draw 2 cards." Then, on the hand: "Cards are what you play
-   with all match: you don't draw new ones each round."
-7. **Weather.** The AI plays Hoarfrost. On the row: "Hoarfrost: every unit in
-   the melee row, on both sides, now has strength 1."
-8. **Clear Skies.** "Play Clear Skies to remove all weather."
-9. **Passing.** "You are ahead. Pass: you play no more cards this round, but
-   the AI still can." The AI plays a card and passes; the player wins the
-   round.
-10. **Lives and the passive** (Next). On the lives: "You won the round: the
-    AI loses a life. Win 2 rounds to win the match." On the leader: "Your
-    leader, The Commander, gives you 1 card for each round you win."
+1. **Rows** (Next). On the rows.
+2. **Hand** (Next). On the hand: a unit's number is its strength.
+3. **A unit.** Play the Soldier in melee. The AI answers with a unit.
+4. **Totals** (Next). On the player's total.
+5. **Another row.** Play the Sniper in ranged. The AI answers.
+6. **A Spy.** Play the Informant: it goes on the AI's side and gives it 3
+   points, but you draw 2 cards. The AI answers with Hoarfrost.
+7. **Cards** (Next). On the hand: you don't draw new cards each round.
+8. **Weather** (Next). On the melee row: Hoarfrost sets every melee unit to 1.
+9. **Clear Skies.** Play it. The AI plays a War Horn on its siege row.
+10. **Passing.** Pass; the AI passes too and the player wins the round.
 
-Round 2:
+Round 2 (the round-1 winner, the player, starts it):
 
-11. The AI starts, plays a unit and passes. "The AI passed. Play just enough
-    to win, and keep your other cards."
-12. **A Medic.** On the Medic: "Play the Medic. It brings back a unit from
-    your discard pile." Then, on the discard pile: "Choose the Sniper: it
-    comes back to the board."
-13. One more unit if needed, then Pass. The player wins the match: "Tutorial
-    complete", with **Play a match** and **Return to main menu**.
+11. **Lives** (Next). On the lives: the AI loses a life; win 2 rounds.
+12. **The passive** (Next). On the leader: The Commander gives 1 card for each
+    round won.
+13. **A Medic.** Play the Medic, in siege.
+14. **Revive.** Choose the Sniper from the discard pile; the AI passes.
+15. **Win.** The AI passed and the player is ahead: Pass to win the match,
+    then "Tutorial complete", with **Play a match** and **Return to main
+    menu**.
 
 ## Architecture
 

@@ -11,6 +11,7 @@ The match is the Humans (the player, index 0) against the Robots (the AI).
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from rowen.api import schemas
 from rowen.data import load_deck
@@ -30,6 +31,9 @@ from rowen.engine.public import (
 
 HUMAN = 0
 AI = 1
+
+# frontend/src/tutorial.json: this file is backend/src/rowen/api/tutorial.py.
+TUTORIAL_JSON = Path(__file__).parents[4] / "frontend" / "src" / "tutorial.json"
 
 # What a balloon points at: "rows", "hand", "total", "lives", "leader",
 # "discard", "weather", "row:<melee|ranged|siege>" or "card:<card id>". The
@@ -224,3 +228,24 @@ def generate(script: tuple[ScriptStep, ...] = SCRIPT, seed: int = SEED) -> Tutor
             )
         )
     return Tutorial(steps=tuple(steps))
+
+
+def document() -> str:
+    """Return the recorded tutorial, as the text of ``tutorial.json``."""
+    return generate().model_dump_json(indent=2) + "\n"
+
+
+def main() -> None:
+    """Write the recorded tutorial to ``frontend/src/tutorial.json``.
+
+    After changing the script, the cards or the rules, write it again, in
+    ``backend``: ``uv run python -m rowen.api.tutorial``. A test fails while
+    the file is out of date.
+    """
+    # Always "\n", also on Windows, as .gitattributes asks for every text file.
+    TUTORIAL_JSON.write_text(document(), encoding="utf-8", newline="\n")
+
+
+# Only when run with "python -m"; the tests call main() instead.
+if __name__ == "__main__":  # pragma: no cover
+    main()
