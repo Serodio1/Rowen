@@ -96,6 +96,36 @@ as the Computer Spy but gives Robots 3 points where the Computer Spy gives
 Humans 2. Left as it
 is, close enough to fair; the Normal AI, which the site offers, is even.
 
+## After the change: the Humans draw 1 card, with stronger cards
+
+With 2 cards after each round won, a deck of Spies ended the match with far
+more cards than its opponent (see below), so on 3 November 2026 the
+Commander's passive went back to 1 card. With only that change, Robots won
+65.3% ± 2.1% (Easy AI, 2000 matches, seed 7). Changes to the Human cards
+were tried on copies of the deck, with the passive at 1 card and the same
+command:
+
+| Change tried (Easy AI, 2000 matches) | Robots won |
+|---|---|
+| Smart Guy 3 → 5 | 60.3% ± 2.2% |
+| Smart Guy 3 → 5, Informant 3 → 2 | 58.0% ± 2.2% |
+| Smart Guy 3 → 4, Informant 3 → 2 | 60.4% ± 2.2% |
+| Smart Guy 3 → 5, Informant 3 → 2, Plane 3 → 4 | 53.9% ± 2.2% |
+| Smart Guy 3 → 5, Informant 3 → 2, Human 1 → 2 | 50.3% ± 2.2% |
+| **Smart Guy 3 → 5, Human 1 → 2** | **52.2% ± 2.2%** |
+| Smart Guy 3 → 5, Human 1 → 2, Plane 3 → 4 | 47.8% ± 2.2% |
+
+The one in bold was kept: the Informant stays at 3, since a weaker one gives
+the opponent fewer points and makes a deck of Spies stronger. Measured with
+the commands at the top:
+
+| AI on both sides | Matches | Decisive | Draws | Robots won | Humans won |
+|---|---|---|---|---|---|
+| Easy | 4000 | 3928 | 72 | **52.7% ± 1.6%** | 47.3% |
+| Normal | 1000 | 976 | 24 | **48.2% ± 3.1%** | 51.8% |
+
+Both margins reach 50%: fair, as before the change.
+
 ## A deck a player built: Spies
 
 The faction decks are close to fair, but a player builds their own. One who
