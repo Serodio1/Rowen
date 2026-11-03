@@ -1,11 +1,10 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
-import type { Event } from "./api/client.ts";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Balloon } from "./Balloon.tsx";
 import { Board } from "./Board.tsx";
 import { onFirstClick } from "./clicks.ts";
 import { Controls } from "./Controls.tsx";
 import type { Chosen, Playing } from "./plays.ts";
-import { Rounds } from "./Rounds.tsx";
+import { Rounds, type RoundEnded } from "./Rounds.tsx";
 import { Banner, Showcase } from "./Showcase.tsx";
 import {
   mayMove,
@@ -103,6 +102,28 @@ function Steps({
   const busy = progress.step < animation.length;
   const showing = animation[progress.step];
   const resultId = useId();
+  // Where the cards and the moves are: the board, and the buttons under it.
+  const boardArea = useRef<HTMLDivElement>(null);
+  const movesArea = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // As in PlayMatch: once the move asked can be made, the focus goes to
+    // the lit card, or else to Pass, unless it is elsewhere (on Next, which
+    // the balloon focused on a step that only explains).
+    const focused = document.activeElement;
+    const areas = [boardArea.current, movesArea.current];
+    if (
+      !busy &&
+      (focused === document.body ||
+        areas.some((area) => area?.contains(focused)))
+    ) {
+      (
+        boardArea.current?.querySelector<HTMLElement>(
+          "[data-choosable]:not(:disabled)",
+        ) ??
+        movesArea.current?.querySelector<HTMLElement>("button:not(:disabled)")
+      )?.focus({ preventScroll: focused === document.body });
+    }
+  }, [at, busy]);
 
   const step = steps[at];
   const last = steps.at(-1)?.moves.at(-1)?.view;
@@ -137,10 +158,7 @@ function Steps({
   const over = view.match_over && !busy;
   const rounds = steps
     .flatMap((step) => step.moves.flatMap((move) => move.events))
-    .filter(
-      (event): event is Extract<Event, { type: "round_ended" }> =>
-        event.type === "round_ended",
-    );
+    .filter((event): event is RoundEnded => event.type === "round_ended");
 
   return (
     <section className="flex flex-col gap-3">
@@ -153,7 +171,7 @@ function Steps({
         </h2>
         {leave}
       </div>
-      <div inert={over}>
+      <div ref={boardArea} inert={over}>
         <Board
           view={board}
           playing={view.match_over ? undefined : playing}
@@ -169,9 +187,11 @@ function Steps({
           />
         )}
       </div>
-      {!view.match_over && (
-        <Controls view={view} playing={playing} thinking={false} />
-      )}
+      <div ref={movesArea}>
+        {!view.match_over && (
+          <Controls view={view} playing={playing} thinking={false} />
+        )}
+      </div>
       {/* Mounted all along, so its status region reads each new step. */}
       <Balloon
         target={step?.target ?? ""}

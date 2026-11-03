@@ -1,7 +1,7 @@
 import type { Event } from "./api/client.ts";
 
 /** The end of a round, as the API sends it. */
-type RoundEnded = Extract<Event, { type: "round_ended" }>;
+export type RoundEnded = Extract<Event, { type: "round_ended" }>;
 
 /**
  * How each round went, in a table: the player's score, the AI's and who

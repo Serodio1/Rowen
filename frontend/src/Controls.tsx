@@ -22,13 +22,16 @@ export function Controls({
   const names = cardNames(view);
   const chosen = playing.chosen;
   const name = chosen === null ? "" : (names.get(chosen.card) ?? chosen.card);
-  let hint = "Choose a card to play, or pass.";
+  let hint: string | null = "Choose a card to play, or pass.";
   if (thinking) {
     // The answer comes once the AI has made its moves.
     hint = "The AI is thinking…";
   } else if (view.current !== view.player) {
     // Until the player's move has played out: the AI thinks after it.
     hint = "The AI's turn.";
+  } else if (view.legal_actions.length === 0) {
+    // Nothing to do, as on a tutorial's step that only explains.
+    hint = null;
   } else if (view.reviving) {
     hint =
       chosen === null
@@ -62,7 +65,9 @@ export function Controls({
   }
   return (
     <div className="flex flex-col items-center gap-2">
-      <p className="text-center text-sm text-gold-200">{hint}</p>
+      {hint !== null && (
+        <p className="text-center text-sm text-gold-200">{hint}</p>
+      )}
       <div
         role="group"
         aria-label="Moves"

@@ -106,6 +106,39 @@ test("Next moves on", async () => {
   expect(balloon()).toHaveTextContent(steps[1]?.text ?? "");
 });
 
+test("the second click of a double click on Next does nothing", async () => {
+  await open();
+  const next = screen.getByRole("button", { name: "Next" });
+  fireEvent.click(next, { detail: 1 });
+  fireEvent.click(next, { detail: 2 });
+  expect(balloon()).toHaveTextContent(steps[1]?.text ?? "");
+});
+
+test("a step that only explains has no hint under the board", async () => {
+  await open();
+  expect(screen.queryByText("Choose a card to play, or pass.")).toBeNull();
+  doStep();
+  doStep();
+  expect(
+    screen.getByText("Choose a card to play, or pass."),
+  ).toBeInTheDocument();
+});
+
+test("after a lit move, the focus goes to the next step's lit card", async () => {
+  await open();
+  for (let step = 0; step < 5; step += 1) {
+    doStep();
+  }
+  // Step 6: the Informant, with no Next to take the focus.
+  expect(balloon()).toHaveTextContent(steps[5]?.text ?? "");
+  expect(
+    within(
+      document.querySelector<HTMLElement>('[data-tutorial="card:informant"]') ??
+        document.body,
+    ).getByRole("button"),
+  ).toHaveFocus();
+});
+
 test("a second click while a move plays out does nothing", async () => {
   await open();
   for (let step = 0; step < 4; step += 1) {

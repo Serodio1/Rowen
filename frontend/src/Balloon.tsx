@@ -8,6 +8,7 @@ import {
 } from "@floating-ui/react-dom";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { arrowSide, type Side } from "./arrowSide.ts";
+import { onFirstClick } from "./clicks.ts";
 import { BUTTON } from "./styles.ts";
 
 // Each side's position and the two borders that make the rotated square a point.
@@ -82,7 +83,13 @@ export function Balloon({
 
   // Without a target the button still shows, so the tutorial can't get stuck.
   const next = onNext && (
-    <button type="button" ref={nextRef} className={BUTTON} onClick={onNext}>
+    <button
+      type="button"
+      ref={nextRef}
+      className={BUTTON}
+      // It stays the same button on the next step: a double click would skip it.
+      onClick={onFirstClick(onNext)}
+    >
       Next
     </button>
   );
