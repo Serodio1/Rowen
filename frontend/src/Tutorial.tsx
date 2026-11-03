@@ -194,7 +194,13 @@ function Steps({
       </div>
       {/* Mounted all along, so its status region reads each new step. */}
       <Balloon
-        target={step?.target ?? ""}
+        // Once a card is chosen, it points at where the card goes, so it
+        // doesn't cover it (above the hand, it covered the row next to it).
+        target={
+          chosen === null
+            ? `[data-tutorial="${step?.target ?? ""}"]`
+            : "[data-target]"
+        }
         text={step?.text ?? ""}
         shown={step !== undefined && !busy}
         onNext={step?.view.legal_actions.length === 0 ? advance : undefined}

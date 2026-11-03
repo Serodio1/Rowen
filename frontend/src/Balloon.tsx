@@ -20,8 +20,8 @@ const ARROW_CLASSES: Record<Side, string> = {
 };
 
 /**
- * The tutorial's speech balloon: it points at the element with
- * `data-tutorial="<target>"`, and follows it. The text is also in a hidden
+ * The tutorial's speech balloon: it points at the element `target` (a CSS
+ * selector) finds, and follows it. The text is also in a hidden
  * status region, so a screen reader reads it even if there is no target.
  * It is a `note`, not a `dialog`: nothing else on the page is blocked.
  *
@@ -65,9 +65,7 @@ export function Balloon({
     if (!shown) {
       return;
     }
-    const found = document.querySelector<HTMLElement>(
-      `[data-tutorial="${target}"]`,
-    );
+    const found = document.querySelector<HTMLElement>(target);
     found?.scrollIntoView({ block: "nearest" });
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the DOM
     setElement(found);
@@ -76,7 +74,10 @@ export function Balloon({
   // A new step: the keyboard goes to Next. (It is also a new node if the
   // target appeared or went away.)
   useEffect(() => {
-    nextRef.current?.focus();
+    // Not scrolled to: until floating-ui places it anew, the balloon is
+    // still where the last step's was, maybe off the screen (it scrolled the
+    // page away from the target on a phone).
+    nextRef.current?.focus({ preventScroll: true });
   }, [text, element, shown]);
 
   const side = arrowSide(placement);

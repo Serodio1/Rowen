@@ -93,7 +93,13 @@ test("only the asked card can be played, and playing it moves on", async () => {
   expect(soldier).toBeEnabled();
   // The other cards in the hand are no buttons: they can't be chosen.
   expect(hand.getAllByRole("button")).toEqual([soldier]);
+  const scrolledTo = vi.fn();
+  Element.prototype.scrollIntoView = scrolledTo;
   fireEvent.click(soldier);
+  // Chosen, the balloon points at the row it goes in, not at the card.
+  expect(scrolledTo.mock.contexts.at(-1)).toBe(
+    screen.getByRole("button", { name: "Play Soldier in the melee row" }),
+  );
   fireEvent.click(
     screen.getByRole("button", { name: "Play Soldier in the melee row" }),
   );

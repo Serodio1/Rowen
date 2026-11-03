@@ -4,6 +4,18 @@ import { expect, test } from "./test.ts";
 // move shows at once.
 test.use({ reducedMotion: "reduce" });
 
+/** The balloon doesn't cover the middle of what the player must click. */
+async function expectUncovered(target: import("@playwright/test").Locator) {
+  await target.scrollIntoViewIfNeeded();
+  expect(
+    await target.evaluate((element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(x + width / 2, y + height / 2);
+      return hit !== null && element.contains(hit);
+    }),
+  ).toBe(true);
+}
+
 /** Open the tutorial and do what each balloon asks, until it is over. */
 async function playTutorial(
   page: import("@playwright/test").Page,
@@ -16,16 +28,19 @@ async function playTutorial(
   for (let step = 0; step < 100 && !(await done.isVisible()); step += 1) {
     await expect(note).toBeVisible();
     if (inside !== undefined) {
-      const box = await note.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box?.x).toBeGreaterThanOrEqual(0);
-      expect(box?.y).toBeGreaterThanOrEqual(0);
-      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
-        inside.width,
-      );
-      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
-        inside.height,
-      );
+      // Once floating-ui has placed it (it may first be where the last was).
+      await expect(async () => {
+        const box = await note.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box?.x).toBeGreaterThanOrEqual(0);
+        expect(box?.y).toBeGreaterThanOrEqual(0);
+        expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+          inside.width,
+        );
+        expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+          inside.height,
+        );
+      }).toPass();
     }
     const text = await note.textContent();
     const next = page.getByRole("button", { name: "Next" });
@@ -34,10 +49,11 @@ async function playTutorial(
     if (await next.isVisible()) {
       await next.click();
     } else if ((await lit.count()) > 0) {
+      await expectUncovered(lit.first());
       await lit.first().click();
       if ((await row.count()) > 0) {
-        // Not click(): on the Medic step the balloon covers the row (reported).
-        await row.first().dispatchEvent("click");
+        await expectUncovered(row.first());
+        await row.first().click();
       }
     } else {
       await page.getByRole("button", { name: "Pass" }).click();
@@ -60,10 +76,7 @@ test("plays the tutorial to the end", async ({ page }) => {
   ).toBeVisible();
 });
 
-// Fails today: on step 4 ("Each row adds up…", target "total") the balloon is
-// above the screen at 390x844 (y = -259; the page is scrolled 494 px down and
-// scrollIntoView didn't bring the target back). Reported; enable once fixed.
-test.fixme("the balloons fit a phone's screen", async ({ page }) => {
+test("the balloons fit a phone's screen", async ({ page }) => {
   const size = { width: 390, height: 844 };
   await page.setViewportSize(size);
   await playTutorial(page, size);
