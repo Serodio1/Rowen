@@ -8,13 +8,19 @@ VARIANT is a comma list of flags, e.g. "giveup=10,cards".
   spies: in a play-out, a player holding a Spy plays it first, as people do
     (the baseline's board-only score almost never picks one), unless the
     opponent has passed.
+  scare: in a play-out, a player plays a Scarecrow on a Spy on their own
+    side (the opponent's), unless the opponent has passed.
+  redraw: before round 1, the Hard AI also swaps a Bond card without its
+    pair in the hand, then its weakest plain unit (no ability, not a Legend)
+    if it is weaker than the average unit left in its deck list.
 """
 
 import os
 
 from rowen.ai import baseline, montecarlo
 from rowen.engine.abilities import on_opponent_side
-from rowen.engine.actions import Pass, PlayUnit
+from rowen.engine.actions import EndRedraw, Pass, PlayScarecrow, PlayUnit, Redraw
+from rowen.engine.cards import Ability, UnitCard
 from rowen.engine.game import legal_actions
 
 FLAGS = dict(
@@ -40,6 +46,15 @@ def variant_next(state):
         if behind >= int(FLAGS["giveup"] or 10) and cards_ok:
             spies = tuple(a for a in legal_actions(state) if _spy(state, a))
             return baseline.best(state, spies) if spies else Pass()
+    if "scare" in FLAGS and not state.reviving and not them.passed:
+        scares = tuple(
+            a for a in legal_actions(state)
+            if isinstance(a, PlayScarecrow) and on_opponent_side(
+                next(u for u in me.rows[a.row].units if u.id == a.unit)
+            )
+        )
+        if scares:
+            return scares[0]
     if "spies" in FLAGS and not state.reviving and not them.passed:
         spies = tuple(a for a in legal_actions(state) if _spy(state, a))
         if spies:
@@ -51,6 +66,8 @@ def choose(view, level, decks, seed):
     """The arena's choose: "hard" = the variant, "normal" = main's Hard."""
     if level == "easy":
         return baseline.choose_action(view)
+    if level == "hard" and "redraw" in FLAGS and EndRedraw() in view.legal_actions:
+        return _redraw(view, decks[view.player])
     montecarlo._next = variant_next if level == "hard" else ORIGINAL_NEXT
     try:
         return montecarlo.choose_action(
@@ -58,3 +75,27 @@ def choose(view, level, decks, seed):
         )
     finally:
         montecarlo._next = ORIGINAL_NEXT
+
+
+def _redraw(view, deck):
+    first = baseline._redraw(view)
+    if first != EndRedraw():
+        return first
+    hand = view.hand
+    units = [c for c in hand if isinstance(c, UnitCard)]
+    lonely = [
+        c for c in units
+        if c.ability is Ability.BOND
+        and sum(o.ability is Ability.BOND and o.group == c.group for o in units) == 1
+    ]
+    left = list(deck)
+    for c in hand:
+        if c in left:
+            left.remove(c)
+    pool = [c.strength for c in left if isinstance(c, UnitCard)]
+    average = sum(pool) / len(pool) if pool else 0
+    plain = [c for c in units if c.ability is None and not c.legend and c.strength < average]
+    for c in sorted(lonely, key=lambda c: c.strength) + sorted(plain, key=lambda c: c.strength):
+        if Redraw(card=c.id) in view.legal_actions:
+            return Redraw(card=c.id)
+    return EndRedraw()
