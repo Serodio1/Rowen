@@ -132,8 +132,9 @@ The faction decks are close to fair, but a player builds their own. One who
 beat the Hard AI in every match played [`docs/decks/spies.json`](decks/spies.json):
 the Humans' cards with three Informants (Spies) and three Medics, two
 Scarecrows, and no weather. Spies draw cards, Medics bring them back, and the
-Commander's passive draws two more after each round won: the player ends with
-far more cards than the AI. `rowen-arena --deck` plays it in place of the
+Commander's passive drew two more after each round won (one since 3 November
+2026): the player ended with far more cards than the AI. The figures below
+were measured with two; with one, they were not measured again. `rowen-arena --deck` plays it in place of the
 Humans' own deck. Until 2 November 2026, the AIs guessed that the Humans
 played their own deck; since then, as on the site, they guess from the list
 of the deck played (ADR 0018).
