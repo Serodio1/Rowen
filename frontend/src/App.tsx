@@ -16,7 +16,6 @@ import type {
   Played,
   PlayerDeck,
   PlayerDecks,
-  View,
 } from "./api/client.ts";
 import {
   decksQuery,
@@ -32,6 +31,8 @@ import {
   type RequestError,
 } from "./api/requests.ts";
 import { Board } from "./Board.tsx";
+import { Controls } from "./Controls.tsx";
+import { Rounds } from "./Rounds.tsx";
 import { Failed } from "./Failed.tsx";
 import { CardFace, LeaderFace } from "./CardFace.tsx";
 import { Banner, CardPreview, Showcase } from "./Showcase.tsx";
@@ -50,16 +51,8 @@ import { AccountBar, AccountDialog } from "./Account.tsx";
 import { MyDecks } from "./Decks.tsx";
 import { MyMatches } from "./Matches.tsx";
 import { ALERT, BUTTON, PANEL } from "./styles.ts";
+import { isCardAction, type Chosen, type Playing } from "./plays.ts";
 import {
-  isCardAction,
-  otherActions,
-  playsOf,
-  selfPlay,
-  type Chosen,
-  type Playing,
-} from "./plays.ts";
-import {
-  actionText,
   cardNames,
   cardsById,
   cardText,
@@ -544,9 +537,6 @@ function YourDecks({
 
 /** What happened after one request, numbered from 1 in the match. */
 type Entry = Happened & { number: number };
-
-/** The end of a round, as the API sends it. */
-type RoundEnded = Extract<Event, { type: "round_ended" }>;
 
 /** Return the events of the moves played, in order. */
 function eventsOf(played: Played): Event[] {
@@ -1083,101 +1073,6 @@ function PlayMatch({
 }
 
 /**
- * What the player is to do now, in words, and the moves that are no card:
- * passing, or keeping the hand before round 1. While a card is chosen, a
- * button lets it go (as Escape does on the board). On the AI's turn, that
- * it is, and while it plays (`thinking`), that the AI is thinking.
- */
-function Controls({
-  view,
-  playing,
-  thinking,
-}: {
-  view: View;
-  playing: Playing;
-  thinking: boolean;
-}) {
-  const names = cardNames(view);
-  const chosen = playing.chosen;
-  const name = chosen === null ? "" : (names.get(chosen.card) ?? chosen.card);
-  let hint = "Choose a card to play, or pass.";
-  if (thinking) {
-    // The answer comes once the AI has made its moves.
-    hint = "The AI is thinking…";
-  } else if (view.current !== view.player) {
-    // Until the player's move has played out: the AI thinks after it.
-    hint = "The AI's turn.";
-  } else if (view.reviving) {
-    hint =
-      chosen === null
-        ? "Choose a unit to revive."
-        : `Choose the row to revive ${name} in.`;
-  } else if (
-    view.legal_actions.some((action) => action.type === "end_redraw")
-  ) {
-    hint =
-      chosen === null
-        ? "Choose a card to swap, or keep this hand."
-        : `Choose ${name} again to swap it.`;
-  } else if (
-    chosen !== null &&
-    selfPlay(playsOf(view.legal_actions, chosen.card)) !== undefined
-  ) {
-    // Weather, Clear Skies and Wildfire have nowhere to choose: choosing
-    // the card again, with a click or the keyboard, plays it.
-    hint = `Choose ${name} again to play it.`;
-  } else if (chosen !== null) {
-    // A Scarecrow goes in the place of a unit, which it takes back.
-    const scarecrow = view.hand.some(
-      (card) =>
-        card.id === chosen.card &&
-        card.type === "special" &&
-        card.kind === "scarecrow",
-    );
-    hint = scarecrow
-      ? `Choose a unit to take back with ${name}, or choose ${name} again to put it back.`
-      : `Choose where to play ${name}, or choose it again to put it back.`;
-  }
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <p className="text-center text-sm text-gold-200">{hint}</p>
-      <div
-        role="group"
-        aria-label="Moves"
-        className="flex flex-wrap justify-center gap-2"
-      >
-        {chosen !== null && (
-          <button
-            type="button"
-            className={BUTTON}
-            aria-keyshortcuts="Escape"
-            disabled={playing.disabled}
-            onClick={() => {
-              playing.onChoose(null);
-            }}
-          >
-            Cancel
-          </button>
-        )}
-        {otherActions(view.legal_actions).map((action) => (
-          <button
-            key={action.type}
-            type="button"
-            className={BUTTON}
-            disabled={playing.disabled}
-            onClick={onFirstClick(() => {
-              playing.onPlay(action);
-            })}
-          >
-            {actionText(action, names)}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
  * What happened in the match so far, the latest first: the sentences of
  * each move and of the AI's answer. Screen readers read what is added.
  */
@@ -1313,52 +1208,6 @@ function cardIn(target: EventTarget): Pointed | null {
 interface Pointed {
   id: string;
   strength: number | undefined;
-}
-
-/**
- * How each round went, in a table: the player's score, the AI's and who
- * won it.
- *
- * @param viewer - The player of the view: 0 or 1.
- */
-function Rounds({
-  rounds,
-  viewer,
-}: {
-  rounds: readonly RoundEnded[];
-  viewer: number;
-}) {
-  return (
-    <table className="w-full text-center">
-      <caption className="sr-only">The rounds</caption>
-      <thead className="font-display text-sm text-gold-300">
-        <tr>
-          <th scope="col">Round</th>
-          <th scope="col">You</th>
-          <th scope="col">The AI</th>
-          <th scope="col">Won by</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rounds.map((round, index) => (
-          <tr key={index} className="border-t border-gold-600/60">
-            <th scope="row" className="py-1 font-normal">
-              {index + 1}
-            </th>
-            <td>{round.scores[viewer]}</td>
-            <td>{round.scores[1 - viewer]}</td>
-            <td>
-              {round.winner === null
-                ? "Tie"
-                : round.winner === viewer
-                  ? "You"
-                  : "The AI"}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
 }
 
 /**

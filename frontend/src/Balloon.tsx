@@ -23,15 +23,21 @@ const ARROW_CLASSES: Record<Side, string> = {
  * `data-tutorial="<target>"`, and follows it. The text is also in a hidden
  * status region, so a screen reader reads it even if there is no target.
  * It is a `note`, not a `dialog`: nothing else on the page is blocked.
+ *
+ * @param shown - False while a move plays out: nothing shows, not even in
+ *   the status region, so it is read with the board it speaks of. Shown
+ *   again, it finds its target anew, as the board may have drawn a new node.
  */
 export function Balloon({
   target,
   text,
   onNext,
+  shown = true,
 }: {
   target: string;
   text: string;
   onNext?: () => void;
+  shown?: boolean;
 }) {
   const [element, setElement] = useState<HTMLElement | null>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
@@ -55,19 +61,22 @@ export function Balloon({
 
   // The target may mount after the balloon, and changes from step to step.
   useLayoutEffect(() => {
+    if (!shown) {
+      return;
+    }
     const found = document.querySelector<HTMLElement>(
       `[data-tutorial="${target}"]`,
     );
     found?.scrollIntoView({ block: "nearest" });
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the DOM
     setElement(found);
-  }, [target, text]);
+  }, [target, text, shown]);
 
   // A new step: the keyboard goes to Next. (It is also a new node if the
   // target appeared or went away.)
   useEffect(() => {
     nextRef.current?.focus();
-  }, [text, element]);
+  }, [text, element, shown]);
 
   const side = arrowSide(placement);
 
@@ -81,9 +90,9 @@ export function Balloon({
   return (
     <>
       <p role="status" className="sr-only">
-        {text}
+        {shown && text}
       </p>
-      {element ? (
+      {!shown ? null : element ? (
         <div
           ref={setFloating}
           role="note"

@@ -96,3 +96,19 @@ test("arrowSide is the side opposite the placement", () => {
   expect(arrowSide("left")).toBe("right");
   expect(arrowSide("right-end")).toBe("left");
 });
+
+test("hidden, it shows nothing; shown again, it finds its target anew", () => {
+  const old = addTarget();
+  const { rerender } = render(<Balloon target="pass" text="One." shown />);
+  expect(screen.getByRole("note")).toBeInTheDocument();
+  rerender(<Balloon target="pass" text="One." shown={false} />);
+  expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  // The board drew a new node for the same target meanwhile.
+  old.remove();
+  const target = addTarget();
+  scrollIntoView.mockClear();
+  rerender(<Balloon target="pass" text="One." shown />);
+  expect(screen.getByRole("note")).toHaveTextContent("One.");
+  expect(scrollIntoView.mock.contexts[0]).toBe(target);
+});
