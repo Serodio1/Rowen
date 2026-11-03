@@ -74,6 +74,8 @@ export function Balloon({
   // A new step: the keyboard goes to Next. (It is also a new node if the
   // target appeared or went away.)
   useEffect(() => {
+    // shortcut: for one frame a new balloon may show where the last one was,
+    // until floating-ui moves it; hide it until `isPositioned` if anyone sees it.
     // Not scrolled to: until floating-ui places it anew, the balloon is
     // still where the last step's was, maybe off the screen (it scrolled the
     // page away from the target on a phone).

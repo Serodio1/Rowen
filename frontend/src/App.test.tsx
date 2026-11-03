@@ -2108,27 +2108,52 @@ function doTutorialStep() {
   }
 }
 
-/** Open the tutorial from the menu; return the requests sent until then. */
+// jsdom has none; the tutorial's tests stub it, and this puts it back.
+const scrollIntoView = Object.getOwnPropertyDescriptor(
+  Element.prototype,
+  "scrollIntoView",
+);
+
+/**
+ * Open the tutorial from the menu; return the requests sent, and how many
+ * there were just before the Tutorial button was clicked.
+ */
 async function openTutorial() {
   Element.prototype.scrollIntoView = () => undefined;
+  onTestFinished(() => {
+    if (scrollIntoView === undefined) {
+      Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    } else {
+      Object.defineProperty(
+        Element.prototype,
+        "scrollIntoView",
+        scrollIntoView,
+      );
+    }
+  });
   const { api, requests } = fakeApi(THE_DECKS);
   renderApp(api);
   await screen.findByRole("button", { name: "Humans" });
+  const before = requests.length;
   fireEvent.click(screen.getByRole("button", { name: "Tutorial" }));
   await screen.findByRole("note");
-  return requests;
+  return { requests, before };
 }
 
 test("the menu has a Tutorial button, which shows the first balloon and sends nothing", async () => {
-  const requests = await openTutorial();
-  const before = requests.length;
+  const { requests, before } = await openTutorial();
 
   expect(screen.getByRole("note")).toBeInTheDocument();
   expect(
     screen.queryByRole("heading", { name: "Choose your deck" }),
   ).not.toBeInTheDocument();
+  // Two Next steps, then the Soldier: a lit move.
+  for (let step = 0; step < 3; step += 1) {
+    doTutorialStep();
+  }
+  await settle();
+  expect(screen.getByRole("note")).toHaveTextContent("Each row adds up");
   expect(requests).toHaveLength(before);
-  expect(sent(requests, "POST /api/matches")).toHaveLength(0);
 });
 
 test("Leave tutorial goes back to the menu, with the focus on the decks' heading", async () => {
@@ -2164,6 +2189,8 @@ test("leaving the tutorial in the middle of an animation logs no error", async (
   }
   withMotion();
   doTutorialStep();
+  // The move is playing out: no balloon meanwhile.
+  expect(screen.queryByRole("note")).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Leave tutorial" }));
   await act(() => vi.advanceTimersByTimeAsync(TIMES.show + TIMES.fly));
