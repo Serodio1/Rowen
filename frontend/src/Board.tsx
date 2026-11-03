@@ -178,15 +178,24 @@ export function Board({
       <div className="grid grid-cols-3 gap-2 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:grid-cols-1 lg:content-center lg:gap-3">
         <div className="flex flex-col gap-2">
           {ai.leader !== null && (
-            <LeaderSlot leader={ai.leader} whose="The AI's" />
+            <LeaderSlot
+              leader={ai.leader}
+              whose="The AI's"
+              target="ai-leader"
+            />
           )}
           <PlayerPanel name="The AI" side={ai} ahead={ai.total > you.total} />
         </div>
         <Weather cards={weatherCards} hidden={stage.hidden} />
         <div className="flex flex-col gap-2">
-          <PlayerPanel name="You" side={you} ahead={you.total > ai.total} />
+          <PlayerPanel
+            name="You"
+            side={you}
+            ahead={you.total > ai.total}
+            tutorial
+          />
           {you.leader !== null && (
-            <LeaderSlot leader={you.leader} whose="Your" />
+            <LeaderSlot leader={you.leader} whose="Your" target="leader" />
           )}
         </div>
       </div>
@@ -216,12 +225,16 @@ export function Board({
           />
         ))}
       </div>
-      <div className="flex flex-col gap-2 border-t-2 border-gold-600/70 pt-3 lg:col-start-2 lg:row-start-2">
+      <div
+        data-tutorial="rows"
+        className="flex flex-col gap-2 border-t-2 border-gold-600/70 pt-3 lg:col-start-2 lg:row-start-2"
+      >
         {(["melee", "ranged", "siege"] as const).map((row) => (
           <BoardRow
             key={row}
             kind={row}
             label={`Your ${row} row`}
+            target={`row:${row}`}
             side={mine}
             stage={stage}
             row={you.rows[row]}
@@ -263,6 +276,7 @@ export function Board({
           name="Your deck and discard pile"
           side={you}
           cell={cellOf.discard(mine)}
+          tutorial
           onOpen={
             onPile &&
             (() => {
@@ -299,10 +313,12 @@ function PlayerPanel({
   name,
   side,
   ahead,
+  tutorial = false,
 }: {
   name: string;
   side: Side;
   ahead: boolean;
+  tutorial?: boolean;
 }) {
   const id = useId();
   return (
@@ -319,7 +335,7 @@ function PlayerPanel({
       </h3>
       <dl className="mt-1 grid grid-cols-[auto_1fr] items-center lg:grid-cols-[5.5rem_1fr] gap-x-2 gap-y-1 text-xs lg:text-sm">
         <dt className="opacity-80">Total</dt>
-        <dd>
+        <dd data-tutorial={tutorial ? "total" : undefined}>
           <span
             className={`inline-grid min-w-9 place-items-center rounded-full border-2 px-1 py-0.5 font-display text-lg font-bold ${
               ahead
@@ -332,7 +348,7 @@ function PlayerPanel({
           {ahead && <span className="sr-only"> (ahead)</span>}
         </dd>
         <dt className="opacity-80">Lives</dt>
-        <dd>
+        <dd data-tutorial={tutorial ? "lives" : undefined}>
           <span aria-hidden className="flex gap-1.5">
             {side.lives === 0
               ? "–"
@@ -368,12 +384,21 @@ function PlayerPanel({
  *
  * @param whose - Whose leader it is, as it starts a sentence: `Your`.
  */
-function LeaderSlot({ leader, whose }: { leader: Leader; whose: string }) {
+function LeaderSlot({
+  leader,
+  whose,
+  target,
+}: {
+  leader: Leader;
+  whose: string;
+  target: string;
+}) {
   const art = artOf(leader);
   const id = useId();
   return (
     <figure
       aria-labelledby={id}
+      data-tutorial={target}
       className="self-center rounded-md border-2 border-gold-600/70 bg-wood-900/85 p-1 shadow-inner shadow-black/50"
       title={`${leader.name}: ${leader.passive}`}
     >
@@ -407,6 +432,7 @@ function Weather({
     <div
       role="group"
       aria-labelledby={id}
+      data-tutorial="weather"
       className="flex flex-col items-center justify-center gap-1 rounded-lg border border-wood-600 bg-black/30 p-2 shadow-inner shadow-black/50"
     >
       <h3
@@ -458,6 +484,7 @@ function Weather({
  * @param weather - The weather card that hits this row, if one is in play.
  * @param weathered - Whether the row shows under weather now: not while
  *   the weather card is still on its way.
+ * @param target - The tutorial's name for the row, if it points at it.
  * @param bubble - The colour of the score's bubble: the player's or the AI's.
  * @param targets - Where the card chosen may go in this row: the whole row
  *   lights up as a button, or each unit it may go over. On the AI's side,
@@ -471,6 +498,7 @@ function BoardRow({
   row,
   weather,
   weathered,
+  target,
   bubble,
   targets,
 }: {
@@ -481,6 +509,7 @@ function BoardRow({
   row: RowView;
   weather: SpecialCard | undefined;
   weathered: boolean;
+  target?: string;
   bubble: string;
   targets?: RowTargets | undefined;
 }) {
@@ -491,6 +520,7 @@ function BoardRow({
     <div
       role="group"
       aria-label={name}
+      data-tutorial={target}
       data-cell={cellOf.row(side, kind)}
       className="relative flex min-h-23 items-center gap-2 overflow-hidden rounded-md border border-wood-600/70 bg-black/25 p-1"
     >
@@ -780,7 +810,10 @@ function Hand({
     : [];
   const list = { playing, plays, names };
   return (
-    <div className="flex flex-col gap-2 rounded-lg border-2 border-gold-600/80 bg-gold-400/10 p-2 shadow-inner shadow-black/40 lg:col-start-2 lg:row-start-3">
+    <div
+      data-tutorial="hand"
+      className="flex flex-col gap-2 rounded-lg border-2 border-gold-600/80 bg-gold-400/10 p-2 shadow-inner shadow-black/40 lg:col-start-2 lg:row-start-3"
+    >
       {/* While reviving, the units to revive take the hand's place, whose
           cards can't be chosen then: the board never grows. */}
       {revivable.length > 0 ? (
@@ -882,6 +915,13 @@ function CardList({
         // Copies of a card share its id, so the place in the list is the key.
         <li
           key={index}
+          // Only the first copy of a card is the tutorial's target.
+          data-tutorial={
+            from === "hand" &&
+            cards.findIndex(({ id }) => id === card.id) === index
+              ? `card:${card.id}`
+              : undefined
+          }
           className="relative hover:z-10 has-focus-visible:z-10 has-aria-pressed:z-10"
         >
           {playing !== undefined && choosable.has(card.id) ? (
@@ -969,11 +1009,13 @@ function Piles({
   name,
   side,
   cell,
+  tutorial = false,
   onOpen,
 }: {
   name: string;
   side: Side;
   cell: string;
+  tutorial?: boolean;
   onOpen?: (() => void) | undefined;
 }) {
   const id = useId();
@@ -991,7 +1033,11 @@ function Piles({
       <dl className="flex gap-2 text-center text-xs lg:flex-col lg:items-center">
         <div className="flex flex-col items-center gap-1">
           <dt className="opacity-80">Discard pile</dt>
-          <dd data-cell={cell} className="flex flex-col items-center gap-1">
+          <dd
+            data-cell={cell}
+            data-tutorial={tutorial ? "discard" : undefined}
+            className="flex flex-col items-center gap-1"
+          >
             {onOpen === undefined ? (
               <DiscardTop top={top} />
             ) : (

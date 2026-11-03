@@ -4,6 +4,7 @@ import { Board } from "./Board.tsx";
 import type { Card, View } from "./api/client.ts";
 import {
   CAPTAIN,
+  DECKS,
   HOARFROST,
   SOLDIER,
   WAR_HORN,
@@ -626,4 +627,47 @@ test("while a Clear Skies is on its way, the weather it clears still shows", () 
       name: /^Hoarfrost/,
     }),
   ).toBeInTheDocument();
+});
+
+test("every place the tutorial points at is marked on the board", () => {
+  const [humans, robots] = DECKS;
+  const { container } = render(
+    <Board
+      view={view({
+        hand: [SOLDIER, SOLDIER, HOARFROST],
+        players: [
+          side({ leader: humans?.leader ?? null }),
+          side({ leader: robots?.leader ?? null }),
+        ],
+      })}
+    />,
+  );
+
+  for (const target of [
+    "rows",
+    "row:melee",
+    "row:ranged",
+    "row:siege",
+    "hand",
+    "total",
+    "lives",
+    "leader",
+    "ai-leader",
+    "discard",
+    "weather",
+    "card:soldier",
+    "card:hoarfrost",
+  ]) {
+    expect(
+      container.querySelectorAll(`[data-tutorial="${target}"]`),
+      target,
+    ).toHaveLength(1);
+  }
+  // The marks are the player's: the AI's leader has its own.
+  expect(
+    container.querySelector('[data-tutorial="leader"] img'),
+  ).toHaveAttribute("src", expect.stringContaining("humans"));
+  expect(
+    container.querySelector('[data-tutorial="row:melee"]'),
+  ).toHaveAccessibleName(/^Your melee row/);
 });
