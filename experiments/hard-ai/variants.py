@@ -5,6 +5,9 @@ VARIANT is a comma list of flags, e.g. "giveup=10,cards".
   giveup[=N]: in a play-out, a player N (10) or more points behind, not on
     their last life, gives up the round (playing a Spy first, if they hold one).
   cards: with giveup, only give up when not behind in cards in the hand.
+  spies: in a play-out, a player holding a Spy plays it first, as people do
+    (the baseline's board-only score almost never picks one), unless the
+    opponent has passed.
 """
 
 import os
@@ -37,6 +40,10 @@ def variant_next(state):
         if behind >= int(FLAGS["giveup"] or 10) and cards_ok:
             spies = tuple(a for a in legal_actions(state) if _spy(state, a))
             return baseline.best(state, spies) if spies else Pass()
+    if "spies" in FLAGS and not state.reviving and not them.passed:
+        spies = tuple(a for a in legal_actions(state) if _spy(state, a))
+        if spies:
+            return baseline.best(state, spies)
     return ORIGINAL_NEXT(state)
 
 
