@@ -11,7 +11,6 @@ from collections.abc import Mapping
 
 from rowen.engine.cards import WEATHER_ROWS, Ability, Card, SpecialKind, UnitCard
 from rowen.engine.decks import Passive
-from rowen.engine.passives import ROUND_WIN_DRAWS
 
 # What each ability does (rules, section 7).
 ABILITY_TEXTS: Mapping[Ability, str] = {
@@ -67,7 +66,8 @@ SPECIAL_TEXTS: Mapping[SpecialKind, str] = {
 
 # What each faction's passive does (rules, section 12).
 PASSIVE_TEXTS: Mapping[Passive, str] = {
-    Passive.DRAW_ON_ROUND_WIN: f"Draws {ROUND_WIN_DRAWS} cards after winning a round.",
+    # 1 is passives.ROUND_WIN_DRAWS.
+    Passive.DRAW_ON_ROUND_WIN: "Draws 1 card after winning a round.",
     Passive.KEEP_A_UNIT: (
         "After each round, one random unit stays on the board, but not a "
         "Legend or a Spy."

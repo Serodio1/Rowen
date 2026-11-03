@@ -145,38 +145,28 @@ def test_each_player_starts_with_their_decks_leader() -> None:
     assert [side.leader for side in player_view(state, 0).players] == leaders
 
 
-# Humans: draw 2 cards after winning a round
+# Humans: draw 1 card after winning a round
 
 
-def test_the_winner_draws_the_first_2_cards_of_their_deck() -> None:
+def test_the_winner_draws_the_first_card_of_their_deck() -> None:
     state, events = end_round(
         player(SNIPER, passive=DRAW, deck=(SCOUT, KNIGHT, SNIPER)), player(KNIGHT)
     )
 
     humans = state.players[0]
-    assert humans.hand == (KNIGHT, SCOUT, KNIGHT)
-    assert humans.deck == (SNIPER,)
-    assert after_round(events) == (CardsDrawn(player=0, cards=("scout", "knight")),)
-
-
-def test_a_deck_with_1_card_left_gives_that_one() -> None:
-    state, events = end_round(
-        player(SNIPER, passive=DRAW, deck=(SCOUT,)), player(KNIGHT)
-    )
-
-    assert state.players[0].hand == (KNIGHT, SCOUT)
-    assert state.players[0].deck == ()
+    assert humans.hand == (KNIGHT, SCOUT)
+    assert humans.deck == (KNIGHT, SNIPER)
     assert after_round(events) == (CardsDrawn(player=0, cards=("scout",)),)
 
 
 def test_a_winner_with_an_empty_hand_draws_before_passing() -> None:
     # A player with no card left passes at once, but only after drawing: the
-    # 2 cards let them play the next round.
+    # card lets them play the next round.
     winner = replace(player(KNIGHT, passive=DRAW, deck=(SCOUT, SNIPER)), hand=())
 
     state, _ = end_round(winner, player())
 
-    assert state.players[0].hand == (SCOUT, SNIPER)
+    assert state.players[0].hand == (SCOUT,)
     assert not state.players[0].passed
 
 
@@ -211,7 +201,7 @@ def test_the_opponent_sees_only_how_many_cards_were_drawn() -> None:
         player(SNIPER, passive=DRAW, deck=(SCOUT, KNIGHT)), player(KNIGHT)
     )
 
-    assert player_events(after_round(events), 1) == (OpponentDrew(player=0, count=2),)
+    assert player_events(after_round(events), 1) == (OpponentDrew(player=0, count=1),)
 
 
 # Robots: one random unit stays on the board

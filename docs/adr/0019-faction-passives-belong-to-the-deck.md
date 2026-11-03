@@ -86,3 +86,16 @@ decisive matches with the Easy AI on both sides, and 57% with the Normal AI,
 about 10 percentage points of it from the passives. The Humans now draw **2
 cards** after winning a round (`passives.ROUND_WIN_DRAWS`). A match saved
 before this change, still being played, may no longer replay, as above.
+
+## Update (2026-11-03): the Humans draw 1 card, and two Human cards are stronger
+
+With 2 cards after each round won, a deck of Spies (`docs/decks/spies.json`)
+ended the match with far more cards than its opponent: a player beat the Hard
+AI with 5 cards still in hand. The Humans now draw **1 card** after winning a
+round again. With only that change, Robots won 65.3% of the decisive matches
+(Easy AI on both sides, 2000 matches), so two Human cards were made stronger
+instead: the Human (Bond) from 1 to 2, and the Smart Guy from 3 to 5, as
+strong as the Robots' AI. The Informant was left as it is: weaker, it would
+give the opponent fewer points and make the deck of Spies stronger still.
+The figures are in `docs/balance.md`. As above, a match saved before this
+change may no longer replay.

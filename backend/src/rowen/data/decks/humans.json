@@ -11,7 +11,7 @@
       "id": "human",
       "name": "Human",
       "rows": ["melee"],
-      "strength": 1,
+      "strength": 2,
       "ability": "bond",
       "group": "humans",
       "copies": 5
@@ -59,7 +59,7 @@
       "id": "smart-guy",
       "name": "Smart Guy",
       "rows": ["siege"],
-      "strength": 3,
+      "strength": 5,
       "copies": 3
     },
     {
