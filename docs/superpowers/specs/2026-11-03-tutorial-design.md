@@ -71,13 +71,14 @@ It lives in the API because it writes the API's own JSON shapes
 
 - **The script:** a list of steps. Each has the balloon's text, its target
   (a card, a row, a total, the lives, the leader, the hand or the discard
-  pile), and one of: the player's action, the AI's actions, or Next.
+  pile), the player's action or Next, then the AI's actions, if any.
 - **The generator**, run as `uv run python -m rowen.api.tutorial` (like
   `rowen.api.openapi`): it starts the match with `start_match` (Humans
   against Robots, the fixed seed) and carries out each action with `apply`,
-  which checks it, so a step that is no longer legal makes it fail. After
-  each step it records the player's view and events in the API's JSON
-  shapes, with the view's legal actions cut down to the asked one.
+  which checks it, so a step that is no longer legal makes it fail. At
+  each step it records the player's view before the step, in the API's JSON
+  shapes and cut down to the asked action, and then each move's events and
+  the view after it.
 - **The output:** `frontend/src/tutorial.json`.
 
 ### Frontend: the tutorial screen
@@ -110,7 +111,8 @@ Nothing changes in the rules, the API's endpoints, the database or nginx.
 - **A stale `tutorial.json`** (the rules or the cards changed): the backend
   test fails in CI, before the merge.
 - **Size:** measured in the first PR: about 300 KB indented in the repo,
-  about 134 KB compact as bundled, about 11 KB gzipped; loaded lazily.
+  about 134 KB compact as bundled, which nginx gzips to about 4 KB; loaded
+  lazily.
 
 ## Tests and pull requests
 

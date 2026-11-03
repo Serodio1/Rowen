@@ -29,8 +29,19 @@ def test_the_views_show_only_the_players_hand() -> None:
         # The step's view and the view after each of its moves.
         for view in (step.view, *(move.view for move in step.moves)):
             assert view.player == 0
-            # The AI's side shows how many cards it holds, never which.
-            assert "hand" not in view.players[1].model_dump()
+
+
+def test_no_event_shows_the_ais_cards() -> None:
+    # The AI's draws reach the player only as "opponent_drew", with a count.
+    dumps = [
+        event.model_dump()
+        for step in generate().steps
+        for move in step.moves
+        for event in move.events
+    ]
+    assert not [d for d in dumps if d.get("player") == 1 and "cards" in d]
+    # The player's own draw (the Informant's) is there, with its cards.
+    assert any(d["type"] == "cards_drawn" and d["player"] == 0 for d in dumps)
 
 
 def test_the_redraw_is_not_a_step() -> None:
@@ -76,3 +87,9 @@ def test_main_writes_the_document(
 
 def test_main_writes_next_to_the_frontend_sources() -> None:
     assert tutorial.TUTORIAL_JSON == TUTORIAL_JSON
+
+
+def test_an_illegal_ai_action_fails_with_the_step() -> None:
+    wrong = (replace(SCRIPT[0], ai=(PlayUnit(card="president", row=Row.SIEGE),)),)
+    with pytest.raises(ScriptError, match="step 1"):
+        generate(wrong)

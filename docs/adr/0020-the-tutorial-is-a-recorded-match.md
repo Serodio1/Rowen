@@ -51,8 +51,8 @@ tutorial should not add API calls or stored matches.
   Changing the cards, the rules or the script means generating the file again,
   and CI says so when it is forgotten. The seed is found by search; changing
   the deal means searching for a new one.
-- The file is large (about 300 KB indented, about 134 KB compact as bundled
-  and about 11 KB gzipped, since every step repeats the whole view), which is
-  why it is loaded lazily and not with the first page.
+- The file is large (about 300 KB indented, about 134 KB compact as bundled,
+  which nginx gzips to about 4 KB, since every step repeats the whole
+  view), which is why it is loaded lazily and not with the first page.
 - The page gets a second mode of the board, fed with recorded views instead of
   the API's answers (the next pull request).

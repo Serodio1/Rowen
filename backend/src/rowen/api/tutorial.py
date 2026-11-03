@@ -18,6 +18,7 @@ from rowen.data import load_deck
 from rowen.engine.public import (
     Action,
     EndRedraw,
+    IllegalActionError,
     Pass,
     PlayHorn,
     PlaySpecial,
@@ -30,7 +31,6 @@ from rowen.engine.public import (
 )
 
 HUMAN = 0
-AI = 1
 
 # frontend/src/tutorial.json: this file is backend/src/rowen/api/tutorial.py.
 TUTORIAL_JSON = Path(__file__).parents[4] / "frontend" / "src" / "tutorial.json"
@@ -162,7 +162,7 @@ class TutorialStep(schemas.Schema):
     Attributes:
         text: What the balloon says.
         target: What the balloon points at (see ``Target``).
-        view: The match after the step's actions, as the player sees it, with
+        view: The match before the step's actions, as the player sees it, with
             the legal actions cut down to the asked one.
         moves: The actions played in this step, the player's and the AI's,
             for the page to animate.
@@ -212,7 +212,10 @@ def generate(script: tuple[ScriptStep, ...] = SCRIPT, seed: int = SEED) -> Tutor
             asked = (schemas.from_action(step.action),)
         moves: list[schemas.MovePlayed] = []
         for action in (() if step.action is None else (step.action,)) + step.ai:
-            state, events = apply(state, action)
+            try:
+                state, events = apply(state, action)
+            except IllegalActionError as error:
+                raise ScriptError(f"step {number}: {action} is not legal") from error
             moves.append(
                 schemas.MovePlayed(
                     events=schemas.from_events(events, HUMAN),
