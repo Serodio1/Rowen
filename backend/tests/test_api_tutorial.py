@@ -26,9 +26,11 @@ def test_the_player_wins_the_match_in_two_rounds() -> None:
 
 def test_the_views_show_only_the_players_hand() -> None:
     for step in generate().steps:
-        assert step.view.player == 0
-        # The AI's side shows how many cards it holds, never which.
-        assert "hand" not in step.view.players[1].model_dump()
+        # The step's view and the view after each of its moves.
+        for view in (step.view, *(move.view for move in step.moves)):
+            assert view.player == 0
+            # The AI's side shows how many cards it holds, never which.
+            assert "hand" not in view.players[1].model_dump()
 
 
 def test_the_redraw_is_not_a_step() -> None:

@@ -109,7 +109,8 @@ Nothing changes in the rules, the API's endpoints, the database or nginx.
   history or the stats.
 - **A stale `tutorial.json`** (the rules or the cards changed): the backend
   test fails in CI, before the merge.
-- **Size:** expected to be some tens of KB; measured in the first PR.
+- **Size:** measured in the first PR: about 300 KB indented in the repo,
+  about 134 KB compact as bundled, about 11 KB gzipped; loaded lazily.
 
 ## Tests and pull requests
 
