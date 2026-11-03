@@ -13,15 +13,23 @@ The match is the Humans (the player, index 0) against the Robots (the AI).
 from dataclasses import dataclass
 
 from rowen.api import schemas
+from rowen.data import load_deck
 from rowen.engine.public import (
     Action,
+    EndRedraw,
     Pass,
     PlayHorn,
     PlaySpecial,
     PlayUnit,
     Revive,
     Row,
+    apply,
+    player_view,
+    start_match,
 )
+
+HUMAN = 0
+AI = 1
 
 # What a balloon points at: "rows", "hand", "total", "lives", "leader",
 # "discard", "weather", "row:<melee|ranged|siege>" or "card:<card id>". The
@@ -166,3 +174,53 @@ class Tutorial(schemas.Schema):
     """The whole tutorial: what ``tutorial.json`` holds."""
 
     steps: tuple[TutorialStep, ...]
+
+
+class ScriptError(ValueError):
+    """The script asks for something the engine can't do at that step."""
+
+
+def generate(script: tuple[ScriptStep, ...] = SCRIPT, seed: int = SEED) -> Tutorial:
+    """Play ``script`` with the engine and record what the player sees.
+
+    Both players end their redraw first, so the redraw is not a step. Each
+    step records the view before its actions, with the legal actions cut down
+    to the asked one, and then the moves: the player's action and the AI's.
+
+    Raises:
+        ScriptError: If a step points at a card the player doesn't hold, or
+            asks for an action that isn't legal, naming the step (from 1).
+    """
+    state = start_match((load_deck("humans"), load_deck("robots")), seed)
+    state, _ = apply(state, EndRedraw())
+    state, _ = apply(state, EndRedraw())
+    steps: list[TutorialStep] = []
+    for number, step in enumerate(script, start=1):
+        view = player_view(state, HUMAN)
+        card = step.target.removeprefix("card:")
+        if step.target.startswith("card:") and card not in {c.id for c in view.hand}:
+            raise ScriptError(f"step {number}: {card} is not in the player's hand")
+        shown = schemas.from_view(view)
+        asked: tuple[schemas.Action, ...] = ()
+        if step.action is not None:
+            if step.action not in view.legal_actions:
+                raise ScriptError(f"step {number}: {step.action} is not legal")
+            asked = (schemas.from_action(step.action),)
+        moves: list[schemas.MovePlayed] = []
+        for action in (() if step.action is None else (step.action,)) + step.ai:
+            state, events = apply(state, action)
+            moves.append(
+                schemas.MovePlayed(
+                    events=schemas.from_events(events, HUMAN),
+                    view=schemas.from_view(player_view(state, HUMAN)),
+                )
+            )
+        steps.append(
+            TutorialStep(
+                text=step.text,
+                target=step.target,
+                view=shown.model_copy(update={"legal_actions": asked}),
+                moves=tuple(moves),
+            )
+        )
+    return Tutorial(steps=tuple(steps))
