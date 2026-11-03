@@ -50,6 +50,7 @@ import { onFirstClick } from "./clicks.ts";
 import { AccountBar, AccountDialog } from "./Account.tsx";
 import { MyDecks } from "./Decks.tsx";
 import { MyMatches } from "./Matches.tsx";
+import { Tutorial } from "./Tutorial.tsx";
 import { ALERT, BUTTON, PANEL } from "./styles.ts";
 import { isCardAction, type Chosen, type Playing } from "./plays.ts";
 import {
@@ -86,6 +87,9 @@ export function App({ api }: { api: Api }) {
   // Whether the end of the match is shown, over the whole page: the top of
   // the page is out of reach meanwhile too.
   const [ended, setEnded] = useState(false);
+  // Whether the tutorial is shown, in the match's place: nothing of it is
+  // saved, and nothing goes to the server.
+  const [tutorial, setTutorial] = useState(false);
   // What is shown in the decks' place while no match is played: the
   // player's matches, the decks they built, or neither.
   const [showing, setShowing] = useState<"matches" | "decks" | null>(null);
@@ -140,6 +144,10 @@ export function App({ api }: { api: Api }) {
     setShowing(null);
     setLeft((times) => times + 1);
   }, [username, queryClient, owner]);
+  const leaveTutorial = () => {
+    setTutorial(false);
+    setLeft((times) => times + 1);
+  };
   const top = useRef<HTMLDivElement>(null);
   const wasLoggingIn = useRef(false);
   useEffect(() => {
@@ -171,14 +179,14 @@ export function App({ api }: { api: Api }) {
             // Not during a match: the button would leave it without a word,
             // and a guest's match is in no list to come back to.
             onShowMatches={
-              match === null && showing !== "matches"
+              match === null && !tutorial && showing !== "matches"
                 ? () => {
                     setShowing("matches");
                   }
                 : undefined
             }
             onShowDecks={
-              match === null && showing !== "decks"
+              match === null && !tutorial && showing !== "decks"
                 ? () => {
                     setShowing("decks");
                   }
@@ -186,7 +194,13 @@ export function App({ api }: { api: Api }) {
             }
           />
         </div>
-        {match === null ? (
+        {tutorial ? (
+          <Tutorial
+            onLeave={leaveTutorial}
+            // The decks are the menu: both buttons end there.
+            onPlay={leaveTutorial}
+          />
+        ) : match === null ? (
           showing === "decks" ? (
             <MyDecks
               api={api}
@@ -229,6 +243,9 @@ export function App({ api }: { api: Api }) {
               waiting={session.isPending}
               level={level}
               onLevel={setLevel}
+              onTutorial={() => {
+                setTutorial(true);
+              }}
             />
           )
         ) : (
@@ -272,6 +289,7 @@ export function App({ api }: { api: Api }) {
  *   logged out: it says so.
  * @param level - The level of the AI the match starts with.
  * @param onLevel - Called with the level the player chooses.
+ * @param onTutorial - Called to open the tutorial.
  */
 function ChooseDeck({
   api,
@@ -282,6 +300,7 @@ function ChooseDeck({
   waiting,
   level,
   onLevel,
+  onTutorial,
 }: {
   api: Api;
   onStart: (match: Played) => void;
@@ -293,6 +312,7 @@ function ChooseDeck({
   loggedOut: boolean;
   level: Level;
   onLevel: (level: Level) => void;
+  onTutorial: () => void;
 }) {
   const queryClient = useQueryClient();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -347,6 +367,12 @@ function ChooseDeck({
       >
         Choose your deck
       </h2>
+      {/* First thing under the heading, where a newcomer looks first. */}
+      <div>
+        <button type="button" className={BUTTON} onClick={onTutorial}>
+          Tutorial
+        </button>
+      </div>
       {loggedOut && (
         <p role="status" className="italic">
           You were logged out, so the match was left: log in to play on.

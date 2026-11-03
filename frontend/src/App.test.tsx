@@ -1,6 +1,7 @@
 import { onlineManager } from "@tanstack/react-query";
 import {
   act,
+  cleanup,
   fireEvent,
   screen,
   waitFor,
@@ -2083,4 +2084,91 @@ test("while moves play out, the board shows the match as it was then, up to the 
   expect(place()).toBeNull();
   expect(theAis()).toBe("0");
   expect(result()).toBe(2);
+});
+
+/**
+ * Do what the tutorial's balloon asks, as a player would: click Next, or
+ * Pass, or the lit card and then where it goes.
+ */
+function doTutorialStep() {
+  const next = screen.queryByRole("button", { name: "Next" });
+  const pass = screen.queryByRole("button", { name: "Pass" });
+  if (next !== null || pass !== null) {
+    fireEvent.click((next ?? pass) as HTMLElement);
+    return;
+  }
+  const board = screen.getByRole("region", { name: "Board" });
+  fireEvent.click(
+    board.querySelector<HTMLElement>("[data-choosable]:not(:disabled)") ??
+      board,
+  );
+  const target = board.querySelector<HTMLElement>("[data-target]");
+  if (target !== null) {
+    fireEvent.click(target);
+  }
+}
+
+/** Open the tutorial from the menu; return the requests sent until then. */
+async function openTutorial() {
+  Element.prototype.scrollIntoView = () => undefined;
+  const { api, requests } = fakeApi(THE_DECKS);
+  renderApp(api);
+  await screen.findByRole("button", { name: "Humans" });
+  fireEvent.click(screen.getByRole("button", { name: "Tutorial" }));
+  await screen.findByRole("note");
+  return requests;
+}
+
+test("the menu has a Tutorial button, which shows the first balloon and sends nothing", async () => {
+  const requests = await openTutorial();
+  const before = requests.length;
+
+  expect(screen.getByRole("note")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "Choose your deck" }),
+  ).not.toBeInTheDocument();
+  expect(requests).toHaveLength(before);
+  expect(sent(requests, "POST /api/matches")).toHaveLength(0);
+});
+
+test("Leave tutorial goes back to the menu, with the focus on the decks' heading", async () => {
+  await openTutorial();
+
+  fireEvent.click(screen.getByRole("button", { name: "Leave tutorial" }));
+
+  expect(
+    await screen.findByRole("heading", { name: "Choose your deck" }),
+  ).toHaveFocus();
+});
+
+test("at the end of the tutorial, Play a match and Return to main menu show the decks", async () => {
+  const { loadTutorial } = await import("./tutorial.ts");
+  const { steps } = await loadTutorial();
+  for (const button of ["Play a match", "Return to main menu"]) {
+    await openTutorial();
+    for (let step = 0; step < steps.length; step += 1) {
+      doTutorialStep();
+    }
+    fireEvent.click(screen.getByRole("button", { name: button }));
+    expect(
+      await screen.findByRole("heading", { name: "Choose your deck" }),
+    ).toHaveFocus();
+    cleanup();
+  }
+});
+
+test("leaving the tutorial in the middle of an animation logs no error", async () => {
+  await openTutorial();
+  for (let step = 0; step < 4; step += 1) {
+    doTutorialStep();
+  }
+  withMotion();
+  doTutorialStep();
+
+  fireEvent.click(screen.getByRole("button", { name: "Leave tutorial" }));
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.show + TIMES.fly));
+
+  expect(
+    screen.getByRole("heading", { name: "Choose your deck" }),
+  ).toBeInTheDocument();
 });
