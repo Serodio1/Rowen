@@ -19,7 +19,7 @@ tutorial should not add API calls or stored matches.
 1. **The tutorial is a guided match on the real board**, always identical,
    reached by an optional **Tutorial** button on the main menu. The Humans
    (the player) play the Robots (the AI) for 2 rounds, about 3 minutes.
-2. **It is a recorded match, played back in the page.** A script of 15 steps
+2. **It is a recorded match, played back in the page.** A script of 16 steps
    (`rowen.api.tutorial`) says what the player does at each step and how the
    AI answers. A generator plays it with the engine from a fixed seed, with
    `apply` checking every action, and records, at each step, the player's

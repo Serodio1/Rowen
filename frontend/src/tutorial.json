@@ -6995,6 +6995,343 @@
       "moves": []
     },
     {
+      "text": "The AI's leader, The Overseer, keeps one of its units on the board after each round: that Robot stays for round 2.",
+      "target": "ai-leader",
+      "view": {
+        "player": 0,
+        "hand": [
+          {
+            "type": "unit",
+            "id": "smart-guy",
+            "name": "Smart Guy",
+            "rows": [
+              "siege"
+            ],
+            "strength": 5,
+            "ability": null,
+            "group": null,
+            "legend": false,
+            "opponent_side": false,
+            "description": []
+          },
+          {
+            "type": "unit",
+            "id": "plane",
+            "name": "Plane",
+            "rows": [
+              "siege"
+            ],
+            "strength": 3,
+            "ability": "muster",
+            "group": "planes",
+            "legend": false,
+            "opponent_side": false,
+            "description": [
+              "Muster: plays at once every card of its group from your deck and hand."
+            ]
+          },
+          {
+            "type": "unit",
+            "id": "human",
+            "name": "Human",
+            "rows": [
+              "melee"
+            ],
+            "strength": 2,
+            "ability": "bond",
+            "group": "humans",
+            "legend": false,
+            "opponent_side": false,
+            "description": [
+              "Bond: its strength is multiplied by the number of units in its row that share its bond."
+            ]
+          },
+          {
+            "type": "special",
+            "id": "war-horn",
+            "name": "War Horn",
+            "kind": "war-horn",
+            "weather_row": null,
+            "description": [
+              "Goes in the horn slot of one of your rows, and doubles the strength of its units, but not of a Legend."
+            ]
+          },
+          {
+            "type": "unit",
+            "id": "medic",
+            "name": "Medic",
+            "rows": [
+              "siege"
+            ],
+            "strength": 4,
+            "ability": "medic",
+            "group": null,
+            "legend": false,
+            "opponent_side": false,
+            "description": [
+              "Medic: plays at once a unit, not a Legend, from your own discard pile."
+            ]
+          },
+          {
+            "type": "unit",
+            "id": "human",
+            "name": "Human",
+            "rows": [
+              "melee"
+            ],
+            "strength": 2,
+            "ability": "bond",
+            "group": "humans",
+            "legend": false,
+            "opponent_side": false,
+            "description": [
+              "Bond: its strength is multiplied by the number of units in its row that share its bond."
+            ]
+          },
+          {
+            "type": "special",
+            "id": "downpour",
+            "name": "Downpour",
+            "kind": "downpour",
+            "weather_row": "siege",
+            "description": [
+              "Weather: every unit in the siege rows, on both sides, has strength 1, but not a Legend. A second copy changes nothing."
+            ]
+          },
+          {
+            "type": "unit",
+            "id": "smart-guy",
+            "name": "Smart Guy",
+            "rows": [
+              "siege"
+            ],
+            "strength": 5,
+            "ability": null,
+            "group": null,
+            "legend": false,
+            "opponent_side": false,
+            "description": []
+          },
+          {
+            "type": "special",
+            "id": "scarecrow",
+            "name": "Scarecrow",
+            "kind": "scarecrow",
+            "weather_row": null,
+            "description": [
+              "Takes a unit on your side, not a Legend, back to your hand, and stays in its place with strength 0."
+            ]
+          }
+        ],
+        "players": [
+          {
+            "rows": {
+              "melee": {
+                "units": [],
+                "horn": null,
+                "scarecrows": [],
+                "scarecrow_places": [],
+                "weathered": false,
+                "score": 0
+              },
+              "ranged": {
+                "units": [],
+                "horn": null,
+                "scarecrows": [],
+                "scarecrow_places": [],
+                "weathered": false,
+                "score": 0
+              },
+              "siege": {
+                "units": [],
+                "horn": null,
+                "scarecrows": [],
+                "scarecrow_places": [],
+                "weathered": false,
+                "score": 0
+              }
+            },
+            "weather": [],
+            "discard": [
+              {
+                "type": "special",
+                "id": "clear-skies",
+                "name": "Clear Skies",
+                "kind": "clear-skies",
+                "weather_row": null,
+                "description": [
+                  "Removes every weather card in play."
+                ]
+              },
+              {
+                "type": "unit",
+                "id": "soldier",
+                "name": "Soldier",
+                "rows": [
+                  "melee",
+                  "ranged"
+                ],
+                "strength": 4,
+                "ability": "agile",
+                "group": null,
+                "legend": false,
+                "opponent_side": false,
+                "description": [
+                  "Agile: can be played in the melee or the ranged row."
+                ]
+              },
+              {
+                "type": "unit",
+                "id": "sniper",
+                "name": "Sniper",
+                "rows": [
+                  "ranged"
+                ],
+                "strength": 6,
+                "ability": null,
+                "group": null,
+                "legend": false,
+                "opponent_side": false,
+                "description": []
+              }
+            ],
+            "lives": 2,
+            "passed": false,
+            "redraws_left": 0,
+            "hand_size": 9,
+            "deck_size": 22,
+            "total": 0,
+            "leader": {
+              "id": "humans-leader",
+              "name": "The Commander",
+              "passive": "Draws 1 card after winning a round."
+            }
+          },
+          {
+            "rows": {
+              "melee": {
+                "units": [
+                  {
+                    "card": {
+                      "type": "unit",
+                      "id": "robot",
+                      "name": "Robot",
+                      "rows": [
+                        "melee"
+                      ],
+                      "strength": 1,
+                      "ability": "bond",
+                      "group": "robots",
+                      "legend": false,
+                      "opponent_side": false,
+                      "description": [
+                        "Bond: its strength is multiplied by the number of units in its row that share its bond."
+                      ]
+                    },
+                    "strength": 1
+                  }
+                ],
+                "horn": null,
+                "scarecrows": [],
+                "scarecrow_places": [],
+                "weathered": false,
+                "score": 1
+              },
+              "ranged": {
+                "units": [],
+                "horn": null,
+                "scarecrows": [],
+                "scarecrow_places": [],
+                "weathered": false,
+                "score": 0
+              },
+              "siege": {
+                "units": [],
+                "horn": null,
+                "scarecrows": [],
+                "scarecrow_places": [],
+                "weathered": false,
+                "score": 0
+              }
+            },
+            "weather": [],
+            "discard": [
+              {
+                "type": "special",
+                "id": "hoarfrost",
+                "name": "Hoarfrost",
+                "kind": "hoarfrost",
+                "weather_row": "melee",
+                "description": [
+                  "Weather: every unit in the melee rows, on both sides, has strength 1, but not a Legend. A second copy changes nothing."
+                ]
+              },
+              {
+                "type": "unit",
+                "id": "robot",
+                "name": "Robot",
+                "rows": [
+                  "melee"
+                ],
+                "strength": 1,
+                "ability": "bond",
+                "group": "robots",
+                "legend": false,
+                "opponent_side": false,
+                "description": [
+                  "Bond: its strength is multiplied by the number of units in its row that share its bond."
+                ]
+              },
+              {
+                "type": "unit",
+                "id": "informant",
+                "name": "Informant",
+                "rows": [
+                  "melee"
+                ],
+                "strength": 3,
+                "ability": "spy",
+                "group": null,
+                "legend": false,
+                "opponent_side": true,
+                "description": [
+                  "Spy: goes on the opponent's side, where its strength counts for them. Whoever plays it draws 2 cards."
+                ]
+              },
+              {
+                "type": "special",
+                "id": "war-horn",
+                "name": "War Horn",
+                "kind": "war-horn",
+                "weather_row": null,
+                "description": [
+                  "Goes in the horn slot of one of your rows, and doubles the strength of its units, but not of a Legend."
+                ]
+              }
+            ],
+            "lives": 1,
+            "passed": false,
+            "redraws_left": 0,
+            "hand_size": 6,
+            "deck_size": 25,
+            "total": 1,
+            "leader": {
+              "id": "robots-leader",
+              "name": "The Overseer",
+              "passive": "After each round, one random unit stays on the board, but not a Legend or a Spy."
+            }
+          }
+        ],
+        "current": 0,
+        "round": 2,
+        "reviving": false,
+        "legal_actions": [],
+        "match_over": false,
+        "winner": null
+      },
+      "moves": []
+    },
+    {
       "text": "Round 2, and you start. Play the Medic. It brings back a unit from your discard pile.",
       "target": "card:medic",
       "view": {

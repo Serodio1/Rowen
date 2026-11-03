@@ -31,7 +31,7 @@ ones new factions bring).
 
 The match uses a fixed seed (`SEED = 59`), chosen so that the player starts
 and their hand holds what the script needs. The texts are in English, as the
-game is. The script has 15 steps (Next = the step only explains); the exact
+game is. The script has 16 steps (Next = the step only explains); the exact
 texts are `SCRIPT` in `rowen.api.tutorial`:
 
 Round 1:
@@ -53,9 +53,11 @@ Round 2 (the round-1 winner, the player, starts it):
 11. **Lives** (Next). On the lives: the AI loses a life; win 2 rounds.
 12. **The passive** (Next). On the leader: The Commander gives 1 card for each
     round won.
-13. **A Medic.** Play the Medic, in siege.
-14. **Revive.** Choose the Sniper from the discard pile; the AI passes.
-15. **Win.** The AI passed and the player is ahead: Pass to win the match,
+13. **The AI's passive** (Next). On the AI's leader: The Overseer keeps one
+    of its units on the board after each round; that Robot stays.
+14. **A Medic.** Play the Medic, in siege.
+15. **Revive.** Choose the Sniper from the discard pile; the AI passes.
+16. **Win.** The AI passed and the player is ahead: Pass to win the match,
     then "Tutorial complete", with **Play a match** and **Return to main
     menu**.
 
@@ -70,7 +72,7 @@ It lives in the API because it writes the API's own JSON shapes
 (`schemas.py`).
 
 - **The script:** a list of steps. Each has the balloon's text, its target
-  (a card, a row, a total, the lives, the leader, the hand or the discard
+  (a card, a row, a total, the lives, a leader, the hand or the discard
   pile), the player's action or Next, then the AI's actions, if any.
 - **The generator**, run as `uv run python -m rowen.api.tutorial` (like
   `rowen.api.openapi`): it starts the match with `start_match` (Humans

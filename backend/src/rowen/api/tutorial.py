@@ -36,7 +36,7 @@ HUMAN = 0
 TUTORIAL_JSON = Path(__file__).parents[4] / "frontend" / "src" / "tutorial.json"
 
 # What a balloon points at: "rows", "hand", "total", "lives", "leader",
-# "discard", "weather", "row:<melee|ranged|siege>" or "card:<card id>". The
+# "ai-leader", "discard", "weather", "row:<melee|ranged|siege>" or "card:<card id>". The
 # page finds it by a ``data-tutorial`` attribute with the same text.
 Target = str
 
@@ -134,6 +134,12 @@ SCRIPT: tuple[ScriptStep, ...] = (
     ScriptStep(
         "Your leader, The Commander, gives you 1 card for each round you win.",
         "leader",
+        None,
+    ),
+    ScriptStep(
+        "The AI's leader, The Overseer, keeps one of its units on the board "
+        "after each round: that Robot stays for round 2.",
+        "ai-leader",
         None,
     ),
     ScriptStep(
