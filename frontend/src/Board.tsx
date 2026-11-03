@@ -308,6 +308,8 @@ function sides(view: View): { you: Side; ai: Side } {
  *
  * @param ahead - Whether their total is the higher one, which a gold ring
  *   shows.
+ * @param tutorial - Whether their total and lives carry the tutorial's names
+ *   for them (`data-tutorial`): the player's do.
  */
 function PlayerPanel({
   name,
@@ -1004,6 +1006,8 @@ function CardButton({
  *   Wildfire go once played.
  * @param onOpen - If given, the discard pile is a button that lists its
  *   cards.
+ * @param tutorial - Whether the discard pile carries the tutorial's name for
+ *   it (`data-tutorial`): the player's does.
  */
 function Piles({
   name,

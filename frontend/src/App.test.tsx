@@ -2174,10 +2174,17 @@ test("at the end of the tutorial, Play a match and Return to main menu show the 
     for (let step = 0; step < steps.length; step += 1) {
       doTutorialStep();
     }
+    // The result is over the whole page: the top of it is out of reach.
+    expect(
+      screen.getByRole("button", { name: "Log in" }).closest("[inert]"),
+    ).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: button }));
     expect(
       await screen.findByRole("heading", { name: "Choose your deck" }),
     ).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Log in" }).closest("[inert]"),
+    ).toBeNull();
     cleanup();
   }
 });

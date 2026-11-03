@@ -15,7 +15,9 @@ const { steps } = await loadTutorial();
 async function open() {
   const onLeave = vi.fn();
   const onPlay = vi.fn();
-  render(<Tutorial onLeave={onLeave} onPlay={onPlay} />);
+  render(
+    <Tutorial onLeave={onLeave} onPlay={onPlay} onEnded={() => undefined} />,
+  );
   expect(screen.getByText("Loading the tutorial…")).toBeInTheDocument();
   await screen.findByRole("note");
   return { onLeave, onPlay };

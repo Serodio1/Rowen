@@ -62,6 +62,15 @@ test("focusing Next doesn't scroll: the balloon may not be placed yet", () => {
   focus.mockRestore();
 });
 
+test("a held Enter on Next doesn't click it again", () => {
+  addTarget();
+  render(<Balloon target={PASS} text="Hello." onNext={() => undefined} />);
+  const next = screen.getByRole("button", { name: "Next" });
+  // fireEvent returns false when the default (the click) is prevented.
+  expect(fireEvent.keyDown(next, { key: "Enter", repeat: true })).toBe(false);
+  expect(fireEvent.keyDown(next, { key: "Enter" })).toBe(true);
+});
+
 test("without onNext there is no Next button", () => {
   addTarget();
   render(<Balloon target={PASS} text="Hello." />);

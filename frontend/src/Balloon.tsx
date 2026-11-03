@@ -67,7 +67,7 @@ export function Balloon({
     }
     const found = document.querySelector<HTMLElement>(target);
     found?.scrollIntoView({ block: "nearest" });
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the DOM
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the target is a DOM node outside React
     setElement(found);
   }, [target, text, shown]);
 
@@ -92,6 +92,12 @@ export function Balloon({
       className={BUTTON}
       // It stays the same button on the next step: a double click would skip it.
       onClick={onFirstClick(onNext)}
+      // A held Enter repeats the click: it would skip the steps that follow.
+      onKeyDown={(event) => {
+        if (event.repeat) {
+          event.preventDefault();
+        }
+      }}
     >
       Next
     </button>

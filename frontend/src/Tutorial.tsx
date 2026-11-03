@@ -26,13 +26,17 @@ import { loadTutorial, type Tutorial as Recording } from "./tutorial.ts";
  *
  * @param onLeave - Called to go back to the main menu.
  * @param onPlay - Called to start a real match, once the tutorial is over.
+ * @param onEnded - Called with whether the end of the tutorial is shown
+ *   over the whole page, as PlayMatch does.
  */
 export function Tutorial({
   onLeave,
   onPlay,
+  onEnded,
 }: {
   onLeave: () => void;
   onPlay: () => void;
+  onEnded: (ended: boolean) => void;
 }) {
   const [recording, setRecording] = useState<Recording | null>(null);
   const [failed, setFailed] = useState(false);
@@ -78,6 +82,7 @@ export function Tutorial({
       leave={leave}
       onLeave={onLeave}
       onPlay={onPlay}
+      onEnded={onEnded}
     />
   );
 }
@@ -87,11 +92,13 @@ function Steps({
   leave,
   onLeave,
   onPlay,
+  onEnded,
 }: {
   recording: Recording;
   leave: ReactNode;
   onLeave: () => void;
   onPlay: () => void;
+  onEnded: (ended: boolean) => void;
 }) {
   // The step shown: `steps.length` once all are played.
   const [at, setAt] = useState(0);
@@ -128,6 +135,14 @@ function Steps({
   const step = steps[at];
   const last = steps.at(-1)?.moves.at(-1)?.view;
   const view = step?.view ?? last;
+  const over = view?.match_over === true && !busy;
+  useEffect(() => {
+    onEnded(over);
+    // Left by any button, it is no longer shown.
+    return () => {
+      onEnded(false);
+    };
+  }, [over, onEnded]);
   if (view === undefined) {
     // An empty recording: the backend's tests rule it out.
     return leave;
@@ -155,7 +170,6 @@ function Steps({
     onChoose: setChosen,
     onPlay: advance,
   };
-  const over = view.match_over && !busy;
   const rounds = steps
     .flatMap((step) => step.moves.flatMap((move) => move.events))
     .filter((event): event is RoundEnded => event.type === "round_ended");

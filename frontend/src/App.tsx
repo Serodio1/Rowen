@@ -199,6 +199,7 @@ export function App({ api }: { api: Api }) {
             onLeave={leaveTutorial}
             // The decks are the menu: both buttons end there.
             onPlay={leaveTutorial}
+            onEnded={setEnded}
           />
         ) : match === null ? (
           showing === "decks" ? (
