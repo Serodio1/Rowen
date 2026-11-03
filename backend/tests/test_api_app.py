@@ -186,7 +186,7 @@ def test_the_decks_are_the_ones_in_the_data_files(client: TestClient) -> None:
                 "leader": {
                     "id": "humans-leader",
                     "name": "The Commander",
-                    "passive": "Draws 2 cards after winning a round.",
+                    "passive": "Draws 1 card after winning a round.",
                 },
             },
             {

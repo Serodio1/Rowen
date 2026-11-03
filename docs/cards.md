@@ -13,13 +13,13 @@ and the tests check that every deck in it is valid.
 
 | Card | Type | Row | Strength | Ability | Group | Copies |
 |---|---|---|---|---|---|---|
-| Human | Unit | Melee | 1 | Bond | humans | 5 |
+| Human | Unit | Melee | 2 | Bond | humans | 5 |
 | Soldier | Unit | Melee / Ranged | 4 | Agile | - | 3 |
 | Sniper | Unit | Ranged | 6 | - | - | 3 |
 | Informant | Unit | Melee | 3 | Spy | - | 2 |
 | Watch Man | Unit | Melee | 5 | Ward | - | 2 |
 | Medic | Unit | Siege | 4 | Medic | - | 1 |
-| Smart Guy | Unit | Siege | 3 | - | - | 3 |
+| Smart Guy | Unit | Siege | 5 | - | - | 3 |
 | Plane | Unit | Siege | 3 | Muster | planes | 4 |
 | Prime Minister | Legend | Ranged | 7 | - | - | 1 |
 | President | Legend | Melee | 10 | Inspire | - | 1 |
