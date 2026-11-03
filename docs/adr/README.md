@@ -32,6 +32,7 @@ plus a section on the alternatives that were considered.
 | [0017](0017-keep-a-copy-of-a-built-deck-in-each-match.md) | Keep a copy of a player's built deck in each match they play with it | Accepted |
 | [0018](0018-monte-carlo-ai-guesses-the-hidden-cards.md) | Let a Monte Carlo AI guess the hidden cards | Accepted |
 | [0019](0019-faction-passives-belong-to-the-deck.md) | Give each faction a passive, brought by its leader and carried out by the engine | Accepted |
+| [0020](0020-the-tutorial-is-a-recorded-match.md) | Teach the game with a tutorial that is a recorded match | Accepted |
 
 ## Writing a new ADR
 
