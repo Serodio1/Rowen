@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { arrowSide } from "./arrowSide.ts";
 import { Balloon } from "./Balloon.tsx";
 
 // jsdom has no layout and no scrollIntoView: stub it, and check it is called.
@@ -9,13 +10,15 @@ beforeEach(() => {
 });
 afterEach(() => {
   scrollIntoView.mockClear();
-  document.body.innerHTML = "";
+  for (const target of added.splice(0)) target.remove();
 });
 
-function addTarget() {
+const added: HTMLElement[] = [];
+function addTarget(name = "pass") {
   const target = document.createElement("div");
-  target.dataset["tutorial"] = "pass";
+  target.dataset["tutorial"] = name;
   document.body.append(target);
+  added.push(target);
   return target;
 }
 
@@ -53,4 +56,43 @@ test("without onNext there is no Next button", () => {
   addTarget();
   render(<Balloon target="pass" text="Hello." />);
   expect(screen.queryByRole("button")).not.toBeInTheDocument();
+});
+
+test("a target that mounts later, in a new step, gets the panel", () => {
+  const { rerender } = render(<Balloon target="pass" text="One." />);
+  expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  addTarget("row");
+  rerender(<Balloon target="row" text="Two." />);
+  expect(screen.getByRole("note")).toHaveTextContent("Two.");
+});
+
+test("a new text keeps the status node and moves the focus to Next", () => {
+  addTarget();
+  const { rerender } = render(
+    <Balloon target="pass" text="One." onNext={() => undefined} />,
+  );
+  const status = screen.getByRole("status");
+  const next = screen.getByRole("button", { name: "Next" });
+  next.blur();
+  rerender(<Balloon target="pass" text="Two." onNext={() => undefined} />);
+  expect(screen.getByRole("status")).toBe(status);
+  expect(status).toHaveTextContent("Two.");
+  expect(screen.getByRole("button", { name: "Next" })).toHaveFocus();
+});
+
+test("the arrow sits on the edge facing the target", () => {
+  addTarget();
+  const { container } = render(<Balloon target="pass" text="One." />);
+  // jsdom has no layout, so floating-ui keeps the placement "top".
+  expect(container.ownerDocument.querySelector("[data-side]")).toHaveAttribute(
+    "data-side",
+    "bottom",
+  );
+});
+
+test("arrowSide is the side opposite the placement", () => {
+  expect(arrowSide("top")).toBe("bottom");
+  expect(arrowSide("bottom-start")).toBe("top");
+  expect(arrowSide("left")).toBe("right");
+  expect(arrowSide("right-end")).toBe("left");
 });
