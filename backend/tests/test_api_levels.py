@@ -6,6 +6,7 @@ own, in memory. The Monte Carlo AI is watched through a spy, which records how
 the API calls it and then lets it choose.
 """
 
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -220,13 +221,23 @@ def test_on_hard_the_robots_answer_a_deck_of_spies_with_their_deck_against_them(
     match = start_built(client, "humans", SPIES, "hard")
 
     assert sorted(card.id for card in calls[0].decks[1]) == counter_deck()
-    # Every later request makes the same deck again: playing on and reading
-    # the match both play its actions again with it.
+    # Every later request makes the same deck again, as it plays the match's
+    # actions again. Its 37 cards, not the faction's 35, show in the size of
+    # the AI's deck in the view.
+    assert client.get(f"/matches/{match['id']}").json()["view"] == match["view"]
     calls.clear()
     while not calls:
         match = play_first(client, match)
     assert sorted(card.id for card in calls[0].decks[1]) == counter_deck()
-    assert client.get(f"/matches/{match['id']}").status_code == 200
+
+
+def test_the_robots_deck_against_spies_differs_from_their_own_as_described() -> None:
+    # As the comment on ROBOTS_AGAINST_SPIES says.
+    own = Counter(card.id for card in load_deck("robots").cards)
+    counter = Counter(counter_deck())
+
+    assert counter - own == Counter({"computer-spy": 1, "scarecrow": 1, "mechanic": 2})
+    assert own - counter == Counter({"drone": 1, "war-horn": 1})
 
 
 @pytest.mark.parametrize(
