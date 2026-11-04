@@ -13,6 +13,9 @@ VARIANT is a comma list of flags, e.g. "giveup=10,cards".
   redraw: before round 1, the Hard AI also swaps a Bond card without its
     pair in the hand, then its weakest plain unit (no ability, not a Legend)
     if it is weaker than the average unit left in its deck list.
+  ward: the Hard AI plays a Ward unit first (before thinking) while its
+    melee row (where every Spy goes) has none, the opponent hasn't passed,
+    and the opponent's deck list may still hide a Spy.
 """
 
 import os
@@ -20,7 +23,7 @@ import os
 from rowen.ai import baseline, montecarlo
 from rowen.engine.abilities import on_opponent_side
 from rowen.engine.actions import EndRedraw, Pass, PlayScarecrow, PlayUnit, Redraw
-from rowen.engine.cards import Ability, UnitCard
+from rowen.engine.cards import Ability, Row, UnitCard
 from rowen.engine.game import legal_actions
 
 FLAGS = dict(
@@ -68,6 +71,10 @@ def choose(view, level, decks, seed):
         return baseline.choose_action(view)
     if level == "hard" and "redraw" in FLAGS and EndRedraw() in view.legal_actions:
         return _redraw(view, decks[view.player])
+    if level == "hard" and "ward" in FLAGS:
+        ward = _ward(view, decks)
+        if ward is not None:
+            return ward
     montecarlo._next = variant_next if level == "hard" else ORIGINAL_NEXT
     try:
         return montecarlo.choose_action(
@@ -99,3 +106,18 @@ def _redraw(view, deck):
         if Redraw(card=c.id) in view.legal_actions:
             return Redraw(card=c.id)
     return EndRedraw()
+
+
+def _ward(view, decks):
+    me, them = view.players[view.player], view.players[1 - view.player]
+    if view.reviving or them.passed or EndRedraw() in view.legal_actions:
+        return None
+    if any(u.card.ability is Ability.WARD for u in me.rows[Row.MELEE].units):
+        return None
+    if not any(montecarlo._spy(c) for c in montecarlo._unseen(view, decks, 1 - view.player)):
+        return None
+    wards = {c.id for c in view.hand if isinstance(c, UnitCard) and c.ability is Ability.WARD}
+    for a in view.legal_actions:
+        if isinstance(a, PlayUnit) and a.card in wards and a.row is Row.MELEE:
+            return a
+    return None
