@@ -187,3 +187,15 @@ each):
 
 78.6% before: the third Firewall alone takes little from it, within the
 margin.
+
+## On Hard, against a deck of Spies: the Robots' deck against them
+
+Since 4 November 2026, on Hard, the Robots answer a deck of 3 Spies or more
+with a deck built against them (ADR 0018, update of 4 November 2026, later).
+Against the Spies deck, the same seeds as above:
+
+| AI on both sides | Matches | Decisive | Draws | Spies won |
+|---|---|---|---|---|
+| Hard | 320 | 317 | 3 | **63.1% ± 5.3%** |
+
+Against the Humans' own deck nothing changes: it has two Informants.
