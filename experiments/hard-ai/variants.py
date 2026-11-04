@@ -23,6 +23,7 @@ VARIANT is a comma list of flags, e.g. "giveup=10,cards".
   medicspy: the Hard AI plays a Medic while its discard pile holds a Spy,
     unless the opponent has passed.
   revivespy: when the Hard AI revives, it picks a Spy if it can.
+  robotsonly: the four rules above only for a player whose deck is Robots.
 Levels: "hard" = the variant, "normal" = main's Hard, "normal8" = main's Normal.
 """
 
@@ -84,7 +85,8 @@ def choose(view, level, decks, seed):
             view, decks=decks, samples=montecarlo.NORMAL_SAMPLES, seed=seed
         )
     if level == "hard":
-        rule = _rules(view)
+        robots = any(c.id == "firewall" for c in decks[view.player])
+        rule = _rules(view) if robots or "robotsonly" not in FLAGS else None
         if rule is not None:
             return rule
     if level == "hard" and "ward" in FLAGS:
