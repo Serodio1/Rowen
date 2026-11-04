@@ -164,3 +164,26 @@ the cards above, 320 matches each (seeds 4000 and on, 16 runs of 20):
 
 The deck wins as often with the Easy AI as with the Hard one: its lead comes
 from the deck, and a better AI on both sides doesn't take it away.
+
+## After the change: the Robots have three Firewalls
+
+A deck of Spies plays only Informants, melee Spies, which a Firewall in the
+Robots' melee row keeps out. So on 4 November 2026 the Robots got a third
+Firewall in place of a third Machine (`backend/src/rowen/data/decks/robots.json`).
+Measured with the commands at the top, the Hard AI as of 4 November:
+
+| AI on both sides | Matches | Decisive | Draws | Robots won | Humans won |
+|---|---|---|---|---|---|
+| Easy | 4000 | 3930 | 70 | **54.1% ± 1.6%** | 45.9% |
+| Normal | 1000 | 970 | 30 | **48.7% ± 3.1%** | 51.3% |
+
+Against the Humans' own deck, as fair as before (52.7% and 48.2%). Against
+the Spies deck (`--deck ../docs/decks/spies.json`, seeds 1 to 4, 80 matches
+each):
+
+| AI on both sides | Matches | Decisive | Draws | Spies won |
+|---|---|---|---|---|
+| Hard | 320 | 315 | 5 | **75.9% ± 4.7%** |
+
+78.6% before: the third Firewall alone takes little from it, within the
+margin.

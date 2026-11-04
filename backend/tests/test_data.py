@@ -26,10 +26,10 @@ HUMANS = {
 }
 ROBOTS = {
     "robot": 5,
-    "machine": 3,
+    "machine": 2,
     "drone": 3,
     "computer-spy": 2,
-    "firewall": 2,
+    "firewall": 3,
     "mechanic": 1,
     "ai": 3,
     "server": 4,

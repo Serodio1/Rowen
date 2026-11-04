@@ -66,7 +66,7 @@ AI_REVIVES = 26
 # With this seed, if the player with the humans always plays their first legal
 # action, the AI swaps cards after the player's redraw, and later plays a Spy,
 # which draws cards.
-AI_DRAWS_AND_REDRAWS = 14
+AI_DRAWS_AND_REDRAWS = 1
 
 DECKS = {deck_id: load_deck(deck_id) for deck_id in deck_ids()}
 

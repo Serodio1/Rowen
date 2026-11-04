@@ -22,7 +22,7 @@
       "rows": ["melee", "ranged"],
       "strength": 4,
       "ability": "agile",
-      "copies": 3
+      "copies": 2
     },
     {
       "id": "drone",
@@ -45,7 +45,7 @@
       "rows": ["melee"],
       "strength": 5,
       "ability": "ward",
-      "copies": 2
+      "copies": 3
     },
     {
       "id": "mechanic",

@@ -33,10 +33,10 @@ Total: 25 units, 10 special cards.
 | Card | Type | Row | Strength | Ability | Group | Copies |
 |---|---|---|---|---|---|---|
 | Robot | Unit | Melee | 1 | Bond | robots | 5 |
-| Machine | Unit | Melee / Ranged | 4 | Agile | - | 3 |
+| Machine | Unit | Melee / Ranged | 4 | Agile | - | 2 |
 | Drone | Unit | Ranged | 5 | - | - | 3 |
 | Computer Spy | Unit | Melee | 2 | Spy | - | 2 |
-| Firewall | Unit | Melee | 5 | Ward | - | 2 |
+| Firewall | Unit | Melee | 5 | Ward | - | 3 |
 | Mechanic | Unit | Siege | 4 | Medic | - | 1 |
 | AI | Unit | Siege | 5 | - | - | 3 |
 | Server | Unit | Siege | 3 | Muster | servers | 4 |
