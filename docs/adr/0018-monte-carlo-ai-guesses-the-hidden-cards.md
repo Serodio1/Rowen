@@ -218,3 +218,27 @@ not the AI's. The rules about Spies help most when the Robots' deck has the
 cards to use them: with a Robots deck of three Scarecrows, three Spies, three
 Medics and three Firewalls, the Spies deck won 58.0%. Changes to the Robots'
 deck are separate decisions, made after this one.
+
+## Update (2026-11-04, later): on Hard, the Robots answer a deck of Spies with a deck against them
+
+The AI knows the list of the player's deck (above). On Hard, against a deck
+of 3 Spies or more (`SPIES_TO_COUNTER` in `backend/src/rowen/api/app.py`),
+the Robots play a deck built against Spies (`ROBOTS_AGAINST_SPIES`): one more
+Computer Spy and Scarecrow and two more Mechanics than the faction's own, one
+Drone and one War Horn fewer. The Scarecrows take the player's Spies back,
+the Spies and Mechanics draw and revive, and the Firewalls keep Spies out.
+Measured with `rowen-arena`, the Hard AI on both sides, the Spies deck
+(`docs/decks/spies.json`), seeds 1 to 4, 80 matches each:
+
+| Robots' deck | Spies won |
+| --- | --- |
+| Their own | 75.9% ± 4.7% |
+| Against Spies | **63.1% ± 5.3%** |
+
+Against everyone it would be too strong: on the bench, against the Humans'
+own deck, it won 63.1% where the Robots' own won 49.0%. So it is only the
+answer to a deck of Spies, as a player who knows the opponent's decklist
+would build one. The player isn't told. A match still keeps only the id of
+the AI's faction: the deck follows from the player's deck and the level, so
+every request makes the same one again (`_played`). Only the Robots have such
+a deck; the Humans don't yet.
