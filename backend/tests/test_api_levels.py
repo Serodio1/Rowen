@@ -49,6 +49,7 @@ class Call:
     decks: tuple[tuple[Card, ...], tuple[Card, ...]]
     samples: int
     seed: int
+    hard: bool
 
 
 @pytest.fixture
@@ -63,9 +64,10 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> list[Call]:
         decks: tuple[tuple[Card, ...], tuple[Card, ...]],
         samples: int,
         seed: int,
+        hard: bool = False,
     ) -> Action:
-        made.append(Call(decks=decks, samples=samples, seed=seed))
-        return choose(view, decks=decks, samples=samples, seed=seed)
+        made.append(Call(decks=decks, samples=samples, seed=seed, hard=hard))
+        return choose(view, decks=decks, samples=samples, seed=seed, hard=hard)
 
     monkeypatch.setattr(montecarlo, "choose_action", spy)
     return made
@@ -118,11 +120,14 @@ def test_without_a_level_the_baseline_ai_plays(
 
 
 @pytest.mark.parametrize(
-    ("level", "samples"),
-    [("normal", montecarlo.NORMAL_SAMPLES), ("hard", montecarlo.HARD_SAMPLES)],
+    ("level", "samples", "hard"),
+    [
+        ("normal", montecarlo.NORMAL_SAMPLES, False),
+        ("hard", montecarlo.HARD_SAMPLES, True),
+    ],
 )
 def test_at_normal_and_hard_the_monte_carlo_ai_plays(
-    client: TestClient, calls: list[Call], level: str, samples: int
+    client: TestClient, calls: list[Call], level: str, samples: int, hard: bool
 ) -> None:
     start(client, level=level)
 
@@ -130,6 +135,8 @@ def test_at_normal_and_hard_the_monte_carlo_ai_plays(
     # from the request's.
     assert calls
     assert {call.samples for call in calls} == {samples}
+    # Only Hard plays with its rules of thumb and gives up rounds.
+    assert {call.hard for call in calls} == {hard}
     assert [call.seed for call in calls] == [AI_SEED + n for n in range(len(calls))]
 
 
