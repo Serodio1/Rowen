@@ -16,13 +16,21 @@ VARIANT is a comma list of flags, e.g. "giveup=10,cards".
   ward: the Hard AI plays a Ward unit first (before thinking) while its
     melee row (where every Spy goes) has none, the opponent hasn't passed,
     and the opponent's deck list may still hide a Spy.
+  scareback: the Hard AI takes an opponent's Spy off its side with a
+    Scarecrow, unless the opponent has passed.
+  spyfirst: the Hard AI plays a Spy from its hand first, unless the opponent
+    has passed.
+  medicspy: the Hard AI plays a Medic while its discard pile holds a Spy,
+    unless the opponent has passed.
+  revivespy: when the Hard AI revives, it picks a Spy if it can.
+Levels: "hard" = the variant, "normal" = main's Hard, "normal8" = main's Normal.
 """
 
 import os
 
 from rowen.ai import baseline, montecarlo
 from rowen.engine.abilities import on_opponent_side
-from rowen.engine.actions import EndRedraw, Pass, PlayScarecrow, PlayUnit, Redraw
+from rowen.engine.actions import EndRedraw, Pass, PlayScarecrow, PlayUnit, Redraw, Revive
 from rowen.engine.cards import Ability, Row, UnitCard
 from rowen.engine.game import legal_actions
 
@@ -71,6 +79,14 @@ def choose(view, level, decks, seed):
         return baseline.choose_action(view)
     if level == "hard" and "redraw" in FLAGS and EndRedraw() in view.legal_actions:
         return _redraw(view, decks[view.player])
+    if level == "normal8":
+        return montecarlo.choose_action(
+            view, decks=decks, samples=montecarlo.NORMAL_SAMPLES, seed=seed
+        )
+    if level == "hard":
+        rule = _rules(view)
+        if rule is not None:
+            return rule
     if level == "hard" and "ward" in FLAGS:
         ward = _ward(view, decks)
         if ward is not None:
@@ -120,4 +136,35 @@ def _ward(view, decks):
     for a in view.legal_actions:
         if isinstance(a, PlayUnit) and a.card in wards and a.row is Row.MELEE:
             return a
+    return None
+
+
+def _rules(view):
+    """The top-level rules scareback, spyfirst, medicspy and revivespy."""
+    me, them = view.players[view.player], view.players[1 - view.player]
+    actions = view.legal_actions
+    hand = {c.id: c for c in view.hand}
+    if view.reviving:
+        if "revivespy" in FLAGS:
+            spies = {c.id for c in me.discard if montecarlo._spy(c)}
+            for a in actions:
+                if isinstance(a, Revive) and a.card in spies:
+                    return a
+        return None
+    if them.passed or EndRedraw() in actions:
+        return None
+    if "scareback" in FLAGS:
+        for a in actions:
+            if isinstance(a, PlayScarecrow):
+                unit = next(u for u in me.rows[a.row].units if u.card.id == a.unit)
+                if montecarlo._spy(unit.card):
+                    return a
+    if "spyfirst" in FLAGS:
+        for a in actions:
+            if isinstance(a, PlayUnit) and montecarlo._spy(hand[a.card]):
+                return a
+    if "medicspy" in FLAGS and any(montecarlo._spy(c) and not c.legend for c in me.discard):
+        for a in actions:
+            if isinstance(a, PlayUnit) and hand[a.card].ability is Ability.MEDIC:
+                return a
     return None
