@@ -10,4 +10,5 @@ ROBOTS_DECK=$here/robots-ward3.json $R b-ward3 "$V" hard hard 4000 16 "$D"
 ROBOTS_DECK=$here/robots-antispy-ward3.json $R b-antispy-ward3 "$V" hard hard 4000 16 "$D"
 ROBOTS_DECK=$here/robots-antispy.json $R c-antispy "$V" hard hard 4000 16 -
 ROBOTS_DECK=$here/robots-antispy-ward3.json $R c-antispy-ward3 "$V" hard hard 4000 16 -
+$R c-control "$V" hard hard 4000 16 -
 echo ALLDONE
