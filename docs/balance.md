@@ -151,3 +151,16 @@ deck wins most matches: a built deck can be much stronger than the faction's
 own. The rules for building a deck (at most 3 copies of a card) don't hold
 it back. The Firewall, which keeps the Spies out of the Robots' melee row,
 takes about 9 points from it, but it still wins most matches.
+
+Measured again on 4 November 2026, with the Humans' passive at 1 card and
+the cards above, 320 matches each (seeds 4000 and on, 16 runs of 20):
+
+| AI on both sides | Spies won |
+|---|---|
+| Easy | **69.8% ± 5.1%** |
+| Normal | **78.3% ± 4.6%** |
+| Hard, before 4 November 2026 | **75.2% ± 4.8%** |
+| Hard, with its rules of thumb (ADR 0018, update of 4 November 2026) | **78.6% ± 4.5%** |
+
+The deck wins as often with the Easy AI as with the Hard one: its lead comes
+from the deck, and a better AI on both sides doesn't take it away.

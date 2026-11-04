@@ -165,3 +165,56 @@ never which are in the hand or in what order they come. With a faction's own
 deck, nothing changes. The API gives the AI the decks of the match
 (`_ai_choice` in `backend/src/rowen/api/app.py`), and `rowen-arena` does the
 same, so it keeps measuring the AI as it plays on the site.
+
+## Update (2026-11-04): the Hard level gives up lost rounds and follows rules of thumb
+
+After the Humans' passive went back to 1 card (ADR 0019, `docs/balance.md`),
+changes to the Hard level were measured with `rowen-arena`, each on a fixed
+copy of `main` and the same seeds, in two ways:
+
+- **(a)**: the new Hard against the Hard as it was, faction decks, 400
+  matches. Kept if it wins more than about 55%.
+- **(b)**: the new Hard on both sides, the Spies deck (`docs/decks/spies.json`)
+  against Robots, 320 matches: the Spies deck's share. The Hard as it was
+  gives **75.2% ± 4.8%**; lower is better.
+
+| Change | (a) new Hard won | (b) Spies won |
+| --- | --- | --- |
+| In the play-outs, a player 10 or more points behind, with a life to spare, gives up the round (playing a Spy first) | 56.4% | 82.5% |
+| The same, only when not behind in cards in the hand (**kept**) | **58.4% ± 4.9%** | 80.0% |
+| …and in the play-outs, a Spy is played first | 55.5% | 78.4% |
+| …and in the play-outs, a Scarecrow takes an opponent's Spy back | 57.4% | 82.0% |
+| …and before round 1, a better choice of cards to swap | 62.4% | 80.6% |
+| …and a Ward unit first, where the opponent's Spies would go (**kept**) | **60.2% ± 4.8%** | **75.9% ± 4.7%** |
+| …and four rules about Spies before the samples (**kept**, below) | **61.2% ± 4.8%** | 78.6% |
+
+The rows without a margin were measured on 3 November 2026 with the same
+bench (branch `experiment/hard-ai`, never merged); the others on 4 November.
+Giving up at 5, 10 or 15 points behind won as often. Giving up whatever the
+cards offered rounds to an opponent ahead in cards, which a deck of Spies
+always is: hence "not behind in cards". Three more changes won no more than
+the Hard as it was (48.6% for the Hard against itself): reviving by the
+samples instead of the baseline (48.6%), a Scarecrow rule in the play-outs
+without giving up (49.2%), and a tie-break between equal totals (48.8%). A
+prototype of information-set Monte Carlo tree search (ISMCTS) won 44.4%.
+
+So the Hard level (`hard=True` in `choose_action`) now:
+
+1. In its play-outs, gives up a round 10 or more points behind (`GIVE_UP_BEHIND`)
+   when it has a life to spare and no fewer cards than the opponent, playing
+   a Spy first if it holds one (`_next`).
+2. Before the samples, follows rules of thumb (`_rule_of_thumb`): after a
+   Medic, revive a Spy; take an opponent's Spy back with a Scarecrow; play a
+   Spy; play a Medic while a Spy is in the discard pile; play a Ward unit in
+   a row where the opponent's Spies would go. A Spy draws 2 cards, which the
+   play-outs, scoring each move by its points only, never see.
+
+Normal and Easy don't change. In 12 matches, this code took the same 375
+decisions as the version measured on the bench.
+
+None of these brings (b) near 50%: the Spies deck won 69.8% with the Easy AI
+on both sides and 78.3% with the Normal, so most of its lead is the deck's,
+not the AI's. The rules about Spies help most when the Robots' deck has the
+cards to use them: with a Robots deck of three Scarecrows, three Spies, three
+Medics and three Firewalls, the Spies deck won 58.0%. Changes to the Robots'
+deck are separate decisions, made after this one.
