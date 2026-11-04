@@ -152,16 +152,21 @@ def test_each_decision_guesses_with_a_seed_of_its_own(
 
 
 @pytest.mark.parametrize(
-    ("level", "samples"),
-    [("normal", montecarlo.NORMAL_SAMPLES), ("hard", montecarlo.HARD_SAMPLES)],
+    ("level", "samples", "hard"),
+    [
+        ("normal", montecarlo.NORMAL_SAMPLES, False),
+        ("hard", montecarlo.HARD_SAMPLES, True),
+    ],
 )
 def test_each_monte_carlo_level_tries_its_own_samples(
-    monkeypatch: pytest.MonkeyPatch, level: Level, samples: int
+    monkeypatch: pytest.MonkeyPatch, level: Level, samples: int, hard: bool
 ) -> None:
-    tried: list[int] = []
+    tried: list[tuple[int, bool]] = []
 
-    def fake_choose_action(view: PlayerView, *, samples: int, **_: object) -> Action:
-        tried.append(samples)
+    def fake_choose_action(
+        view: PlayerView, *, samples: int, hard: bool, **_: object
+    ) -> Action:
+        tried.append((samples, hard))
         return view.legal_actions[0]
 
     monkeypatch.setattr(montecarlo, "choose_action", fake_choose_action)
@@ -169,7 +174,8 @@ def test_each_monte_carlo_level_tries_its_own_samples(
 
     choose(view, level, (DECKS[0].cards, DECKS[1].cards), 6)
 
-    assert tried == [samples]
+    # Only Hard plays with its rules of thumb and gives up rounds.
+    assert tried == [(samples, hard)]
 
 
 def test_the_report_shows_the_share_of_decisive_matches_and_its_margin() -> None:

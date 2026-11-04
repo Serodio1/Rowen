@@ -22,14 +22,27 @@ as a human does.
 
 The randomness comes from a seed, so the same view and seed always give the
 same action, which keeps the tests repeatable.
+
+The Hard level plays a little better than its samples alone (ADR 0018, update
+of 4 November 2026). In its play-outs, a player far behind gives up the round
+when it costs them no cards. And a few rules of thumb, about Spies and Ward
+units, come before the samples: a Spy draws 2 cards, which a play-out's
+points-only scoring of each move doesn't see.
 """
 
 from dataclasses import replace
 
 from rowen.ai import baseline
 from rowen.engine.abilities import on_opponent_side
-from rowen.engine.actions import Action, EndRedraw, Pass
-from rowen.engine.cards import Card, UnitCard
+from rowen.engine.actions import (
+    Action,
+    EndRedraw,
+    Pass,
+    PlayScarecrow,
+    PlayUnit,
+    Revive,
+)
+from rowen.engine.cards import Ability, Card, UnitCard
 from rowen.engine.game import apply_legal, legal_actions, match_over
 from rowen.engine.rng import Rng
 from rowen.engine.state import GameState
@@ -41,6 +54,10 @@ from rowen.engine.view import PlayerView, SideView
 NORMAL_SAMPLES = 8
 HARD_SAMPLES = 16
 
+# In a Hard play-out, how many points behind a player gives up the round. 5,
+# 10 and 15 won as often in rowen-arena (ADR 0018, update of 4 November 2026).
+GIVE_UP_BEHIND = 10
+
 
 def choose_action(
     view: PlayerView,
@@ -48,6 +65,7 @@ def choose_action(
     decks: tuple[tuple[Card, ...], tuple[Card, ...]],
     samples: int,
     seed: int,
+    hard: bool = False,
 ) -> Action:
     """Return the AI's next action: one of ``view.legal_actions``.
 
@@ -59,6 +77,9 @@ def choose_action(
         samples: How many guesses of the hidden cards to try. More play
             better and take longer.
         seed: Where the guesses' randomness comes from.
+        hard: Whether to play as the Hard level: with its rules of thumb
+            (``_rule_of_thumb``) and its way of giving up rounds in the
+            play-outs (``_next``).
 
     Raises:
         ValueError: If the view has no legal actions, or ``samples`` is not
@@ -69,6 +90,10 @@ def choose_action(
         raise ValueError("the AI has no legal actions: it isn't its turn")
     if samples < 1:
         raise ValueError(f"samples must be at least 1, got {samples}")
+    if hard:
+        rule = _rule_of_thumb(view, decks)
+        if rule is not None:
+            return rule
 
     # The baseline's choice is kept where the hidden cards don't change it.
     # Before round 1, guessing the cards it would draw says little about which
@@ -87,7 +112,7 @@ def choose_action(
     for _ in range(samples):
         state, rng = guess(view, decks, rng)
         for action in actions:
-            totals[action] += _play_out(state, action)
+            totals[action] += _play_out(state, action, hard=hard)
     # max keeps the first of equal totals, in the order of the legal actions.
     return max(actions, key=lambda action: totals[action])
 
@@ -167,7 +192,71 @@ def _spy(card: Card) -> bool:
     return isinstance(card, UnitCard) and on_opponent_side(card)
 
 
-def _play_out(state: GameState, action: Action) -> int:
+def _rule_of_thumb(
+    view: PlayerView, decks: tuple[tuple[Card, ...], tuple[Card, ...]]
+) -> Action | None:
+    """Return the Hard AI's action where a rule of thumb says what to play, or ``None``.
+
+    Each Spy the AI plays draws it 2 cards, and each one it takes away from the
+    opponent costs them 2: in rowen-arena, these rules won more often (ADR
+    0018, update of 4 November 2026). In this order:
+
+    - After a Medic, revive a Spy.
+    - Take an opponent's Spy back from its own side with a Scarecrow: back in
+      the AI's hand, the Spy is the AI's to play.
+    - Play a Spy from the hand.
+    - Play a Medic while the discard pile holds a Spy to revive.
+    - Play a Ward unit in a row with none yet where a Spy the opponent may
+      still hold could go: it keeps every Spy out of that row.
+
+    Before round 1 and once the opponent has passed, no rule applies: a Spy
+    played then only gives the opponent points.
+    """
+    me, opponent = view.players[view.player], view.players[1 - view.player]
+    actions = view.legal_actions
+    if view.reviving:
+        spies = {card.id for card in me.discard if _spy(card)}
+        return next(
+            (a for a in actions if isinstance(a, Revive) and a.card in spies), None
+        )
+    if opponent.passed or EndRedraw() in actions:
+        return None
+    hand = {card.id: card for card in view.hand}
+    units = [a for a in actions if isinstance(a, PlayUnit)]
+    for action in actions:
+        if isinstance(action, PlayScarecrow):
+            unit = next(
+                u for u in me.rows[action.row].units if u.card.id == action.unit
+            )
+            if _spy(unit.card):
+                return action
+    for unit_action in units:
+        if _spy(hand[unit_action.card]):
+            return unit_action
+    # A Medic can't revive a Legend.
+    if any(
+        _spy(card) and not card.legend
+        for card in me.discard
+        if isinstance(card, UnitCard)
+    ):
+        for unit_action in units:
+            card = hand[unit_action.card]
+            if isinstance(card, UnitCard) and card.ability is Ability.MEDIC:
+                return unit_action
+    their_spies = [card for card in _unseen(view, decks, 1 - view.player) if _spy(card)]
+    for unit_action in units:
+        card, row = hand[unit_action.card], unit_action.row
+        if (
+            isinstance(card, UnitCard)
+            and card.ability is Ability.WARD
+            and not any(u.card.ability is Ability.WARD for u in me.rows[row].units)
+            and any(row in spy.rows for spy in their_spies if isinstance(spy, UnitCard))
+        ):
+            return unit_action
+    return None
+
+
+def _play_out(state: GameState, action: Action, *, hard: bool = False) -> int:
     """Return the score, for the player whose turn it is, after the action.
 
     After it, both players play on as ``_next`` says until the match ends. The
@@ -177,11 +266,11 @@ def _play_out(state: GameState, action: Action) -> int:
     player = state.current
     state, _ = apply_legal(state, action)
     while not match_over(state):
-        state, _ = apply_legal(state, _next(state))
+        state, _ = apply_legal(state, _next(state, hard=hard))
     return baseline.score(state, player)
 
 
-def _next(state: GameState) -> Action:
+def _next(state: GameState, *, hard: bool = False) -> Action:
     """Return the next action in a play-out, for the player whose turn it is.
 
     They play as the baseline AI does, in a quicker way: on the guessed match
@@ -189,6 +278,13 @@ def _next(state: GameState) -> Action:
     the opponent has passed, they play on as ``baseline.next_play`` says.
     Before, they pass as ``baseline.passes_first`` says, as the baseline does,
     and otherwise play the best card.
+
+    On the Hard level, a player ``GIVE_UP_BEHIND`` or more points behind,
+    with a life to spare and no fewer cards in the hand than the opponent,
+    gives up the round: they keep their cards for the next one, as people
+    do. They play a Spy first if they hold one, which draws them 2 cards.
+    With fewer cards they play on: giving up would hand the opponent the
+    round and leave them ahead in cards too.
     """
     player = state.current
     actions = legal_actions(state)
@@ -196,8 +292,25 @@ def _next(state: GameState) -> Action:
         return baseline.best(state, actions)
     if state.players[1 - player].passed:
         return baseline.next_play(state, player)
-    plays = tuple(action for action in actions if action != Pass())
     lead = baseline.player_lead(state, player)
+    me, opponent = state.players[player], state.players[1 - player]
+    if (
+        hard
+        and -lead >= GIVE_UP_BEHIND
+        and me.lives > 1
+        and len(me.hand) >= len(opponent.hand)
+    ):
+        spies = tuple(a for a in actions if _plays_a_spy(state, a))
+        return baseline.best(state, spies) if spies else Pass()
+    plays = tuple(action for action in actions if action != Pass())
     if not plays or baseline.passes_first(lead, state.players[player].lives):
         return Pass()
     return baseline.best(state, plays)
+
+
+def _plays_a_spy(state: GameState, action: Action) -> bool:
+    """Return whether the action plays a Spy from the current player's hand."""
+    if not isinstance(action, PlayUnit):
+        return False
+    hand = state.players[state.current].hand
+    return any(card.id == action.card and _spy(card) for card in hand)

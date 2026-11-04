@@ -1087,7 +1087,9 @@ def _ai_choice(
         montecarlo.NORMAL_SAMPLES if level == "normal" else montecarlo.HARD_SAMPLES
     )
     guess = (decks[HUMAN].cards, decks[AI].cards)
-    return montecarlo.choose_action(view, decks=guess, samples=samples, seed=seed)
+    return montecarlo.choose_action(
+        view, decks=guess, samples=samples, seed=seed, hard=level == "hard"
+    )
 
 
 def _move(state: GameState, events: tuple[Event, ...]) -> MovePlayed:

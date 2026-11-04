@@ -246,7 +246,9 @@ def choose(
     samples = (
         montecarlo.NORMAL_SAMPLES if level == "normal" else montecarlo.HARD_SAMPLES
     )
-    return montecarlo.choose_action(view, decks=decks, samples=samples, seed=seed)
+    return montecarlo.choose_action(
+        view, decks=decks, samples=samples, seed=seed, hard=level == "hard"
+    )
 
 
 def report(first: Level, second: Level, tally: Tally) -> list[str]:

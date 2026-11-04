@@ -8,9 +8,22 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from rowen.ai import baseline
-from rowen.ai.montecarlo import _next, _play_out, choose_action, guess
+from rowen.ai.montecarlo import (
+    _next,
+    _play_out,
+    _rule_of_thumb,
+    choose_action,
+    guess,
+)
 from rowen.data import deck_ids, load_deck
-from rowen.engine.actions import Action, EndRedraw, Pass, PlayUnit, Revive
+from rowen.engine.actions import (
+    Action,
+    EndRedraw,
+    Pass,
+    PlayScarecrow,
+    PlayUnit,
+    Revive,
+)
 from rowen.engine.cards import Ability, Card, Row, SpecialCard, SpecialKind, UnitCard
 from rowen.engine.game import apply, legal_actions, match_over, start_match
 from rowen.engine.rng import Rng
@@ -24,6 +37,17 @@ INFORMANT = UnitCard(
     rows=(Row.MELEE,),
     strength=3,
     ability=Ability.SPY,
+)
+
+MEDIC = UnitCard(
+    id="medic", name="Medic", rows=(Row.SIEGE,), strength=4, ability=Ability.MEDIC
+)
+WATCH_MAN = UnitCard(
+    id="watch-man",
+    name="Watch Man",
+    rows=(Row.MELEE,),
+    strength=5,
+    ability=Ability.WARD,
 )
 
 SCARECROW = SpecialCard(id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW)
@@ -380,6 +404,123 @@ def test_adds_up_every_sample() -> None:
     assert action == PlayUnit(card="knight", row=Row.MELEE)
 
 
+# The Hard level's rules of thumb
+
+
+def test_hard_plays_its_rule_of_thumb_before_any_sample() -> None:
+    # With an Informant in the hand, the Hard AI plays it; the other levels
+    # leave it to the samples, which score a move by its points only.
+    state = match(player((KNIGHT, INFORMANT)), player((SCOUT,)))
+    view = player_view(state, 0)
+    decks = ((KNIGHT, INFORMANT), (SCOUT,))
+
+    action = choose_action(view, decks=decks, samples=4, seed=0, hard=True)
+
+    assert action == PlayUnit(card="informant", row=Row.MELEE)
+    assert choose_action(view, decks=decks, samples=4, seed=0) != action
+
+
+def test_hard_revives_a_spy() -> None:
+    # The baseline revives the strongest unit, the Knight (as in
+    # test_revives_as_the_baseline_does); the Hard AI, the Informant.
+    state = replace(
+        match(player(discard=(INFORMANT, KNIGHT)), player((SCOUT,))), reviving=True
+    )
+    view = player_view(state, 0)
+
+    action = _rule_of_thumb(view, ((INFORMANT, KNIGHT), (SCOUT,)))
+
+    assert isinstance(action, Revive)
+    assert action.card == "informant"
+    assert action in view.legal_actions
+
+
+def test_hard_revives_as_the_baseline_without_a_spy() -> None:
+    state = replace(
+        match(player(discard=(SCOUT, KNIGHT)), player((SCOUT,))), reviving=True
+    )
+
+    assert _rule_of_thumb(player_view(state, 0), ((SCOUT, KNIGHT), (SCOUT,))) is None
+
+
+def test_hard_takes_back_an_opponents_spy_with_a_scarecrow() -> None:
+    # The Informant on the AI's side is the opponent's Spy: back in the AI's
+    # hand, it is the AI's to play. The Knight is the stronger unit to take.
+    state = match(player((SCARECROW,), melee=(KNIGHT, INFORMANT)), player((SCOUT,)))
+    view = player_view(state, 0)
+
+    action = _rule_of_thumb(view, ((SCARECROW, KNIGHT), (INFORMANT, SCOUT)))
+
+    assert action == PlayScarecrow(card="scarecrow", row=Row.MELEE, unit="informant")
+
+
+def test_hard_plays_a_medic_while_a_spy_is_in_its_discard_pile() -> None:
+    state = match(player((KNIGHT, MEDIC), discard=(INFORMANT,)), player((SCOUT,)))
+    view = player_view(state, 0)
+
+    action = _rule_of_thumb(view, ((KNIGHT, MEDIC, INFORMANT), (SCOUT,)))
+
+    assert action == PlayUnit(card="medic", row=Row.SIEGE)
+
+
+def test_hard_keeps_its_medic_without_a_spy_to_revive() -> None:
+    state = match(player((KNIGHT, MEDIC), discard=(SCOUT,)), player((SCOUT,)))
+
+    assert (
+        _rule_of_thumb(player_view(state, 0), ((KNIGHT, MEDIC, SCOUT), (SCOUT,)))
+        is None
+    )
+
+
+def test_hard_plays_a_ward_unit_where_the_opponents_spies_would_go() -> None:
+    # The opponent's list has an Informant the AI hasn't seen: a melee Spy.
+    state = match(player((KNIGHT, WATCH_MAN)), player((SCOUT,)))
+    view = player_view(state, 0)
+
+    action = _rule_of_thumb(view, ((KNIGHT, WATCH_MAN), (SCOUT, INFORMANT)))
+
+    assert action == PlayUnit(card="watch-man", row=Row.MELEE)
+
+
+@pytest.mark.parametrize(
+    ("melee", "discard", "their_deck"),
+    [
+        # No Spy in the opponent's list.
+        ((), (), (SCOUT, KNIGHT)),
+        # Their only Spy is seen already: in the AI's discard pile, where an
+        # opponent's Spy ends up after the round.
+        ((), (INFORMANT,), (SCOUT, INFORMANT)),
+        # A Ward unit is in the row already.
+        ((WATCH_MAN,), (), (SCOUT, INFORMANT)),
+    ],
+)
+def test_hard_keeps_its_ward_unit_when_no_spy_can_come(
+    melee: tuple[UnitCard, ...],
+    discard: tuple[Card, ...],
+    their_deck: tuple[Card, ...],
+) -> None:
+    state = match(
+        player((KNIGHT, WATCH_MAN), melee=melee, discard=discard), player((SCOUT,))
+    )
+    decks = ((KNIGHT, WATCH_MAN, *melee), their_deck)
+
+    assert _rule_of_thumb(player_view(state, 0), decks) is None
+
+
+@pytest.mark.parametrize("before_round_1", [True, False])
+def test_hard_has_no_rule_before_round_1_nor_once_the_opponent_passed(
+    before_round_1: bool,
+) -> None:
+    # A Spy then would only give the opponent points.
+    opponent = replace(player((SCOUT,)), passed=not before_round_1)
+    ai = replace(player((INFORMANT,)), redraws_left=2 if before_round_1 else 0)
+    state = match(ai, opponent)
+    view = player_view(state, 0)
+
+    assert (EndRedraw() in view.legal_actions) is before_round_1
+    assert _rule_of_thumb(view, ((INFORMANT,), (SCOUT, INFORMANT))) is None
+
+
 # _next: the play-out
 
 
@@ -396,6 +537,43 @@ def test_play_out_passes_ahead_by_10_but_not_on_the_last_life(
 ) -> None:
     state = match(player((KNIGHT,), siege=(wall(lead),), lives=lives), player((SCOUT,)))
     assert _next(state) == action
+
+
+@pytest.mark.parametrize(
+    ("ai_hand", "behind", "lives", "their_hand", "action"),
+    [
+        # 10 behind, a life to spare, as many cards: gives up the round.
+        ((KNIGHT,), 10, 2, (SCOUT,), Pass()),
+        # With a Spy, plays it first: 2 cards more for the next round.
+        (
+            (KNIGHT, INFORMANT),
+            10,
+            2,
+            (SCOUT, SCOUT),
+            PlayUnit(card="informant", row=Row.MELEE),
+        ),
+        # 9 behind: plays on.
+        ((KNIGHT,), 9, 2, (SCOUT,), PlayUnit(card="knight", row=Row.MELEE)),
+        # The last life: plays on.
+        ((KNIGHT,), 10, 1, (SCOUT,), PlayUnit(card="knight", row=Row.MELEE)),
+        # Fewer cards than the opponent: plays on.
+        ((KNIGHT,), 10, 2, (SCOUT, SCOUT), PlayUnit(card="knight", row=Row.MELEE)),
+    ],
+)
+def test_hard_play_out_gives_up_a_round_far_behind(
+    ai_hand: tuple[Card, ...],
+    behind: int,
+    lives: int,
+    their_hand: tuple[Card, ...],
+    action: Action,
+) -> None:
+    state = match(
+        player(ai_hand, lives=lives), player(their_hand, siege=(wall(behind),))
+    )
+
+    assert _next(state, hard=True) == action
+    # The other levels play on.
+    assert _next(state) == PlayUnit(card="knight", row=Row.MELEE)
 
 
 def test_play_out_passes_once_ahead_after_the_opponent_passed() -> None:
