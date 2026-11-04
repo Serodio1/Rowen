@@ -238,4 +238,4 @@ leaders, each with a passive of their own.)
 | D8 | What does Wildfire destroy when the strongest unit is a Legend? | The strongest units that aren't Legends: Legends are left out of the count (section 8) |
 | D9 | Which passive does each faction have? | Humans draw 1 card after winning a round (2 from 30 October to 3 November 2026, `docs/balance.md`); Robots keep one random unit, not a Legend or a Spy, after each round (section 12) |
 | D10 | What does a leader do? | Brings the faction's passive; no ability to use during the match. One leader per faction for now (section 12) |
-| D11 | Can anything stop a Spy? | Yes: a Ward unit (Watch Man, Firewall: melee, strength 5, 2 in each faction's deck) keeps every Spy, played or revived, out of its row while it is there (section 7.4) |
+| D11 | Can anything stop a Spy? | Yes: a Ward unit (Watch Man, Firewall: melee, strength 5; 2 Watch Men in the Humans' deck, 3 Firewalls in the Robots' since 4 November 2026, `docs/balance.md`) keeps every Spy, played or revived, out of its row while it is there (section 7.4) |
