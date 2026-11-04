@@ -18,6 +18,7 @@ from turns import let_ai_play
 from rowen.ai import montecarlo
 from rowen.api.accounts import MemoryAccountStore
 from rowen.api.app import (
+    ROBOTS_AGAINST_SPIES,
     app,
     get_accounts,
     get_decks,
@@ -186,6 +187,79 @@ def test_the_ai_guesses_from_the_list_of_a_deck_the_player_built(
     while not calls:
         match = play_first(client, match)
     assert calls[0].decks[0] == built
+
+
+# 22 units of the Humans with three Informants, Spies, and no Plane.
+SPIES = {"human": 5, "soldier": 3, "sniper": 3, "informant": 3, "medic": 3}
+SPIES |= {"smart-guy": 3, "prime-minister": 1, "president": 1}
+
+
+def start_built(
+    client: TestClient, deck: str, copies: dict[str, int], level: str
+) -> dict[str, Any]:
+    """Log in, build a deck, and start a match with it at ``level``."""
+    assert client.post("/accounts", json=RUI).status_code == 201
+    built = client.post(
+        "/my-decks", json={"name": "Built", "deck": deck, "copies": copies}
+    ).json()
+    return start(client, deck=None, my_deck=built["id"], level=level)
+
+
+def counter_deck() -> list[str]:
+    """Return the ids of the cards of the Robots' deck against Spies."""
+    return sorted(
+        card_id
+        for card_id, count in ROBOTS_AGAINST_SPIES.copies.items()
+        for _ in range(count)
+    )
+
+
+def test_on_hard_the_robots_answer_a_deck_of_spies_with_their_deck_against_them(
+    client: TestClient, calls: list[Call]
+) -> None:
+    match = start_built(client, "humans", SPIES, "hard")
+
+    assert sorted(card.id for card in calls[0].decks[1]) == counter_deck()
+    # Every later request makes the same deck again: playing on and reading
+    # the match both play its actions again with it.
+    calls.clear()
+    while not calls:
+        match = play_first(client, match)
+    assert sorted(card.id for card in calls[0].decks[1]) == counter_deck()
+    assert client.get(f"/matches/{match['id']}").status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("deck", "copies", "level", "ai_deck"),
+    [
+        # Normal plays the faction's own deck, even against Spies.
+        ("humans", SPIES, "normal", "robots"),
+        # The Humans' own deck has two Informants: one too few.
+        ("humans", None, "hard", "robots"),
+        # Against a deck of Robot Spies, the Humans have no such deck.
+        (
+            "robots",
+            {"robot": 5, "machine": 2, "drone": 3, "computer-spy": 3}
+            | {"firewall": 3, "mechanic": 1, "ai": 3, "server": 4, "super-ai": 1},
+            "hard",
+            "humans",
+        ),
+    ],
+)
+def test_otherwise_the_ai_plays_its_factions_own_deck(
+    client: TestClient,
+    calls: list[Call],
+    deck: str,
+    copies: dict[str, int] | None,
+    level: str,
+    ai_deck: str,
+) -> None:
+    if copies is None:
+        start(client, deck=deck, level=level)
+    else:
+        start_built(client, deck, copies, level)
+
+    assert calls[0].decks[1] == load_deck(ai_deck).cards
 
 
 def test_the_list_of_matches_says_each_ones_level(client: TestClient) -> None:

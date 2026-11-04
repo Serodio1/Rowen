@@ -109,8 +109,10 @@ from rowen.engine.public import (
     GameState,
     PlayerView,
     RoundEnded,
+    UnitCard,
     apply,
     build_deck,
+    on_opponent_side,
     player_view,
     start_match,
 )
@@ -119,6 +121,34 @@ from rowen.engine.public import (
 # coin flip in start_match still decides who starts.
 HUMAN = 0
 AI = 1
+
+# Against a deck of this many Spies or more, the Hard AI plays the Robots with
+# a deck built against them: one more Computer Spy and Scarecrow and two more
+# Mechanics than the faction's own, one Drone and one War Horn fewer
+# (ADR 0018, update of 4 November 2026). The player isn't told.
+SPIES_TO_COUNTER = 3
+ROBOTS_AGAINST_SPIES = DeckCopy(
+    name="Robots against Spies",
+    copies={
+        "robot": 5,
+        "machine": 2,
+        "drone": 2,
+        "computer-spy": 3,
+        "firewall": 3,
+        "mechanic": 3,
+        "ai": 3,
+        "server": 4,
+        "super-ai": 1,
+        "sentry": 1,
+        "scarecrow": 3,
+        "war-horn": 2,
+        "hoarfrost": 1,
+        "thick-fog": 1,
+        "downpour": 1,
+        "clear-skies": 1,
+        "wildfire": 1,
+    },
+)
 
 # How many random bits a seed has. Whoever knows the seed can work out the
 # AI's hand, and a small seed can be found by trying every one against the
@@ -372,7 +402,7 @@ def create_match(
         # A deck kept before the rules changed may break them now.
         raise _invalid_deck() from None
     ai_deck = next(deck for deck in deck_ids() if deck != faction)
-    played = (player_deck, load_deck(ai_deck))
+    played = _played(player_deck, ai_deck, new_match.level)
     state = start_match(played, seed=seed)
     state, actions, moves = _ai_plays(state, new_match.level, played, ai_seed)
     match = store.create(
@@ -501,7 +531,7 @@ def ai_turn(
             "illegal_action",
             "It isn't the AI's turn now.",
         )
-    played = (_deck(old.decks[HUMAN], old.built), load_deck(old.decks[AI]))
+    played = _played(_deck(old.decks[HUMAN], old.built), old.decks[AI], old.level)
     state, actions, moves = _ai_plays(state, old.level, played, ai_seed)
     return _keep(store, old, state, rounds, actions, moves, now)
 
@@ -851,6 +881,24 @@ def _deck(faction: str, built: DeckCopy | None) -> Deck:
     )
 
 
+def _played(player: Deck, ai_deck: str, level: Level) -> tuple[Deck, Deck]:
+    """Return the decks of a match, the player's and the AI's, by player index.
+
+    The AI plays its faction's own deck, but on Hard the Robots answer a deck
+    of ``SPIES_TO_COUNTER`` Spies or more with ``ROBOTS_AGAINST_SPIES``. A
+    match keeps only the id of the AI's faction, as the deck follows from the
+    player's and the level: every request makes the same one again.
+    """
+    spies = sum(
+        isinstance(card, UnitCard) and on_opponent_side(card) for card in player.cards
+    )
+    # shortcut: only the Robots have a deck against Spies; give the Humans one
+    # if a deck of Robot Spies beats the Hard AI too.
+    if level == "hard" and ai_deck == "robots" and spies >= SPIES_TO_COUNTER:
+        return player, _deck(ai_deck, ROBOTS_AGAINST_SPIES)
+    return player, load_deck(ai_deck)
+
+
 def _player_deck(deck: StoredDeck) -> PlayerDeck:
     """Return a deck a player built as the API sends it."""
     return PlayerDeck(
@@ -1000,7 +1048,8 @@ def _play_again(
     """
     player_deck, ai_deck = match.decks
     state = start_match(
-        (_deck(player_deck, match.built), load_deck(ai_deck)), seed=match.seed
+        _played(_deck(player_deck, match.built), ai_deck, match.level),
+        seed=match.seed,
     )
     rounds: tuple[RoundEndedJson, ...] = ()
     for action in match.actions:
