@@ -7,7 +7,7 @@ from cards import HOARFROST, KNIGHT, SCOUT, WAR_HORN
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from rowen.ai import baseline
+from rowen.ai import baseline, montecarlo
 from rowen.ai.montecarlo import (
     _next,
     _play_out,
@@ -49,6 +49,8 @@ WATCH_MAN = UnitCard(
     strength=5,
     ability=Ability.WARD,
 )
+
+LEGEND_SPY = replace(INFORMANT, id="mole", name="Mole", legend=True)
 
 SCARECROW = SpecialCard(id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW)
 
@@ -463,13 +465,13 @@ def test_hard_plays_a_medic_while_a_spy_is_in_its_discard_pile() -> None:
     assert action == PlayUnit(card="medic", row=Row.SIEGE)
 
 
-def test_hard_keeps_its_medic_without_a_spy_to_revive() -> None:
-    state = match(player((KNIGHT, MEDIC), discard=(SCOUT,)), player((SCOUT,)))
+@pytest.mark.parametrize("discard", [SCOUT, LEGEND_SPY])
+def test_hard_keeps_its_medic_without_a_spy_to_revive(discard: UnitCard) -> None:
+    # A Medic can't revive a Legend, even a Spy.
+    state = match(player((KNIGHT, MEDIC), discard=(discard,)), player((SCOUT,)))
+    decks = ((KNIGHT, MEDIC, discard), (SCOUT,))
 
-    assert (
-        _rule_of_thumb(player_view(state, 0), ((KNIGHT, MEDIC, SCOUT), (SCOUT,)))
-        is None
-    )
+    assert _rule_of_thumb(player_view(state, 0), decks) is None
 
 
 def test_hard_plays_a_ward_unit_where_the_opponents_spies_would_go() -> None:
@@ -574,6 +576,33 @@ def test_hard_play_out_gives_up_a_round_far_behind(
     assert _next(state, hard=True) == action
     # The other levels play on.
     assert _next(state) == PlayUnit(card="knight", row=Row.MELEE)
+
+
+@pytest.mark.parametrize("hard", [True, False])
+def test_only_hard_gives_up_rounds_in_its_play_outs(
+    hard: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # No rule of thumb applies here: the samples choose, and each play-out
+    # plays at the level asked for.
+    levels: list[bool] = []
+
+    def spy(state: GameState, *, hard: bool = False) -> Action:
+        levels.append(hard)
+        return _next(state, hard=hard)
+
+    monkeypatch.setattr(montecarlo, "_next", spy)
+    state = match(player((KNIGHT, SCOUT)), player((SCOUT,) * 2))
+
+    choose_action(
+        player_view(state, 0),
+        decks=((KNIGHT, SCOUT), (SCOUT,) * 2),
+        samples=2,
+        seed=0,
+        hard=hard,
+    )
+
+    assert levels
+    assert set(levels) == {hard}
 
 
 def test_play_out_passes_once_ahead_after_the_opponent_passed() -> None:

@@ -209,8 +209,9 @@ def _rule_of_thumb(
     - Play a Ward unit in a row with none yet where a Spy the opponent may
       still hold could go: it keeps every Spy out of that row.
 
-    Before round 1 and once the opponent has passed, no rule applies: a Spy
-    played then only gives the opponent points.
+    Once the opponent has passed, no rule applies: a Spy played then only
+    gives them points. (Before round 1, only redraws are legal: none applies
+    either.)
     """
     me, opponent = view.players[view.player], view.players[1 - view.player]
     actions = view.legal_actions
@@ -219,7 +220,7 @@ def _rule_of_thumb(
         return next(
             (a for a in actions if isinstance(a, Revive) and a.card in spies), None
         )
-    if opponent.passed or EndRedraw() in actions:
+    if opponent.passed:
         return None
     hand = {card.id: card for card in view.hand}
     units = [a for a in actions if isinstance(a, PlayUnit)]
