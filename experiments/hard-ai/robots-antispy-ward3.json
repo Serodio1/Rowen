@@ -1,0 +1,23 @@
+{
+  "faction": "robots",
+  "name": "Robots anti-Spy, 3 Wards",
+  "copies": {
+    "robot": 5,
+    "machine": 2,
+    "drone": 2,
+    "computer-spy": 3,
+    "firewall": 3,
+    "mechanic": 3,
+    "ai": 3,
+    "server": 4,
+    "super-ai": 1,
+    "sentry": 1,
+    "scarecrow": 3,
+    "war-horn": 2,
+    "hoarfrost": 1,
+    "thick-fog": 1,
+    "downpour": 1,
+    "clear-skies": 1,
+    "wildfire": 1
+  }
+}
