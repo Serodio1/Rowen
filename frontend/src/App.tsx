@@ -785,7 +785,10 @@ function PlayMatch({
       onEnded(false);
     };
   }, [ended, onEnded]);
-  const failed = match.isError;
+  // The match couldn't come, or the AI's turn didn't work and the match is
+  // still at it: either way a Try again shows.
+  const aiFailed = aiTurn.isError && stuck === version;
+  const failed = match.isError || aiFailed;
   useEffect(() => {
     // The moves are disabled: the focus goes to what the player can do.
     if (failed) {
@@ -794,6 +797,7 @@ function PlayMatch({
   }, [failed]);
   const notFound =
     play.error?.code === "match_not_found" ||
+    aiTurn.error?.code === "match_not_found" ||
     match.error?.code === "match_not_found";
   const notFoundHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -927,13 +931,14 @@ function PlayMatch({
               Try again
             </button>
           </div>
-        ) : aiTurn.isError && stuck === version ? (
+        ) : aiFailed ? (
           // The AI's turn didn't work, and the match is still at it.
           <div className="flex flex-wrap items-center justify-center gap-2">
             <p role="alert" className={ALERT}>
               {aiTurn.error.message}
             </p>
             <button
+              ref={tryAgain}
               type="button"
               className={BUTTON}
               onClick={() => {

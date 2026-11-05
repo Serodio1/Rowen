@@ -1664,11 +1664,33 @@ test("when the AI's turn doesn't work, the page says so, and asks again only on 
   ).toBeInTheDocument();
   await settle();
   expect(sent(requests, AI_TURN)).toHaveLength(1);
+  // The moves are disabled: the focus is on what the player can do.
+  expect(screen.getByRole("button", { name: "Try again" })).toHaveFocus();
 
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
   await waitFor(() => {
     expect(sent(requests, AI_TURN)).toHaveLength(2);
+  });
+});
+
+test("when the server lost the match by the AI's turn, the page says so, and asks who is logged in", async () => {
+  const { api, requests } = fakeApi({
+    ...AT_ROUND_1,
+    [PLAY]: PLAYER_PLAYED,
+    [AI_TURN]: LOST,
+  });
+  renderApp(api);
+  await playSoldier();
+
+  expect(
+    await screen.findByRole("heading", { name: "Match not found" }),
+  ).toHaveFocus();
+  // Not a Try again that would fail again and again.
+  expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  // The player may have logged out in another tab (see App).
+  await waitFor(() => {
+    expect(sent(requests, "GET /api/session")).toHaveLength(2);
   });
 });
 
