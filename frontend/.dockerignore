@@ -1,8 +1,8 @@
 # Only what the image's build reads goes to Docker, as for the API
 # (backend/.dockerignore): not node_modules (the image installs the packages
 # itself; those from Windows would not work in Linux), not dist (it builds the
-# page itself), and no file kept on this computer only, such as .env.local or
-# a test report. tsc -b checks e2e and the config files too (tsconfig.node.json).
+# page itself), not the tests nor their reports, and no file kept on this
+# computer only, such as .env.local.
 *
 !package.json
 !package-lock.json
@@ -10,9 +10,12 @@
 !index.html
 !src
 !public
-!e2e
 !nginx.conf
 !vite.config.ts
 !eslint.config.js
-!playwright.config.ts
 !tsconfig*.json
+**/*.test.ts
+**/*.test.tsx
+src/test-setup.ts
+src/fake-api.tsx
+src/test-data.ts
