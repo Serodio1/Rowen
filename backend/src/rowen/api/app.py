@@ -40,6 +40,7 @@ To run the server on your computer, in ``backend``:
 import hashlib
 import os
 import secrets
+import threading
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
@@ -170,6 +171,15 @@ RENEW_AFTER = timedelta(days=1)
 
 # How many matches a page of the list of a player's matches holds at most.
 PAGE_SIZE = 20
+
+# The matches whose AI is thinking now, in ai-turn: one turn at a time each,
+# so that many requests at once can't make the AI think as many times (only
+# one of them could be kept anyway). ai_turn is a plain def, so FastAPI runs
+# it in a thread of its own: the lock keeps two threads from both finding a
+# match missing and adding it. shortcut: it holds within one process, as on
+# Cloud Run (one uvicorn, maxScale 1); with several, keep it in the database.
+_thinking: set[UUID] = set()
+_thinking_lock = threading.Lock()
 
 
 def _operation_id(route: APIRoute) -> str:
@@ -517,23 +527,33 @@ def ai_turn(
     The page sends it whenever its view says it is the AI's turn, with the
     version of the match that came with that view. As for a move, another
     version is a 409 that changes nothing. When it isn't the AI's turn, or the
-    match is over, the answer is a 409 too, before the AI thinks: so this
-    costs nothing more than a move, which nginx limits.
+    match is over, or the AI is already thinking about this match for another
+    request, the answer is a 409 too, before the AI thinks. So the AI thinks
+    only once for each move of the player's, which nginx limits, but that once
+    may be several decisions (a redraw, then a card).
     """
     old = _match(store, match_id, _logged_in(accounts, token, now))
     if turn.version != old.version:
         raise _match_changed()
-    state, rounds = _play_again(old)
-    view = player_view(state, AI)
-    if view.current != AI or view.match_over:
-        raise ApiError(
-            status.HTTP_409_CONFLICT,
-            "illegal_action",
-            "It isn't the AI's turn now.",
-        )
-    played = _played(_deck(old.decks[HUMAN], old.built), old.decks[AI], old.level)
-    state, actions, moves = _ai_plays(state, old.level, played, ai_seed)
-    return _keep(store, old, state, rounds, actions, moves, now)
+    with _thinking_lock:
+        if match_id in _thinking:
+            raise _match_changed()
+        _thinking.add(match_id)
+    try:
+        state, rounds = _play_again(old)
+        view = player_view(state, AI)
+        if view.current != AI or view.match_over:
+            raise ApiError(
+                status.HTTP_409_CONFLICT,
+                "illegal_action",
+                "It isn't the AI's turn now.",
+            )
+        played = _played(_deck(old.decks[HUMAN], old.built), old.decks[AI], old.level)
+        state, actions, moves = _ai_plays(state, old.level, played, ai_seed)
+        return _keep(store, old, state, rounds, actions, moves, now)
+    finally:
+        with _thinking_lock:
+            _thinking.discard(match_id)
 
 
 def _keep(

@@ -5,6 +5,7 @@ same responses, without running a server.
 """
 
 import shutil
+import threading
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -827,6 +828,74 @@ def test_the_ai_plays_its_turn_when_the_page_asks(
     kept = store.get(match.id)
     assert kept is not None
     assert replay(kept) == state
+
+
+def test_the_ai_thinks_about_a_match_for_one_request_at_a_time(
+    store: MatchStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A match kept on the AI's turn, and the decisions of its turn.
+    match = store.create(("humans", "robots"), AI_STARTS, (), owner=None, now=NOW)
+    state = start_match((DECKS["humans"], DECKS["robots"]), seed=AI_STARTS)
+    _, answer = ai_answers(state)
+    decisions: list[PlayerView] = []
+    thinking = threading.Event()
+    go_on = threading.Event()
+
+    def slow_choose_action(view: PlayerView) -> Action:
+        decisions.append(view)
+        thinking.set()
+        go_on.wait(timeout=10)
+        return choose_action(view)
+
+    monkeypatch.setattr("rowen.ai.baseline.choose_action", slow_choose_action)
+    app.dependency_overrides[get_store] = lambda: store
+    ask = {"version": match.version}
+    first: list[httpx2.Response] = []
+    request = threading.Thread(
+        target=lambda: first.append(
+            TestClient(app).post(f"/matches/{match.id}/ai-turn", json=ask)
+        )
+    )
+
+    request.start()
+    assert thinking.wait(timeout=10)
+    # While the AI thinks for the first request, three more come.
+    others = [
+        TestClient(app).post(f"/matches/{match.id}/ai-turn", json=ask) for _ in range(3)
+    ]
+    go_on.set()
+    request.join(timeout=10)
+    app.dependency_overrides.clear()
+
+    assert [other.status_code for other in others] == [409, 409, 409]
+    assert {other.json()["code"] for other in others} == {"match_changed"}
+    assert first[0].status_code == 200
+    # The AI thought only for the first request.
+    assert len(decisions) == len(answer)
+
+
+def test_the_ai_may_think_again_after_a_turn_that_failed(
+    client: TestClient, store: MatchStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    match = store.create(("humans", "robots"), AI_STARTS, (), owner=None, now=NOW)
+    decisions: list[PlayerView] = []
+
+    def choose_action_failing_once(view: PlayerView) -> Action:
+        decisions.append(view)
+        if len(decisions) == 1:
+            raise RuntimeError("a bug")
+        return choose_action(view)
+
+    monkeypatch.setattr("rowen.ai.baseline.choose_action", choose_action_failing_once)
+    server = TestClient(app, raise_server_exceptions=False)
+    ask = {"version": match.version}
+
+    failed = server.post(f"/matches/{match.id}/ai-turn", json=ask)
+    again = server.post(f"/matches/{match.id}/ai-turn", json=ask)
+
+    assert failed.status_code == 500
+    # Not a 409: the failed turn doesn't keep the match as thinking.
+    assert again.status_code == 200
 
 
 def test_the_ai_turn_is_turned_down_on_the_players_turn(
