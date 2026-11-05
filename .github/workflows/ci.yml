@@ -47,11 +47,9 @@ jobs:
           --health-timeout 5s
           --health-retries 15
     steps:
-      # Without the token the job was given left in .git/config: no later step
-      # needs to push, so none can, whatever runs in it.
+      # Without leaving the job's token in .git/config, where any later step
+      # could read it: no step needs it (here and in the other jobs).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
         with:
           persist-credentials: false
 
