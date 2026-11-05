@@ -330,7 +330,7 @@
     "/matches/{match_id}/ai-turn": {
       "post": {
         "summary": "Ai Turn",
-        "description": "Let the AI play, at the match's level, until it is the player's turn.\n\nThe page sends it whenever its view says it is the AI's turn, with the\nversion of the match that came with that view. As for a move, another\nversion is a 409 that changes nothing. When it isn't the AI's turn, or the\nmatch is over, the answer is a 409 too, before the AI thinks: so this\ncosts nothing more than a move, which nginx limits.",
+        "description": "Let the AI play, at the match's level, until it is the player's turn.\n\nThe page sends it whenever its view says it is the AI's turn, with the\nversion of the match that came with that view. As for a move, another\nversion is a 409 that changes nothing. When it isn't the AI's turn, or the\nmatch is over, or the AI is already thinking about this match for another\nrequest, the answer is a 409 too, before the AI thinks. So the AI thinks\nonly once for each move of the player's, which nginx limits, but that once\nmay be several decisions (a redraw, then a card).",
         "operationId": "ai_turn",
         "parameters": [
           {

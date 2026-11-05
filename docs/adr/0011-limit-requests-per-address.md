@@ -120,3 +120,22 @@ AI thinks only on its turn, which only a move gives it, and the moves keep
 their limit. On any other turn the API turns it down before the AI thinks.
 So a move still counts once against the moves zone, and the AI still thinks
 at most once for each move.
+
+## Update (2026-11-05)
+
+The last update held for one request at a time, not for many at once: ten
+`ai-turn` requests for the same match, sent together, each made the AI think
+its whole turn (50 decisions in 17 s), though only one could be kept. The API
+now lets the AI think about a match for one request at a time; any other
+request for that match meanwhile is a 409 before the AI thinks. It keeps the
+matches in memory, which holds because the API runs one process (ADR 0010,
+`maxScale: "1"`). So the AI again thinks at most once for each move. Its turn
+may still hold several decisions (a redraw, then a card): on the hard level
+about 0.1 s each on average, up to about 0.7 s.
+
+The location for `ai-turn` passes the match's id on to the API in the address
+it writes itself (`proxy_pass http://127.0.0.1:8000$1`), and nginx decodes the
+address before it matches it. With `[^/]+`, a `%0D%0A` in the id reached the
+API as a new line, with headers of the visitor's own after it. The location
+now takes only the letters of a UUID (`[0-9a-f-]+`), and the Smoke test checks
+that such an address is a 404.

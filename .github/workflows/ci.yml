@@ -181,7 +181,10 @@ jobs:
       # which comes too late: 409. The API then restarts (nginx with it), and
       # the match is still there, kept in PostgreSQL. A move a second stays
       # under nginx's limit of 1 move a second. Then, that the API ignores an
-      # address a visitor writes in X-Forwarded-For. Then an
+      # address a visitor writes in X-Forwarded-For, and that a new line in
+      # the id of an AI's turn (%0D%0A) reaches the API still written as
+      # letters: the API turns the id down (422), where a new line would have
+      # split the request and uvicorn answered 400. Then an
       # account, as the page makes it (with its Origin): logged in, a match of
       # its own, in its list (and none older than it, so nginx passes the
       # query on), out of a guest's reach (404), no stats yet, a log out from
@@ -237,6 +240,8 @@ jobs:
           if docker compose logs api | grep --quiet 203.0.113.9; then
             echo "The API took the address in X-Forwarded-For"; exit 1
           fi
+          curl --silent --show-error --write-out '%{http_code}' --header 'Content-Type: application/json' \
+            --data '{"version": 1}' "$url/api/matches/a%0D%0AX:1/ai-turn" | grep --quiet '"invalid_request".*422$'
           jar=$(mktemp)
           account="{\"username\": \"smoke$(date +%s)\", \"password\": \"smoke test password\"}"
           curl --fail --silent --show-error --cookie-jar "$jar" --header 'Content-Type: application/json' \

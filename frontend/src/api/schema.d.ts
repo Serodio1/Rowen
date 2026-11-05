@@ -129,8 +129,10 @@ export interface paths {
      *     The page sends it whenever its view says it is the AI's turn, with the
      *     version of the match that came with that view. As for a move, another
      *     version is a 409 that changes nothing. When it isn't the AI's turn, or the
-     *     match is over, the answer is a 409 too, before the AI thinks: so this
-     *     costs nothing more than a move, which nginx limits.
+     *     match is over, or the AI is already thinking about this match for another
+     *     request, the answer is a 409 too, before the AI thinks. So the AI thinks
+     *     only once for each move of the player's, which nginx limits, but that once
+     *     may be several decisions (a redraw, then a card).
      */
     post: operations["ai_turn"];
     delete?: never;
