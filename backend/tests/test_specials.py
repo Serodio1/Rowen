@@ -269,7 +269,7 @@ def test_clear_skies_sends_each_weather_card_to_its_players_discard_pile() -> No
     # The Clear Skies goes last: it is resolved once the weather is cleared.
     assert state.players[1].discard == (THICK_FOG, DOWNPOUR, CLEAR_SKIES)
     assert state.players[1].hand == (KNIGHT,)
-    assert events == (WeatherCleared(player=1, card="clear-skies"),)
+    assert events == (WeatherCleared(player=1, card="clear-skies", cleared=True),)
 
 
 def test_clear_skies_gives_the_units_their_strength_back() -> None:
@@ -288,7 +288,7 @@ def test_clear_skies_without_weather_only_goes_to_the_discard_pile() -> None:
 
     assert state.players[0].discard == (CLEAR_SKIES,)
     assert state.players[1].discard == ()
-    assert events == (WeatherCleared(player=0, card="clear-skies"),)
+    assert events == (WeatherCleared(player=0, card="clear-skies", cleared=False),)
 
 
 # Wildfire

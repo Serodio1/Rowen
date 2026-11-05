@@ -144,12 +144,13 @@ def _clear_skies(
     and the Clear Skies to its player's (rules, section 8). With no weather in
     play, only the Clear Skies goes.
     """
+    cleared = any(owner.weather for owner in state.players)
     for index, owner in enumerate(state.players):
         state = with_player(state, index, replace(owner, weather=()))
         state = _discard(state, index, owner.weather)
 
     state = _discard(state, player, (card,))
-    return state, (WeatherCleared(player=player, card=card.id),)
+    return state, (WeatherCleared(player=player, card=card.id, cleared=cleared),)
 
 
 def _wildfire(

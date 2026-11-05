@@ -215,7 +215,9 @@ export function eventText(
     case "weather_played":
       return `${who(event.player)} played ${name(event.card)}: weather on both ${event.row} rows.`;
     case "weather_cleared":
-      return `${who(event.player)} played ${name(event.card)} and cleared all weather.`;
+      return event.cleared
+        ? `${who(event.player)} played ${name(event.card)} and cleared all weather.`
+        : `${who(event.player)} played ${name(event.card)}, but there was no weather.`;
     case "horn_played":
       return `${who(event.player)} played ${name(event.card)} in the ${event.row} row.`;
     case "scarecrow_played":

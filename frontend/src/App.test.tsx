@@ -1311,6 +1311,22 @@ test("the page says what to do, and a card chosen can be let go with Cancel", as
   ).toBeInTheDocument();
 });
 
+test("when the player can only pass, the page says no card can be played", async () => {
+  // Cards in the hand, but none can go anywhere: only passing is legal.
+  const { api } = fakeApi({
+    ...A_MATCH,
+    [PLAY]: played({ ...ROUND_1, legal_actions: [{ type: "pass" }] }),
+  });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+
+  expect(
+    await screen.findByText("No card can be played now: pass."),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Choose a card to play, or pass.")).toBeNull();
+});
+
 /**
  * Let the page move things, as the system of a player who didn't ask for
  * reduced motion does, and make the page's clock the test's, until the test
@@ -1948,7 +1964,7 @@ test("pointing at a row or a pile, and not at a card in it, shows no card", asyn
   renderApp(api);
   await startMatch();
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
-  await screen.findByText("Choose a card to play, or pass.");
+  await screen.findByText("No card can be played now: pass.");
 
   fireEvent.mouseOver(
     screen.getByRole("group", { name: "Your deck and discard pile" }),
@@ -1976,7 +1992,7 @@ test("clicking a discard pile lists its cards beside the board, the most recent 
   renderApp(api);
   await startMatch();
   fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
-  await screen.findByText("Choose a card to play, or pass.");
+  await screen.findByText("No card can be played now: pass.");
 
   const open = within(
     screen.getByRole("group", { name: "Your deck and discard pile" }),

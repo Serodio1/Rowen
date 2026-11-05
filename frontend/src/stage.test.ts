@@ -132,7 +132,7 @@ test("special cards go to the War Horn's place, the weather, a row or the discar
     { type: "horn_played", player: 0, card: "war-horn", row: "siege" },
     { type: "weather_played", player: 0, card: "hoarfrost", row: "melee" },
     { type: "wildfire_played", player: 0, card: "wildfire" },
-    { type: "weather_cleared", player: 1, card: "wildfire" },
+    { type: "weather_cleared", player: 1, card: "wildfire", cleared: true },
   ];
 
   expect(
@@ -401,7 +401,7 @@ test("a Clear Skies keeps the weather it clears on the board until it lands", ()
     players: [side({ weather: [HOARFROST] }), side()],
   });
   const events: Event[] = [
-    { type: "weather_cleared", player: 0, card: "clear-skies" },
+    { type: "weather_cleared", player: 0, card: "clear-skies", cleared: true },
   ];
 
   const after = view();

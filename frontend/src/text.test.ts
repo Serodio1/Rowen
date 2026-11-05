@@ -250,8 +250,12 @@ test.each<[Event, string]>([
     "The AI played Hoarfrost: weather on both melee rows.",
   ],
   [
-    { type: "weather_cleared", player: 0, card: "clear-skies" },
+    { type: "weather_cleared", player: 0, card: "clear-skies", cleared: true },
     "You played Clear Skies and cleared all weather.",
+  ],
+  [
+    { type: "weather_cleared", player: 1, card: "clear-skies", cleared: false },
+    "The AI played Clear Skies, but there was no weather.",
   ],
   [
     { type: "horn_played", player: 0, card: "war-horn", row: "siege" },

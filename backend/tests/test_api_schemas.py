@@ -556,8 +556,13 @@ def test_every_view_of_a_match_is_sent_as_it_is(seed: int) -> None:
             },
         ),
         (
-            engine.WeatherCleared(player=0, card="clear-skies"),
-            {"type": "weather_cleared", "player": 0, "card": "clear-skies"},
+            engine.WeatherCleared(player=0, card="clear-skies", cleared=True),
+            {
+                "type": "weather_cleared",
+                "player": 0,
+                "card": "clear-skies",
+                "cleared": True,
+            },
         ),
         (
             engine.HornPlayed(player=0, card="war-horn", row=SIEGE),

@@ -1278,6 +1278,8 @@ export interface components {
       player: number;
       /** Card */
       card: string;
+      /** Cleared */
+      cleared: boolean;
     };
     /**
      * WeatherPlayed

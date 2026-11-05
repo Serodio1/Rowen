@@ -32,6 +32,10 @@ export function Controls({
   } else if (view.legal_actions.length === 0) {
     // Nothing to do, as on a tutorial's step that only explains.
     hint = null;
+  } else if (view.legal_actions.every((action) => action.type === "pass")) {
+    // Cards in the hand, but none can go anywhere (a Spy with a Ward in
+    // every row it could take): this says why none can be chosen.
+    hint = "No card can be played now: pass.";
   } else if (view.reviving) {
     hint =
       chosen === null

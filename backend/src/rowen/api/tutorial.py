@@ -102,7 +102,8 @@ SCRIPT: tuple[ScriptStep, ...] = (
         (PlaySpecial(card="hoarfrost"),),
     ),
     ScriptStep(
-        "Cards are what you play with all match: you don't draw new ones each round.",
+        "Cards are what you play with all match: you get new ones only from your"
+        " leader and from Spies.",
         "hand",
         None,
     ),

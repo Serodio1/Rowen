@@ -364,8 +364,12 @@ def test_an_action_reads_as_a_choice(action: Action, text: str) -> None:
             "The AI played Downpour: weather on both siege rows.",
         ),
         (
-            WeatherCleared(player=0, card="clear-skies"),
+            WeatherCleared(player=0, card="clear-skies", cleared=True),
             "You played Clear Skies and cleared all weather.",
+        ),
+        (
+            WeatherCleared(player=1, card="clear-skies", cleared=False),
+            "The AI played Clear Skies, but there was no weather.",
         ),
         (
             HornPlayed(player=0, card="war-horn", row=Row.MELEE),

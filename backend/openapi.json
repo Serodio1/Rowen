@@ -2973,6 +2973,10 @@
           "card": {
             "type": "string",
             "title": "Card"
+          },
+          "cleared": {
+            "type": "boolean",
+            "title": "Cleared"
           }
         },
         "additionalProperties": false,
@@ -2980,7 +2984,8 @@
         "required": [
           "type",
           "player",
-          "card"
+          "card",
+          "cleared"
         ],
         "title": "WeatherCleared",
         "description": "A player played Clear Skies: ``engine.WeatherCleared``."
