@@ -325,9 +325,7 @@ def _next(state: GameState, *, hard: bool = False) -> Action:
     ):
         spies = tuple(a for a in actions if _plays_a_spy(state, a))
         return baseline.best(state, spies) if spies else Pass()
-    plays = tuple(
-        action for action in baseline.sensible(state, actions) if action != Pass()
-    )
+    plays = tuple(action for action in actions if action != Pass())
     if not plays or baseline.passes_first(lead, state.players[player].lives):
         return Pass()
     return baseline.best(state, plays)
