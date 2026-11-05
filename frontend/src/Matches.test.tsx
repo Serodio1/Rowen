@@ -288,6 +288,48 @@ test("a list that didn't come says why, and can be asked for again", async () =>
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
+test("resuming a match on the AI's turn asks for the AI's turn once", async () => {
+  const aisTurn = view({ round: 2, current: 1, legal_actions: [] });
+  const yours = view({ round: 2, legal_actions: [{ type: "pass" }] });
+  const requests = showApp({
+    ...RUI,
+    "GET /api/stats": stats([]),
+    "GET /api/matches": page([summary()]),
+    "GET /api/matches/a-match": {
+      status: 200,
+      body: {
+        id: "a-match",
+        version: 7,
+        view: aisTurn,
+        rounds: [],
+      } satisfies Match,
+    },
+    "POST /api/matches/a-match/ai-turn": {
+      status: 200,
+      body: {
+        id: "a-match",
+        version: 8,
+        view: yours,
+        rounds: [],
+        moves: [
+          { events: [{ type: "player_passed", player: 1 }], view: yours },
+        ],
+      } satisfies Played,
+    },
+  });
+  await openMatches();
+  fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+
+  expect(await screen.findByRole("button", { name: "Pass" })).toBeEnabled();
+  await settle();
+  // Once, from the version the page got: not again as the page draws.
+  const turns = requests.filter(
+    (request) => to(request) === "POST /api/matches/a-match/ai-turn",
+  );
+  expect(turns).toHaveLength(1);
+  expect(await turns[0]?.json()).toEqual({ version: 7 });
+});
+
 test("resuming a match gets it as it is now, and its end shows every round", async () => {
   const before = view({ round: 2, legal_actions: [{ type: "pass" }] });
   const over = view({ match_over: true, winner: 0, legal_actions: [] });

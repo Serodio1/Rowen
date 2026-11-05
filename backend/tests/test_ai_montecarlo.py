@@ -540,6 +540,30 @@ def test_hard_plays_a_ward_unit_where_the_opponents_spies_would_go() -> None:
     assert action == PlayUnit(card="watch-man", row=Row.MELEE)
 
 
+# Made up for the test: a ranged Ward unit, and a ranged Spy.
+RANGED_WARD = replace(WATCH_MAN, id="lookout", name="Lookout", rows=(Row.RANGED,))
+RANGED_SPY = replace(
+    INFORMANT, id="eavesdropper", name="Eavesdropper", rows=(Row.RANGED,)
+)
+
+
+@pytest.mark.parametrize(
+    ("their_spy", "action"),
+    [
+        (RANGED_SPY, PlayUnit(card="lookout", row=Row.RANGED)),
+        # The Informant goes in melee only: the Lookout would keep out nothing.
+        (INFORMANT, None),
+    ],
+)
+def test_hard_plays_a_ward_unit_only_where_the_opponents_spy_would_go(
+    their_spy: UnitCard, action: Action | None
+) -> None:
+    state = match(player((KNIGHT, RANGED_WARD)), player((SCOUT,)))
+    decks = ((KNIGHT, RANGED_WARD), (SCOUT, their_spy))
+
+    assert _rule_of_thumb(player_view(state, 0), decks) == action
+
+
 @pytest.mark.parametrize(
     ("melee", "discard", "their_deck"),
     [
