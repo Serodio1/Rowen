@@ -412,9 +412,9 @@ def test_adds_up_every_sample() -> None:
 def test_hard_plays_its_rule_of_thumb_before_any_sample() -> None:
     # With an Informant in the hand, the Hard AI plays it; the other levels
     # leave it to the samples, which score a move by its points only.
-    state = match(player((KNIGHT, INFORMANT)), player((SCOUT,)))
+    state = match(player((KNIGHT, INFORMANT), deck=(SCOUT,)), player((SCOUT,)))
     view = player_view(state, 0)
-    decks = ((KNIGHT, INFORMANT), (SCOUT,))
+    decks = ((KNIGHT, INFORMANT, SCOUT), (SCOUT,))
 
     action = choose_action(view, decks=decks, samples=4, seed=0, hard=True)
 
@@ -426,7 +426,8 @@ def test_hard_revives_a_spy() -> None:
     # The baseline revives the strongest unit, the Knight (as in
     # test_revives_as_the_baseline_does); the Hard AI, the Informant.
     state = replace(
-        match(player(discard=(INFORMANT, KNIGHT)), player((SCOUT,))), reviving=True
+        match(player(discard=(INFORMANT, KNIGHT), deck=(SCOUT,)), player((SCOUT,))),
+        reviving=True,
     )
     view = player_view(state, 0)
 
@@ -448,7 +449,10 @@ def test_hard_revives_as_the_baseline_without_a_spy() -> None:
 def test_hard_takes_back_an_opponents_spy_with_a_scarecrow() -> None:
     # The Informant on the AI's side is the opponent's Spy: back in the AI's
     # hand, it is the AI's to play. The Knight is the stronger unit to take.
-    state = match(player((SCARECROW,), melee=(KNIGHT, INFORMANT)), player((SCOUT,)))
+    state = match(
+        player((SCARECROW,), melee=(KNIGHT, INFORMANT), deck=(SCOUT,)),
+        player((SCOUT,)),
+    )
     view = player_view(state, 0)
 
     action = _rule_of_thumb(view, ((SCARECROW, KNIGHT), (INFORMANT, SCOUT)))
@@ -457,10 +461,12 @@ def test_hard_takes_back_an_opponents_spy_with_a_scarecrow() -> None:
 
 
 def test_hard_plays_a_medic_while_a_spy_is_in_its_discard_pile() -> None:
-    state = match(player((KNIGHT, MEDIC), discard=(INFORMANT,)), player((SCOUT,)))
+    state = match(
+        player((KNIGHT, MEDIC), discard=(INFORMANT,), deck=(SCOUT,)), player((SCOUT,))
+    )
     view = player_view(state, 0)
 
-    action = _rule_of_thumb(view, ((KNIGHT, MEDIC, INFORMANT), (SCOUT,)))
+    action = _rule_of_thumb(view, ((KNIGHT, MEDIC, INFORMANT, SCOUT), (SCOUT,)))
 
     assert action == PlayUnit(card="medic", row=Row.SIEGE)
 
@@ -470,6 +476,56 @@ def test_hard_keeps_its_medic_without_a_spy_to_revive(discard: UnitCard) -> None
     # A Medic can't revive a Legend, even a Spy.
     state = match(player((KNIGHT, MEDIC), discard=(discard,)), player((SCOUT,)))
     decks = ((KNIGHT, MEDIC, discard), (SCOUT,))
+
+    assert _rule_of_thumb(player_view(state, 0), decks) is None
+
+
+@pytest.mark.parametrize(
+    ("deck", "their_melee"),
+    [
+        # No card left to draw: the Spy would only give the opponent points.
+        ((), ()),
+        # A Ward unit in the opponent's melee keeps the Informant out.
+        ((SCOUT,), (WATCH_MAN,)),
+    ],
+)
+def test_hard_has_no_rule_for_a_spy_that_would_draw_nothing(
+    deck: tuple[Card, ...], their_melee: tuple[UnitCard, ...]
+) -> None:
+    opponent = player((SCOUT,), melee=their_melee)
+    decks = ((SCARECROW, MEDIC, INFORMANT, KNIGHT, *deck), (SCOUT, WATCH_MAN))
+    in_hand = match(player((KNIGHT, INFORMANT), deck=deck), opponent)
+    medic = match(player((MEDIC,), discard=(INFORMANT,), deck=deck), opponent)
+    scarecrow = match(
+        player((SCARECROW,), melee=(KNIGHT, INFORMANT), deck=deck), opponent
+    )
+    reviving = replace(
+        match(player(discard=(INFORMANT, KNIGHT), deck=deck), opponent),
+        reviving=True,
+    )
+
+    for state in (in_hand, medic, scarecrow, reviving):
+        assert _rule_of_thumb(player_view(state, 0), decks) is None
+
+
+def test_hard_revives_as_the_baseline_once_the_opponent_passed() -> None:
+    # With the opponent passed, a revived Spy would only give them points.
+    opponent = replace(player((SCOUT,)), passed=True)
+    state = replace(
+        match(player(discard=(INFORMANT, KNIGHT), deck=(SCOUT,)), opponent),
+        reviving=True,
+    )
+
+    assert (
+        _rule_of_thumb(player_view(state, 0), ((INFORMANT, KNIGHT), (SCOUT,))) is None
+    )
+
+
+def test_hard_needs_a_medic_to_revive_its_spy() -> None:
+    state = match(
+        player((KNIGHT,), discard=(INFORMANT,), deck=(SCOUT,)), player((SCOUT,))
+    )
+    decks = ((KNIGHT, INFORMANT, SCOUT), (SCOUT,))
 
     assert _rule_of_thumb(player_view(state, 0), decks) is None
 
