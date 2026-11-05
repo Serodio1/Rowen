@@ -32,3 +32,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 8080
+
+# Healthy once nginx serves the page (docker compose up --wait waits for it,
+# as for the API), with busybox's wget, which Alpine images have.
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --start-interval=1s --retries=5 \
+    CMD ["wget", "--quiet", "--spider", "http://127.0.0.1:8080/"]

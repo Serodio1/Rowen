@@ -1,8 +1,21 @@
-# Not sent to Docker when it builds the image: the image installs the packages
-# itself (node_modules from Windows would not work in Linux) and builds the
-# page itself, and *.local files (such as .env.local) are for this computer
-# only.
-node_modules
-dist
-*.log
-*.local
+# Only what the image's build reads goes to Docker, as for the API
+# (backend/.dockerignore): not node_modules (the image installs the packages
+# itself; those from Windows would not work in Linux), not dist (it builds the
+# page itself), not the tests nor their reports, and no file kept on this
+# computer only, such as .env.local.
+*
+!package.json
+!package-lock.json
+!.npmrc
+!index.html
+!src
+!public
+!nginx.conf
+!vite.config.ts
+!eslint.config.js
+!tsconfig*.json
+**/*.test.ts
+**/*.test.tsx
+src/test-setup.ts
+src/fake-api.tsx
+src/test-data.ts

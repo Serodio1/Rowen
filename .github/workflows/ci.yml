@@ -47,7 +47,11 @@ jobs:
           --health-timeout 5s
           --health-retries 15
     steps:
+      # Without leaving the job's token in .git/config, where any later step
+      # could read it: no step needs it (here and in the other jobs).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
@@ -90,6 +94,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Also turns ESLint errors into annotations on the PR. TypeScript errors
       # are only in the log: tsc prints paths relative to frontend/, which
@@ -135,6 +141,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Build images
         run: docker compose build
@@ -329,6 +337,8 @@ jobs:
       REGISTRY: europe-west1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/rowen
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Built before signing in, so no image can hold the credentials.
       - name: Build images
