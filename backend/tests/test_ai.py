@@ -8,7 +8,7 @@ from cards import HOARFROST, KNIGHT, SCOUT, SNIPER, WAR_HORN
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from rowen.ai.baseline import PASS_LEAD, UNKNOWN, choose_action, imagine, sensible
+from rowen.ai.baseline import PASS_LEAD, UNKNOWN, choose_action, imagine
 from rowen.data import deck_ids, load_deck
 from rowen.engine.actions import (
     Action,
@@ -263,27 +263,6 @@ def test_plays_on_when_far_ahead_on_its_last_life() -> None:
 def test_passes_when_it_has_no_card_it_can_play() -> None:
     # A Scarecrow needs a unit on the AI's side to swap with.
     assert ai_choice(player((SCARECROW,))) == Pass()
-
-
-def test_keeps_clear_skies_while_no_weather_is_in_play() -> None:
-    # It would clear nothing, and only cost a card.
-    assert ai_choice(player((CLEAR_SKIES,))) == Pass()
-
-
-def test_sensible_actions_keep_clear_skies_only_with_weather_in_play() -> None:
-    clear_skies = PlaySpecial(card="clear-skies")
-    actions = (Pass(), clear_skies, PLAY_SNIPER)
-
-    def state(weather: tuple[SpecialCard, ...]) -> GameState:
-        ai = player((CLEAR_SKIES, SNIPER))
-        opponent = player(weather=weather)
-        return GameState(
-            players=(ai, opponent), current=0, round_starter=0, rng=Rng(seed=7)
-        )
-
-    assert sensible(state(()), actions) == (Pass(), PLAY_SNIPER)
-    # The weather may be either player's.
-    assert sensible(state((HOARFROST,)), actions) == actions
 
 
 # choose_action: which card to play

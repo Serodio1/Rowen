@@ -21,7 +21,6 @@ from rowen.engine.actions import (
     EndRedraw,
     Pass,
     PlayScarecrow,
-    PlaySpecial,
     PlayUnit,
     Revive,
 )
@@ -54,9 +53,6 @@ WATCH_MAN = UnitCard(
 LEGEND_SPY = replace(INFORMANT, id="mole", name="Mole", legend=True)
 
 SCARECROW = SpecialCard(id="scarecrow", name="Scarecrow", kind=SpecialKind.SCARECROW)
-CLEAR_SKIES = SpecialCard(
-    id="clear-skies", name="Clear Skies", kind=SpecialKind.CLEAR_SKIES
-)
 
 # Every deck in the data files, by id, as in test_properties.py.
 DECKS = {deck_id: load_deck(deck_id) for deck_id in deck_ids()}
@@ -391,32 +387,6 @@ def test_leaves_the_choice_to_the_baseline(
     action = choose_action(view, decks=((KNIGHT, SCOUT), (SCOUT,)), samples=4, seed=0)
 
     assert action == chosen
-
-
-def test_never_tries_clear_skies_while_no_weather_is_in_play(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    tried: list[Action] = []
-
-    def play_out(state: GameState, action: Action, *, hard: bool = False) -> int:
-        tried.append(action)
-        return 0
-
-    monkeypatch.setattr(montecarlo, "_play_out", play_out)
-    state = match(player((CLEAR_SKIES, KNIGHT, SCOUT)), player((SCOUT,)))
-    decks = ((CLEAR_SKIES, KNIGHT, SCOUT), (SCOUT,))
-
-    choose_action(player_view(state, 0), decks=decks, samples=2, seed=0)
-
-    assert tried
-    assert PlaySpecial(card="clear-skies") not in tried
-
-
-def test_play_out_keeps_clear_skies_while_no_weather_is_in_play() -> None:
-    # Clear Skies is the only card: it would only cost one.
-    state = match(player((CLEAR_SKIES,)), player((SCOUT,)))
-
-    assert _next(state) == Pass()
 
 
 def test_adds_up_every_sample() -> None:

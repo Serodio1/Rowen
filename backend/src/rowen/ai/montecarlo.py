@@ -104,7 +104,6 @@ def choose_action(
     opponent = view.players[1 - view.player]
     if EndRedraw() in actions or opponent.passed or view.reviving:
         return baseline.choose_action(view)
-    actions = baseline.sensible(baseline.imagine(view), actions)
     if len(actions) == 1:
         return actions[0]
 

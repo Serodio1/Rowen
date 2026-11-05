@@ -25,8 +25,8 @@ The Monte Carlo AI (``rowen.ai.montecarlo``) builds on this one: it uses
 """
 
 from rowen.engine.abilities import muster_group
-from rowen.engine.actions import Action, EndRedraw, Pass, PlaySpecial, Redraw
-from rowen.engine.cards import Ability, Row, SpecialCard, SpecialKind, UnitCard
+from rowen.engine.actions import Action, EndRedraw, Pass, Redraw
+from rowen.engine.cards import Ability, Row, UnitCard
 from rowen.engine.events import RoundEnded
 from rowen.engine.game import apply_legal, legal_actions, match_over, match_winner
 from rowen.engine.rng import Rng
@@ -81,7 +81,7 @@ def choose_action(view: PlayerView) -> Action:
         return _redraw(view)
 
     state = imagine(view)
-    plays = tuple(action for action in sensible(state, actions) if action != Pass())
+    plays = tuple(action for action in actions if action != Pass())
 
     # The opponent takes no more turns this round, so the AI can play the rest
     # of it in its head. Pass is tried first, and max keeps the first of equal
@@ -185,26 +185,6 @@ def passes_first(lead: int, lives: int) -> bool:
     Monte Carlo AI's play-outs pass by the same rule.
     """
     return lead >= PASS_LEAD and lives > 1
-
-
-def sensible(state: GameState, actions: tuple[Action, ...]) -> tuple[Action, ...]:
-    """Return the actions without a Clear Skies played while no weather is in play.
-
-    It would clear nothing, and only cost the player a card.
-    """
-    if any(player.weather for player in state.players):
-        return actions
-    hand = state.players[state.current].hand
-    clear_skies = {
-        card.id
-        for card in hand
-        if isinstance(card, SpecialCard) and card.kind is SpecialKind.CLEAR_SKIES
-    }
-    return tuple(
-        action
-        for action in actions
-        if not (isinstance(action, PlaySpecial) and action.card in clear_skies)
-    )
 
 
 def best(state: GameState, actions: tuple[Action, ...]) -> Action:
