@@ -227,6 +227,7 @@ class WeatherCleared(Schema):
     type: Literal["weather_cleared"]
     player: int
     card: str
+    cleared: bool
 
 
 class HornPlayed(Schema):
@@ -948,7 +949,10 @@ def _event(event: engine.EventView) -> EventView:
             )
         case engine.WeatherCleared():
             return WeatherCleared(
-                type="weather_cleared", player=event.player, card=event.card
+                type="weather_cleared",
+                player=event.player,
+                card=event.card,
+                cleared=event.cleared,
             )
         case engine.HornPlayed():
             return HornPlayed(

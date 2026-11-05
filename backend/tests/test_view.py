@@ -239,7 +239,7 @@ def test_events_keep_their_order() -> None:
         UnitMustered(player=0, card="plane", row=Row.SIEGE, from_hand=True),
         NothingToRevive(player=0),
         WeatherPlayed(player=0, card="thick-fog", row=Row.RANGED),
-        WeatherCleared(player=0, card="clear-skies"),
+        WeatherCleared(player=0, card="clear-skies", cleared=True),
         HornPlayed(player=0, card="war-horn", row=Row.MELEE),
         ScarecrowPlayed(player=0, card="scarecrow", row=Row.MELEE, unit="knight"),
         WildfirePlayed(player=0, card="wildfire"),

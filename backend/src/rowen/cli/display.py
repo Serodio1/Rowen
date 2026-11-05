@@ -171,9 +171,10 @@ def event_text(event: EventView, viewer: int, names: Mapping[str, str]) -> str:
                 f" weather on both {event.row} rows."
             )
         case WeatherCleared():
-            return (
-                f"{_who(event.player, viewer)} played {names[event.card]}"
+            return f"{_who(event.player, viewer)} played {names[event.card]}" + (
                 " and cleared all weather."
+                if event.cleared
+                else ", but there was no weather."
             )
         case HornPlayed():
             return (

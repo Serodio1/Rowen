@@ -3510,7 +3510,7 @@
       ]
     },
     {
-      "text": "Cards are what you play with all match: you don't draw new ones each round.",
+      "text": "Cards are what you play with all match: you get new ones only from your leader and from Spies.",
       "target": "hand",
       "view": {
         "player": 0,
@@ -4508,7 +4508,8 @@
             {
               "type": "weather_cleared",
               "player": 0,
-              "card": "clear-skies"
+              "card": "clear-skies",
+              "cleared": true
             }
           ],
           "view": {

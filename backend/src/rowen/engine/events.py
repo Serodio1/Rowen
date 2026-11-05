@@ -54,10 +54,12 @@ class WeatherCleared:
     Attributes:
         player: The index of the player who played the Clear Skies.
         card: The id of the Clear Skies.
+        cleared: Whether any weather was in play to clear.
     """
 
     player: int
     card: str
+    cleared: bool
 
 
 @dataclass(frozen=True, kw_only=True)
