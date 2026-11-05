@@ -192,6 +192,25 @@ def _spy(card: Card) -> bool:
     return isinstance(card, UnitCard) and on_opponent_side(card)
 
 
+def _drawing_spy(view: PlayerView, card: Card) -> bool:
+    """Return whether the card is a Spy that would draw the AI a card if it played it.
+
+    Its deck has a card left, and the opponent has a row the Spy can go in
+    without a Ward unit (rules, section 7.4).
+    """
+    if (
+        not isinstance(card, UnitCard)
+        or not _spy(card)
+        or view.players[view.player].deck_size == 0
+    ):
+        return False
+    rows = view.players[1 - view.player].rows
+    return any(
+        not any(u.card.ability is Ability.WARD for u in rows[row].units)
+        for row in card.rows
+    )
+
+
 def _rule_of_thumb(
     view: PlayerView, decks: tuple[tuple[Card, ...], tuple[Card, ...]]
 ) -> Action | None:
@@ -209,19 +228,21 @@ def _rule_of_thumb(
     - Play a Ward unit in a row with none yet where a Spy the opponent may
       still hold could go: it keeps every Spy out of that row.
 
-    Once the opponent has passed, no rule applies: a Spy played then only
-    gives them points. (Before round 1, only redraws are legal: none applies
-    either.)
+    A Spy counts only while it would draw the AI a card: its deck has one
+    left, and the opponent has a row for the Spy without a Ward unit. Once
+    the opponent has passed, no rule applies, revives included: a Spy played
+    then only gives them points. (Before round 1, only redraws are legal:
+    none applies either.)
     """
     me, opponent = view.players[view.player], view.players[1 - view.player]
     actions = view.legal_actions
+    if opponent.passed:
+        return None
     if view.reviving:
-        spies = {card.id for card in me.discard if _spy(card)}
+        spies = {card.id for card in me.discard if _drawing_spy(view, card)}
         return next(
             (a for a in actions if isinstance(a, Revive) and a.card in spies), None
         )
-    if opponent.passed:
-        return None
     hand = {card.id: card for card in view.hand}
     units = [a for a in actions if isinstance(a, PlayUnit)]
     for action in actions:
@@ -229,14 +250,14 @@ def _rule_of_thumb(
             unit = next(
                 u for u in me.rows[action.row].units if u.card.id == action.unit
             )
-            if _spy(unit.card):
+            if _drawing_spy(view, unit.card):
                 return action
     for unit_action in units:
-        if _spy(hand[unit_action.card]):
+        if _drawing_spy(view, hand[unit_action.card]):
             return unit_action
     # A Medic can't revive a Legend.
     if any(
-        _spy(card) and not card.legend
+        _drawing_spy(view, card) and not card.legend
         for card in me.discard
         if isinstance(card, UnitCard)
     ):
