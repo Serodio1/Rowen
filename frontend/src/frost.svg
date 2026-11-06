@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="120" viewBox="0 0 480 120">
+<!-- Frost over a row (src/index.css, weather-frost): fine grains of rime
+     and a few cracks in the ice. Drawn for Rowen; the cracks are random lines. -->
+<filter id="g" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="3" stitchTiles="stitch"/>
+  <feColorMatrix values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 9 -6.2"/>
+</filter>
+<rect width="480" height="120" filter="url(#g)" opacity="0.7"/>
+
+<g fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round"><path d="M217 120 L211 125 L204 129 L200 136 L198 144 L193 150 L187 156 L182 162 L176 167 L169 170 L161 171 L154 175 L146 176 L139 179 L133 185 L126 189 L121 195" stroke-width="1.1" stroke-opacity="0.7"/>
+<path d="M105 104 L111 100 L118 95 L125 93 L132 88 L140 86" stroke-width="0.8" stroke-opacity="0.5"/>
+<path d="M146 71 L152 66 L159 62" stroke-width="0.5" stroke-opacity="0.4"/>
+<path d="M154 72 L156 64 L155 56" stroke-width="0.5" stroke-opacity="0.4"/>
+<path d="M122 71 L130 70 L138 71 L146 71 L154 72 L162 71" stroke-width="0.8" stroke-opacity="0.5"/>
+<path d="M131 62 L137 56 L143 52" stroke-width="0.5" stroke-opacity="0.4"/>
+<path d="M146 59 L148 52 L149 44" stroke-width="0.5" stroke-opacity="0.4"/>
+<path d="M154 46 L162 46 L170 43" stroke-width="0.5" stroke-opacity="0.4"/>
+<path d="M123 63 L131 62 L139 62 L146 59 L152 53 L154 46" stroke-width="0.8" stroke-opacity="0.5"/>
+<path d="M102 120 L103 112 L105 104 L104 96 L107 89 L112 83 L118 78 L122 71 L123 63 L124 55 L128 48 L133 42" stroke-width="1.1" stroke-opacity="0.7"/>
+<path d="M439 120 L445 115 L453 112 L461 110 L468 109 L475 105 L483 104 L491 106 L499 109 L506 112 L514 111 L521 107 L528 102 L535 100 L543 98 L550 94 L556 88" stroke-width="1.1" stroke-opacity="0.7"/>
+<path d="M258 6 L250 7 L243 10" stroke-width="0.5" stroke-opacity="0.4"/>
+<path d="M289 0 L281 2 L273 1 L265 2 L258 6" stroke-width="0.8" stroke-opacity="0.5"/>
+<path d="M312 0 L304 3 L296 3 L289 0 L283 -6 L280 -13 L280 -21 L284 -28 L290 -33 L297 -37" stroke-width="1.1" stroke-opacity="0.7"/>
+<path d="M375 54 L382 57 L388 62 L392 69 L398 74" stroke-width="0.8" stroke-opacity="0.5"/>
+<path d="M346 77 L348 69 L353 63 L360 58 L368 57 L375 54 L383 53 L391 51 L399 53 L406 56" stroke-width="1.1" stroke-opacity="0.7"/>
+<path d="M422 0 L423 -8 L424 -16 L426 -24 L424 -31 L421 -39 L421 -47 L421 -55 L418 -62 L414 -69 L414 -77 L412 -85" stroke-width="1.1" stroke-opacity="0.7"/>
+<path d="M281 67 L289 65 L296 66 L304 64 L312 63 L319 59 L327 56 L333 51" stroke-width="0.8" stroke-opacity="0.5"/>
+<path d="M310 34 L314 40 L321 45 L327 50" stroke-width="0.5" stroke-opacity="0.4"/>
+<path d="M295 40 L302 36 L310 34 L317 31 L324 27 L332 24 L340 25 L347 28" stroke-width="0.8" stroke-opacity="0.5"/>
+<path d="M274 9 L267 11 L260 16 L257 24" stroke-width="0.5" stroke-opacity="0.4"/>
+<path d="M282 11 L274 9 L266 8 L258 9 L250 10 L244 15 L238 20 L233 26" stroke-width="0.8" stroke-opacity="0.5"/>
+<path d="M232 -3 L229 4 L223 10 L216 13" stroke-width="0.5" stroke-opacity="0.4"/>
+<path d="M278 4 L270 6 L262 4 L255 0 L248 -3 L240 -4 L232 -3 L224 -4" stroke-width="0.8" stroke-opacity="0.5"/>
+<path d="M280 75 L281 67 L285 60 L291 55 L294 48 L295 40 L292 32 L290 25 L287 17 L282 11 L278 4 L275 -3 L274 -11 L275 -19 L276 -27" stroke-width="1.1" stroke-opacity="0.7"/>
+</g>
+</svg>

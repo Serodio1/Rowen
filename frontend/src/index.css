@@ -75,29 +75,55 @@
       translate: 0 -0.5rem;
     }
   }
-  /* The flames over it: they rise from the bottom, flicker, and die down. */
+  /* The flames over it: they rise from the bottom, flicker, and are out
+     before the card is ash. */
   @keyframes flames {
     from {
       opacity: 0;
-      scale: 1 0.3;
+      scale: 1 0.2;
+    }
+    15% {
+      opacity: 1;
+      scale: 1 0.9;
+    }
+    30% {
+      scale: 0.92 1.25;
+    }
+    45% {
+      scale: 1.06 1.05;
+    }
+    60% {
+      opacity: 1;
+      scale: 0.95 1.35;
+    }
+    70%,
+    to {
+      opacity: 0;
+      scale: 1.02 1.1;
+    }
+  }
+  /* Sparks going up. */
+  @keyframes sparks {
+    from {
+      opacity: 0;
     }
     20% {
       opacity: 1;
-      scale: 1 1;
-    }
-    35% {
-      scale: 0.95 1.15;
-    }
-    50% {
-      scale: 1.05 0.9;
-    }
-    65% {
-      opacity: 1;
-      scale: 0.95 1.1;
     }
     to {
       opacity: 0;
-      scale: 1 0.6;
+      translate: 0 -60%;
+    }
+  }
+  /* The card burns away from the bottom up: the mask's clear half, under its
+     black half, comes up over it. */
+  @keyframes burn-away {
+    from,
+    25% {
+      mask-position: 0 0%;
+    }
+    to {
+      mask-position: 0 100%;
     }
   }
 
@@ -148,138 +174,101 @@
     linear-gradient(rgb(255 255 255 / 0.05), rgb(0 0 0 / 0.3));
 }
 
-/* A unit burning (Wildfire): flames over it, a picture only. */
+/* A unit burning (Wildfire), a picture only: tongues of fire over it, sparks
+   going up, and the card burning away from the bottom. The row scrolls
+   sideways, so it hides what goes outside the card: all of it stays inside. */
 [data-ghost].animate-burn {
   position: relative;
+}
+[data-ghost].animate-burn > * {
+  mask-image: linear-gradient(to top, transparent 45%, black 55%);
+  mask-size: 100% 250%;
+  mask-repeat: no-repeat;
+  animation: burn-away 1000ms ease-in forwards;
 }
 [data-ghost].animate-burn::after {
   content: "";
   position: absolute;
-  inset: -25% -10% 0;
+  inset: 0;
   pointer-events: none;
   transform-origin: bottom;
-  /* Tongues of fire from the bottom, over a glow. */
   background-image:
     radial-gradient(
-      ellipse 22% 55% at 25% 100%,
-      rgb(255 200 60 / 0.95),
-      rgb(255 110 20 / 0.7) 45%,
-      transparent 75%
+      ellipse 12% 38% at 18% 100%,
+      rgb(255 245 180),
+      rgb(255 160 30 / 0.9) 40%,
+      transparent 72%
     ),
     radial-gradient(
-      ellipse 26% 75% at 55% 100%,
-      rgb(255 220 90 / 0.95),
-      rgb(255 120 20 / 0.75) 45%,
-      transparent 75%
+      ellipse 14% 55% at 40% 100%,
+      rgb(255 250 200),
+      rgb(255 150 20 / 0.9) 40%,
+      transparent 72%
     ),
     radial-gradient(
-      ellipse 20% 45% at 82% 100%,
-      rgb(255 190 50 / 0.9),
-      rgb(255 100 20 / 0.6) 45%,
-      transparent 75%
+      ellipse 12% 46% at 62% 100%,
+      rgb(255 245 180),
+      rgb(255 140 20 / 0.9) 40%,
+      transparent 72%
     ),
     radial-gradient(
-      ellipse 70% 40% at 50% 100%,
-      rgb(255 80 10 / 0.6),
+      ellipse 11% 34% at 84% 100%,
+      rgb(255 240 170),
+      rgb(255 130 20 / 0.9) 40%,
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 60% 30% at 50% 100%,
+      rgb(255 90 10 / 0.85),
       transparent 80%
     );
   mix-blend-mode: screen;
-  animation: flames 1000ms ease-out forwards;
+  animation: flames 1000ms ease-in-out forwards;
+}
+[data-ghost].animate-burn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 20% 80%, rgb(255 210 120) 1px, transparent 2px),
+    radial-gradient(
+      circle at 45% 70%,
+      rgb(255 190 90) 1.5px,
+      transparent 2.5px
+    ),
+    radial-gradient(circle at 70% 85%, rgb(255 220 140) 1px, transparent 2px),
+    radial-gradient(circle at 85% 65%, rgb(255 180 80) 1px, transparent 2px),
+    radial-gradient(circle at 32% 55%, rgb(255 200 110) 1px, transparent 2px);
+  animation: sparks 1000ms ease-out forwards;
 }
 
 /* What each kind of weather looks like over a row. */
-/* Frost: rime creeping in from the edges, whiter near the ground, with a
-   few crystals, over a cold blue. */
+/* Frost: a sheet of ice, with rime and cracks (frost.svg), two streaks of
+   light on it, and whiter near the ground. */
 @utility weather-frost {
   background-image:
-    /* A few crystals here and there, in places of their own: tiles that
-       repeat would line them up. */
-    radial-gradient(
-      circle at 4% 30%,
-      rgb(255 255 255 / 0.85) 1px,
-      transparent 2px
+    url("./frost.svg"),
+    linear-gradient(
+      105deg,
+      transparent 20%,
+      rgb(255 255 255 / 0.28) 24%,
+      transparent 27% 58%,
+      rgb(255 255 255 / 0.2) 61%,
+      transparent 63%
     ),
-    radial-gradient(
-      circle at 11% 72%,
-      rgb(255 255 255 / 0.55) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 19% 18%,
-      rgb(255 255 255 / 0.85) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 27% 55%,
-      rgb(255 255 255 / 0.55) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 34% 85%,
-      rgb(255 255 255 / 0.85) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 41% 34%,
-      rgb(255 255 255 / 0.55) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 48% 68%,
-      rgb(255 255 255 / 0.85) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 56% 12%,
-      rgb(255 255 255 / 0.55) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 63% 47%,
-      rgb(255 255 255 / 0.85) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 70% 80%,
-      rgb(255 255 255 / 0.55) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 77% 25%,
-      rgb(255 255 255 / 0.85) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 84% 60%,
-      rgb(255 255 255 / 0.55) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 91% 38%,
-      rgb(255 255 255 / 0.85) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 97% 75%,
-      rgb(255 255 255 / 0.55) 1px,
-      transparent 2px
-    ),
-    /* Rime along the ground, and patches of it. */
-      linear-gradient(to top, rgb(235 248 255 / 0.45), transparent 40%),
-    radial-gradient(
-      ellipse at 12% 100%,
-      rgb(235 248 255 / 0.35),
-      transparent 45%
-    ),
-    radial-gradient(
-      ellipse at 70% 0%,
-      rgb(235 248 255 / 0.25),
-      transparent 40%
-    ),
-    /* A cold blue. */
-      linear-gradient(rgb(110 170 225 / 0.3), rgb(150 200 240 / 0.38));
-  /* Frost on the edges. */
-  box-shadow: inset 0 0 22px 6px rgb(225 245 255 / 0.5);
+    linear-gradient(to top, rgb(245 252 255 / 0.6), transparent 30%),
+    linear-gradient(rgb(160 215 250 / 0.62), rgb(210 240 255 / 0.68));
+  background-size:
+    480px 120px,
+    auto,
+    auto,
+    auto;
+  /* Its edges: a thin bright line, and frost inside them. */
+  box-shadow:
+    inset 0 0 0 1px rgb(240 252 255 / 0.9),
+    inset 0 0 16px 3px rgb(230 248 255 / 0.8);
 }
 
 /* Fog: soft white clouds. */
