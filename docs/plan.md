@@ -37,7 +37,7 @@ Principles:
    The server validates them and returns only what that player is allowed to see
    (the opponent's hand is never sent).
 4. **Data-driven cards.** Cards live in JSON. Abilities are referenced by key
-   (`"ability": "tight_bond"`) and implemented once in code.
+   (`"ability": "bond"`) and implemented once in code.
 5. **Deterministic.** The random seed is part of the state. Same seed + same actions
    = same game, which gives replays and reproducible bug reports for free.
 6. **One API for everyone.** The AI uses exactly the same engine API as a human.
@@ -90,7 +90,7 @@ rowen/
 Every milestone ends in a tagged release, a demo-able state and an updated README,
 so the repository is presentable at any point in time.
 
-### Phase 0 — Foundations
+### Phase 0 — Foundations ✅
 
 - `docs/rules.md`: Rowen rules, close to Witcher 3 Gwent, split into *MVP* and
   *later* mechanics. **Approved by Rui before any engine code.**
@@ -104,7 +104,7 @@ so the repository is presentable at any point in time.
 
 Done when: CI is green on the skeleton and the rules are approved.
 
-### Phase 1 — Game engine → `v0.1.0`
+### Phase 1 — Game engine → `v0.1.0` ✅
 
 - Card model and JSON loader with validation; starter set of 2 factions.
 - Game setup (seeded shuffle, deal 10, redraw), turns, passing, rounds, scoring,
@@ -120,7 +120,7 @@ Done when: CI is green on the skeleton and the rules are approved.
 Done when: a full match against the AI is playable in the terminal and every MVP
 rule has tests.
 
-### Phase 2 — Walking skeleton, playable online → `v0.2.0`
+### Phase 2 — Walking skeleton, playable online → `v0.2.0` ✅
 
 - FastAPI endpoints: start a match against the AI, get the player view, submit an
   action. Consistent error responses.
@@ -135,7 +135,7 @@ rule has tests.
 
 Done when: anyone with the link can play a full match as a guest.
 
-### Phase 3 — Real interface → `v0.3.0`
+### Phase 3 — Real interface → `v0.3.0` ✅
 
 - Board layout and card component: frame, strength and ability rendered from card
   data; the image is only the illustration.
@@ -147,14 +147,14 @@ Done when: anyone with the link can play a full match as a guest.
 
 Done when: it looks good enough for the README GIF.
 
-### Phase 4 — Accounts and persistence → `v0.4.0`
+### Phase 4 — Accounts and persistence → `v0.4.0` ✅
 
 - Registration and login (hashed passwords, secure cookie session); guest mode
   stays.
 - Deck builder: pick a faction and cards, validated by the engine's rules.
 - Match history and personal statistics.
 
-### Phase 5 — Smarter AI and full rules → `v0.5.0`
+### Phase 5 — Smarter AI and full rules → `v0.5.0` ✅
 
 - Remaining mechanics from `rules.md` (for example leaders and faction passives).
 - Monte Carlo AI (samples the hidden hand, simulates outcomes) with difficulty
@@ -163,8 +163,10 @@ Done when: it looks good enough for the README GIF.
 
 ### `v1.0.0` — First stable release
 
-- README: GIF, live link, architecture diagram, how to run locally, testing
-  strategy, links to the ADRs.
+- README: screenshot, live link, architecture diagram, how to run locally,
+  testing strategy, links to the ADRs (the GIF was dropped: a screenshot and a
+  diagram age better).
+- A tutorial that teaches a newcomer the rules on a recorded match (ADR 0020).
 - Final pass on code quality and documentation.
 
 ### Later (only after `v1.0.0`)
