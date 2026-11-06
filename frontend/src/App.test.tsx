@@ -1636,7 +1636,7 @@ test("once the player's move has played out, the page asks for the AI's turn, an
   await act(() => vi.advanceTimersByTimeAsync(TIMES.fly));
 
   // On the board now: the AI thinks, from the version the move led to.
-  await screen.findByText("The AI is thinking…");
+  expect(await screen.findByText("The AI is thinking…")).toHaveRole("status");
   const [turn] = sent(requests, AI_TURN);
   expect(await turn?.json()).toEqual({ version: 2 });
 

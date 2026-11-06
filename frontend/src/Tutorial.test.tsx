@@ -18,7 +18,7 @@ async function open() {
   render(
     <Tutorial onLeave={onLeave} onPlay={onPlay} onEnded={() => undefined} />,
   );
-  expect(screen.getByText("Loading the tutorial…")).toBeInTheDocument();
+  expect(screen.getByText("Loading the tutorial…")).toHaveRole("status");
   await screen.findByRole("note");
   return { onLeave, onPlay };
 }
