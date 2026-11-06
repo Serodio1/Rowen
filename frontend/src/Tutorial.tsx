@@ -123,12 +123,21 @@ function Steps({
       (focused === document.body ||
         areas.some((area) => area?.contains(focused)))
     ) {
+      const card = boardArea.current?.querySelector<HTMLElement>(
+        "[data-choosable]:not(:disabled)",
+      );
+      // From nowhere, the page stays where it is (see PlayMatch), except for
+      // Pass on a laptop's layout (lg): just under the board, it may be out of
+      // sight. On a phone it is far below the balloon, which says why to pass.
+      const wide =
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(min-width: 64rem)").matches;
       (
-        boardArea.current?.querySelector<HTMLElement>(
-          "[data-choosable]:not(:disabled)",
-        ) ??
+        card ??
         movesArea.current?.querySelector<HTMLElement>("button:not(:disabled)")
-      )?.focus({ preventScroll: focused === document.body });
+      )?.focus({
+        preventScroll: focused === document.body && (card !== null || !wide),
+      });
     }
   }, [at, busy]);
 
