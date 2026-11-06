@@ -147,6 +147,42 @@ test("after a lit move, the focus goes to the next step's lit card", async () =>
   ).toHaveFocus();
 });
 
+test.each([
+  { layout: "a laptop's", wide: true, scrolls: true },
+  { layout: "a phone's", wide: false, scrolls: false },
+])(
+  "on a step that asks for Pass, the focus goes to Pass, and on $layout layout the page goes to it: $scrolls",
+  async ({ wide, scrolls }) => {
+    // Reduced motion, as jsdom without matchMedia: the moves show at once.
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("min-width") ? wide : true,
+    }));
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    await open();
+    const board = () => screen.getByRole("region", { name: "Board" });
+    const asksForPass = () =>
+      screen.queryByRole("button", { name: "Next" }) === null &&
+      board().querySelector("[data-choosable]:not(:disabled)") === null;
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    onTestFinished(() => {
+      focus.mockRestore();
+    });
+    while (!asksForPass()) {
+      doStep();
+    }
+    const pass = screen.getByRole("button", { name: "Pass" });
+    expect(pass).toHaveFocus();
+    // Just under the board, it may be out of sight on a laptop: the page goes
+    // to it. On a phone, the page stays on the balloon, which says why.
+    const call = focus.mock.contexts.findLastIndex(
+      (element) => element === pass,
+    );
+    expect(focus.mock.calls[call]?.[0]).toEqual({ preventScroll: !scrolls });
+  },
+);
+
 test("a second click while a move plays out does nothing", async () => {
   await open();
   for (let step = 0; step < 4; step += 1) {

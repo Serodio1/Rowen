@@ -636,6 +636,12 @@ function PlayMatch({
   );
   const progress = usePlayOut(steps);
   const showing = steps[progress.step];
+  // While moves play out, the board shows the match as it was then (see
+  // `board` below). While a round's end plays out, that is the round before
+  // the moves the player can make: none until the board has caught up, or a
+  // click would be a move in a round they can't see yet.
+  const then = viewAt(steps, progress);
+  const behind = then !== undefined && then.round !== match.data.view.round;
   // The card pointed at or focused, by id, to show it large, with its
   // strength on the board.
   const [pointed, setPointed] = useState<Pointed | null>(null);
@@ -727,6 +733,7 @@ function PlayMatch({
   });
 
   const ready = !(
+    behind ||
     play.isPending ||
     aiTurn.isPending ||
     match.isFetching ||
@@ -839,8 +846,8 @@ function PlayMatch({
   const view = match.data.view;
   // While moves play out, the board shows the match as it was then: its
   // round and both sides. The hand and the moves the player can make are
-  // those of the match as it is, as moves never wait for the animation.
-  const then = viewAt(steps, progress);
+  // those of the match as it is: moves don't wait for the animation, except
+  // for a round's end (`behind`).
   const board =
     then === undefined
       ? view
@@ -862,10 +869,10 @@ function PlayMatch({
   const playing: Playing = {
     actions: view.legal_actions,
     chosen: chosen?.version === match.data.version ? chosen.chosen : null,
-    // No move while one is on its way, or while the moves on the page may be
-    // out of date: the page is asking for the match, or couldn't.
-    disabled:
-      play.isPending || aiTurn.isPending || match.isFetching || match.isError,
+    // No move while one is on its way, while the moves on the page may be
+    // out of date (the page is asking for the match, or couldn't), or while
+    // the board still shows the round before.
+    disabled: !ready,
     onChoose: (card) => {
       setChosen(
         card === null ? null : { version: match.data.version, chosen: card },
