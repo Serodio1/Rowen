@@ -6,25 +6,54 @@ A turn-based card game inspired by the Gwent minigame from *The Witcher 3*, buil
 as a full-stack web application: a pure Python rules engine behind a FastAPI API,
 PostgreSQL, and a React + TypeScript frontend.
 
-> **Status:** Phase 5 is done and released as
-> [`v0.5.0`](https://github.com/Serodio1/Rowen/releases): a match against the
-> AI can be played online, on a board with card art, animations and the
-> keyboard, as a guest or with an account, against an Easy, Normal or Hard AI
-> (the last two guess the cards they can't see). Each faction has a leader
-> with a passive of its own, and the two decks win about as often
-> ([balance report](docs/balance.md)). A player with an account finds their
-> matches under "My matches", resumes an unfinished one, and builds decks of
-> their own under "My decks". v1.0.0, the polish, comes next.
+> **Status:** [`v1.0.0`](https://github.com/Serodio1/Rowen/releases), the
+> first stable release. A match against the AI can be played online, on a
+> board with card art, animations and the keyboard, as a guest or with an
+> account, against an Easy, Normal or Hard AI (the last two guess the cards
+> they can't see). A tutorial teaches the rules on a recorded match. Each
+> faction has a leader with a passive of its own, and the two decks win about
+> as often ([balance report](docs/balance.md)). A player with an account finds
+> their matches under "My matches", resumes an unfinished one, and builds decks
+> of their own under "My decks".
 
 ![A match in Rowen: the AI's rows above, the player's below, each side's
 leader beside its panel, Downpour on both siege rows, a Scarecrow in the AI's
 melee row, and what happened in the log](docs/screenshot.webp)
 
+## How it works
+
+```mermaid
+flowchart LR
+    B["Browser<br/>React + TypeScript"] -- "HTTPS" --> N["nginx<br/>the page, rate limits"]
+    N -- "/api" --> A["API<br/>FastAPI"]
+    A --> E["Engine<br/>pure Python rules"]
+    A --> AI["AI<br/>Easy, Normal, Hard"]
+    AI --> E
+    A --> D[("PostgreSQL<br/>accounts and matches")]
+```
+
+- **The server decides everything.** The page sends what the player wants to
+  do; the API checks it against the engine's legal moves and sends back only
+  what that player may see (never the AI's hand, nor the seed).
+- **The engine** (`backend/src/rowen/engine`) is plain Python with no I/O: an
+  immutable state, `legal_actions(state)` and `apply(state, action)`. The same
+  seed and the same moves always give the same match, so a match is stored as
+  its decks, its seed and its moves.
+- **The AI** uses the same engine API as a player and sees only its own view.
+  Normal and Hard guess the hidden cards many times and play out each guess
+  (Monte Carlo, [ADR 0018](docs/adr/0018-monte-carlo-ai-guesses-the-hidden-cards.md)).
+- **Typed end to end:** mypy strict and TypeScript strict, with the frontend's
+  types generated from the API's OpenAPI document.
+- **Online**, both containers (nginx and the API) run on Google Cloud Run, and
+  the database is PostgreSQL on Neon; every merge to `main` that passes CI is
+  deployed ([deploying](docs/deploy.md)).
+
 ## Play online
 
 **<https://rowen-806785616593.europe-west1.run.app>**: choose the AI's level
 (Easy, Normal or Hard) and a deck, and play against the AI, with nothing to
-install, as a guest or with an account. After
+install, as a guest or with an account. New to the game? Press **Tutorial**
+first. After
 a quiet while the server is stopped, so the first visit can take a few seconds
 more while it starts (about 6 when measured). Matches are kept in a database,
 so a match goes on after the server sleeps, and when a new version goes
@@ -33,7 +62,7 @@ online.
 ## Documentation
 
 - [Project plan](docs/plan.md): goals, architecture, tech stack and roadmap.
-- [Game rules](docs/rules.md)
+- [Game rules](docs/rules.md) and [the cards](docs/cards.md)
 - [Architecture decision records](docs/adr/README.md): why the main
   technical decisions were made.
 - [Deploying to Google Cloud Run](docs/deploy.md)
@@ -106,7 +135,7 @@ uv run rowen-arena hard easy --matches 400   # Hard against Easy, 400 matches
 It shows the share of the decisive matches the first AI won, and each deck's,
 with a 95% margin of error, and how long each AI takes per move. With the
 same level on both sides, it says whether the decks are fair
-([balance report](docs/balance.md)). `--deck docs/decks/spies.json` plays a
+([balance report](docs/balance.md)). `--deck ../docs/decks/spies.json` plays a
 deck built from a faction's cards in place of that faction's own.
 
 ## Run the web API
@@ -172,7 +201,8 @@ With the web API running too (above, in another terminal), open
 <http://localhost:5173> and choose a deck: a match against the AI starts. Click
 a card in your hand to choose it: the places it may go light up, and clicking
 one plays it (a card with nowhere to choose, such as weather, is played by
-clicking it again). The AI answers at once, until the match is over. With the
+clicking it again). Once your move has played out, the page asks for the
+AI's turn and says "The AI is thinking…" until it has played. With the
 keyboard: Tab and the arrow keys go from card to card, Enter chooses, 1, 2 and
 3 play the card chosen in the melee, ranged or siege row, and Escape lets it
 go. The page
@@ -244,7 +274,7 @@ npm run build           # build the production files into dist/
 The end-to-end tests (`frontend/e2e`) play the game in a real browser with
 [Playwright](https://playwright.dev/), against the game in Docker, as CI does:
 a whole match, the layout on a laptop and a phone, an account, a player's
-matches, and a deck built, played and deleted. In PowerShell, from the
+matches, a deck built, played and deleted, and the tutorial. In PowerShell, from the
 repository's folder:
 
 ```powershell

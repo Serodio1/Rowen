@@ -5,6 +5,18 @@ when the same AI plays both sides. First measured on 30 October 2026, at
 commit `9811e2d` (v0.5.0 in progress), with the faction decks and their
 leaders' passives ([ADR 0019](adr/0019-faction-passives-belong-to-the-deck.md)).
 
+**In short, as of v1.0.0** (the sections below say how each was measured):
+
+| Match-up, the same AI on both sides | Share |
+|---|---|
+| Robots against Humans, Easy AI (4000 matches) | Robots won **54.1% ± 1.6%** |
+| Robots against Humans, Normal AI (1000 matches) | Robots won **48.7% ± 3.1%** |
+| The Spies deck against Robots, Hard AI (320 matches) | Spies won **63.1% ± 5.3%** |
+
+The two faction decks are close to fair. A deck a player builds can be much
+stronger: the Spies deck still wins most matches, even against the Robots'
+deck built to answer it.
+
 ## How it is measured
 
 `rowen-arena` lets two AIs play each other
@@ -94,7 +106,7 @@ The Normal margin reaches 50%; the Easy one just misses it (51.9% to 55.1%),
 unit stops the opponent's Spies, and Humans' Informant draws the same 2 cards
 as the Computer Spy but gives Robots 3 points where the Computer Spy gives
 Humans 2. Left as it
-is, close enough to fair; the Normal AI, which the site offers, is even.
+is, close enough to fair: with the Normal AI, the margin reaches 50%.
 
 ## After the change: the Humans draw 1 card, with stronger cards
 
@@ -162,8 +174,9 @@ the cards above, 320 matches each (seeds 4000 and on, 16 runs of 20):
 | Hard, before 4 November 2026 | **75.2% ± 4.8%** |
 | Hard, with its rules of thumb (ADR 0018, update of 4 November 2026) | **78.6% ± 4.5%** |
 
-The deck wins as often with the Easy AI as with the Hard one: its lead comes
-from the deck, and a better AI on both sides doesn't take it away.
+The deck wins most matches with every level, the Easy AI included: most of
+its lead comes from the deck, and a better AI on both sides doesn't take it
+away.
 
 ## After the change: the Robots have three Firewalls
 
@@ -185,8 +198,9 @@ each):
 |---|---|---|---|---|
 | Hard | 320 | 315 | 5 | **75.9% ± 4.7%** |
 
-78.6% before: the third Firewall alone takes little from it, within the
-margin.
+78.6% before, measured with other seeds (4000 and on), so the two compare
+only roughly: the third Firewall alone takes little from it, within the
+margins.
 
 ## On Hard, against a deck of Spies: the Robots' deck against them
 

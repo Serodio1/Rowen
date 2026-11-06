@@ -39,10 +39,13 @@ export async function playOn(page: Page, moves = 100) {
 
 /**
  * Wait until the AI's turn, if it is the AI's, is over: the page says whose
- * turn it is above the moves.
+ * turn it is above the moves. With the animations on (the layout test), the
+ * player's card, the AI's and "The AI passed." or a round's end take 2 s each,
+ * more than the 5 s an expect waits by default.
  */
 export async function yourTurn(page: Page) {
   await expect(page.getByText(/^The AI('s turn\.| is thinking…)$/)).toHaveCount(
     0,
+    { timeout: 15_000 },
   );
 }

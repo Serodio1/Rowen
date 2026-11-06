@@ -215,8 +215,9 @@ decisions as the version measured on the bench.
 None of these brings (b) near 50%: the Spies deck won 69.8% with the Easy AI
 on both sides and 78.3% with the Normal, so most of its lead is the deck's,
 not the AI's. The rules about Spies help most when the Robots' deck has the
-cards to use them: with a Robots deck of three Scarecrows, three Spies, three
-Medics and three Firewalls, the Spies deck won 58.0%. Changes to the Robots'
+cards to use them: on the bench, with these rules on the Robots' side only
+and a Robots deck of three Scarecrows, three Spies, three Mechanics and three
+Firewalls, the Spies deck won 58.0%. Changes to the Robots'
 deck are separate decisions, made after this one.
 
 ## Update (2026-11-04, later): on Hard, the Robots answer a deck of Spies with a deck against them
@@ -234,6 +235,10 @@ Measured with `rowen-arena`, the Hard AI on both sides, the Spies deck
 | --- | --- |
 | Their own | 75.9% ± 4.7% |
 | Against Spies | **63.1% ± 5.3%** |
+
+These seeds differ from the update above (seeds 4000 and on), so its 78.6%
+compares with these only roughly, and the 58.0% of the bench, with the rules
+on one side only, not at all.
 
 Against everyone it would be too strong: on the bench, against the Humans'
 own deck, it won 63.1% where the Robots' own won 49.0%. So it is only the

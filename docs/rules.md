@@ -27,8 +27,8 @@ while spending fewer cards than the opponent, and knowing when to pass.
 | **Special** | Has no strength; produces an effect (section 8). |
 
 Every deck belongs to one **faction**. **Neutral** cards can be put in any deck.
-The MVP has two factions with preconstructed decks; their card lists are defined
-in a separate pull request.
+There are two factions, Humans and Robots, each with a preconstructed deck
+(section 12); their cards are listed in [cards.md](cards.md).
 
 ### Board
 
@@ -128,7 +128,7 @@ can't be taken back with a Scarecrow.
 
 | Ability | Effect |
 |---|---|
-| **Ward** | No **Spy** can go into its row: an opponent can't play one there from their hand, nor revive one there with a Medic. When the Ward unit leaves the row (burnt by Wildfire, taken back with a Scarecrow, or at the end of the round), the row opens again. A Medic whose only units to revive are Spies that can't go anywhere does nothing, as with no valid target. |
+| **Ward** | No **Spy** can go into its row: an opponent can't play one there from their hand, nor revive one there with a Medic. When the Ward unit leaves the row (burnt by Wildfire, taken back with a Scarecrow, or at the end of the round), the row opens again. If the Robots' passive keeps the Ward unit for the next round (section 12), its row stays closed. A Medic whose only units to revive are Spies that can't go anywhere does nothing, as with no valid target. |
 
 Bond groups and muster groups are defined in the card data (usually, cards with
 the same name share a group).
