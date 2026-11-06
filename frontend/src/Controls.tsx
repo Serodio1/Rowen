@@ -70,7 +70,10 @@ export function Controls({
   return (
     <div className="flex flex-col items-center gap-2">
       {hint !== null && (
-        <p className="text-center text-sm text-gold-200">{hint}</p>
+        // A status, so a screen reader says when the turn changes hands.
+        <p role="status" className="text-center text-sm text-gold-200">
+          {hint}
+        </p>
       )}
       <div
         role="group"

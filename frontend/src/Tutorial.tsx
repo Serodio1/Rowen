@@ -67,7 +67,7 @@ export function Tutorial({
   if (recording === null) {
     return (
       <section className={PANEL}>
-        <p role={failed ? "alert" : undefined}>
+        <p role={failed ? "alert" : "status"}>
           {failed
             ? "The tutorial couldn't load. Check the connection."
             : "Loading the tutorial…"}
