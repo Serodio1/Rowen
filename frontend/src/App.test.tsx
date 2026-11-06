@@ -1919,6 +1919,38 @@ test("a player passing and the end of a round show over the whole page, one afte
   expect(banner()).toBeNull();
 });
 
+test("while a round's end plays out, no move can be made: they are the next round's", async () => {
+  withMotion();
+  const after = view({
+    round: 2,
+    legal_actions: [{ type: "pass" }],
+  });
+  const { api } = fakeApi({
+    ...A_MATCH,
+    [PLAY]: played(after, [
+      { type: "player_passed", player: 1 },
+      { type: "round_ended", scores: [5, 3], winner: 0 },
+    ]),
+  });
+  renderApp(api);
+  await startMatch();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this hand" }));
+  const pass = await screen.findByRole("button", { name: "Pass" });
+
+  // The board still shows round 1: a Pass now would be round 2's.
+  await waitFor(() => {
+    expect(pass).toBeDisabled();
+  });
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.announce));
+  expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+    "Round 1",
+  );
+  expect(pass).toBeDisabled();
+  // Once round 2 begins on the board, its moves can be made.
+  await act(() => vi.advanceTimersByTimeAsync(TIMES.announce));
+  expect(pass).toBeEnabled();
+});
+
 test("once the last move has played out, the end of the match shows each round and who won", async () => {
   withMotion();
   const over = view({ match_over: true, winner: 0, legal_actions: [] });
