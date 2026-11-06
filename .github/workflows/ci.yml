@@ -53,7 +53,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           # The same uv as the Docker image (backend/Dockerfile).
           version: "0.12.22"
@@ -354,7 +354,7 @@ jobs:
       # so it comes before signing in: a failed migration pushes nothing.
       # The revision still running meets the new tables for a moment, so a
       # migration must not break it (add, then remove in a later deployment).
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           # The same uv as the Docker image (backend/Dockerfile).
           version: "0.12.22"
