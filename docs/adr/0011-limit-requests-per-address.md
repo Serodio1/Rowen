@@ -131,11 +131,13 @@ request for that match meanwhile is a 409 before the AI thinks. It keeps the
 matches in memory, which holds because the API runs one process (ADR 0010,
 `maxScale: "1"`). So the AI again thinks at most once for each move. Its turn
 may still hold several decisions (a redraw, then a card): on the hard level
-about 0.1 s each on average, up to about 0.7 s.
+about 0.17 s each on average, 0.6 s for 9 in 10, and up to about 1.2 s
+(measured in the review of 4 November 2026).
 
 The location for `ai-turn` passes the match's id on to the API in the address
 it writes itself (`proxy_pass http://127.0.0.1:8000$1`), and nginx decodes the
 address before it matches it. With `[^/]+`, a `%0D%0A` in the id reached the
 API as a new line, with headers of the visitor's own after it. The location
-now takes only the letters of a UUID (`[0-9a-f-]+`), and the Smoke test checks
-that such an address is a 404.
+now takes only the letters of a UUID (`[0-9a-f-]+`). Any other id goes to the
+`/api/matches/` location and reaches the API still encoded, as letters: the
+API turns the id down (422 `invalid_request`), and the Smoke test checks it.
