@@ -2,8 +2,8 @@
 
 Date: 2026-11-12. Status: pull request 1 measured and not kept (ADR 0018,
 update of 12 November 2026). Pull request 2: more samples measured and not
-kept; each level seems to think 1, 2 or 3 s (ADR 0018, later update of the
-same day).
+kept; the AI's turn takes at least 1, 2 or 3 s by level (ADR 0018, later
+update of the same day).
 
 ## Why
 

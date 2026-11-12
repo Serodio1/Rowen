@@ -1640,8 +1640,8 @@ test("once the player's move has played out, the page asks for the AI's turn, an
   const [turn] = sent(requests, AI_TURN);
   expect(await turn?.json()).toEqual({ version: 2 });
 
-  // The answer comes at once, but the Normal AI (the level chosen first)
-  // seems to think for THINKING.normal, from when the page asked.
+  // The answer comes at once, but the Normal AI's turn (the level chosen
+  // first) takes THINKING.normal, from when the page asked.
   answer.answer(Response.json(AI_PASSED.body));
   await settle();
   expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
