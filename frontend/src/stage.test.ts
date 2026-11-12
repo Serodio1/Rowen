@@ -491,6 +491,6 @@ test("atLeast gives the answer once it came and the time has gone by", async () 
   expect(slow).toBe("slow");
 });
 
-test("a stronger AI seems to think longer: 1, 2 and 3 seconds", () => {
+test("the AI's turn takes at least 1, 2 and 3 seconds by level", () => {
   expect(THINKING).toEqual({ easy: 1000, normal: 2000, hard: 3000 });
 });

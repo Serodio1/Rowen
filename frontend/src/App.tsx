@@ -592,7 +592,7 @@ function namesOf(played: Played): [string, string][] {
  * @param started - The match as it started, with what the AI did if it
  *   started, or as the player came back to it, with no moves.
  * @param fresh - Whether the match just started: it begins with a message.
- * @param level - The level of the AI: how long it seems to think at least.
+ * @param level - The level of the AI: how long its turn takes at least.
  * @param onEnded - Called with whether the end of the match is shown over
  *   the whole page.
  * @param onLeave - Called when the player is done with the match.

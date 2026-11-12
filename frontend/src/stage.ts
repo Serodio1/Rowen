@@ -31,10 +31,11 @@ export const TIMES = {
 } as const;
 
 /**
- * How long the AI seems to think at least, by level, in milliseconds. Its
- * strength doesn't change: the page only waits, so that a stronger AI seems
- * to think longer, as on 12 November 2026 (ADR 0018). The wait is in the
- * page, not on the server, where it would be billed as request time.
+ * How long the AI's turn takes at least, by level, in milliseconds: the page
+ * says "The AI is thinking…" until then, and the stronger the AI, the longer
+ * (ADR 0018, update of 12 November 2026). The AI's strength doesn't change.
+ * The wait is in the page, not on the server, where it would be billed as
+ * request time.
  */
 export const THINKING: Readonly<Record<Level, number>> = {
   easy: 1000,

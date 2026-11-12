@@ -1077,7 +1077,7 @@ test("resuming a match that ended in another tab asks for the list again", async
   expect(asked(requests)).toEqual([2, 2]);
 });
 
-test("a match resumed on the AI's turn seems to think for its own level's time, not the level chosen now", async () => {
+test("a match resumed on the AI's turn takes its own level's time, not the level chosen now", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
   vi.useFakeTimers({ shouldAdvanceTime: true });
   onTestFinished(() => {
