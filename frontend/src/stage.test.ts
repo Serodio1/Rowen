@@ -1,6 +1,7 @@
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test, vi } from "vitest";
 import type { Card, Event, View } from "./api/client.ts";
 import {
+  atLeast,
   cellOf,
   newIndexes,
   nextOf,
@@ -8,6 +9,7 @@ import {
   startOf,
   stepsOf,
   stepsOfMoves,
+  THINKING,
   TIMES,
   viewAt,
   type CardStep,
@@ -461,4 +463,35 @@ test("each move plays out on the board it left, and only its own cards are held 
   expect([...stageOf(steps, { step: 1, flying: true }).hidden]).toEqual([
     cellOf.unit(1, "melee", 1),
   ]);
+});
+
+test("atLeast gives the answer once it came and the time has gone by", async () => {
+  vi.useFakeTimers();
+  onTestFinished(() => {
+    vi.useRealTimers();
+  });
+  let fast: string | undefined;
+  void atLeast(1000, Promise.resolve("fast")).then((answer) => {
+    fast = answer;
+  });
+  await vi.advanceTimersByTimeAsync(999);
+  expect(fast).toBeUndefined();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(fast).toBe("fast");
+
+  // A slower answer waits no longer than it took.
+  let slow: string | undefined;
+  void atLeast(
+    1000,
+    new Promise<string>((resolve) => setTimeout(resolve, 1500, "slow")),
+  ).then((answer) => {
+    slow = answer;
+  });
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(slow).toBe("slow");
+});
+
+test("a stronger AI seems to think longer", () => {
+  expect(THINKING.easy).toBeLessThan(THINKING.normal);
+  expect(THINKING.normal).toBeLessThan(THINKING.hard);
 });

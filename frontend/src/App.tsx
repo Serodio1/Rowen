@@ -37,11 +37,13 @@ import { Failed } from "./Failed.tsx";
 import { CardFace, LeaderFace } from "./CardFace.tsx";
 import { Banner, CardPreview, Showcase } from "./Showcase.tsx";
 import {
+  atLeast,
   mayMove,
   NO_STEPS,
   startOf,
   stageOf,
   stepsOfMoves,
+  THINKING,
   usePlayOut,
   viewAt,
   type Step,
@@ -83,6 +85,7 @@ export function App({ api }: { api: Api }) {
     played: Played;
     fresh: boolean;
     owner: string | null;
+    level: Level;
   } | null>(null);
   // Whether the end of the match is shown, over the whole page: the top of
   // the page is out of reach meanwhile too.
@@ -213,7 +216,7 @@ export function App({ api }: { api: Api }) {
           ) : showing === "matches" ? (
             <MyMatches
               api={api}
-              onResume={(resumed) => {
+              onResume={(resumed, resumedLevel) => {
                 // It ended in another tab, and the list doesn't say so yet.
                 if (resumed.view.match_over) {
                   forgetMatches(queryClient);
@@ -223,6 +226,7 @@ export function App({ api }: { api: Api }) {
                   played: { ...resumed, moves: [] },
                   fresh: false,
                   owner: username ?? null,
+                  level: resumedLevel,
                 });
                 setShowing(null);
               }}
@@ -236,7 +240,12 @@ export function App({ api }: { api: Api }) {
               api={api}
               onStart={(played) => {
                 setLoggedOut(false);
-                setMatch({ played, fresh: true, owner: username ?? null });
+                setMatch({
+                  played,
+                  fresh: true,
+                  owner: username ?? null,
+                  level,
+                });
               }}
               focus={left}
               loggedOut={loggedOut}
@@ -256,6 +265,7 @@ export function App({ api }: { api: Api }) {
             api={api}
             started={match.played}
             fresh={match.fresh}
+            level={match.level}
             onEnded={setEnded}
             onLeave={() => {
               setMatch(null);
@@ -493,8 +503,8 @@ function LevelChoice({
         ))}
       </div>
       <p id={about} className="text-center text-sm opacity-80">
-        Easy plays at once. Normal and Hard guess the cards you hold, and think
-        a little longer.
+        Easy plays by what it sees. Normal and Hard guess the cards you hold,
+        and think longer.
       </p>
     </fieldset>
   );
@@ -582,6 +592,7 @@ function namesOf(played: Played): [string, string][] {
  * @param started - The match as it started, with what the AI did if it
  *   started, or as the player came back to it, with no moves.
  * @param fresh - Whether the match just started: it begins with a message.
+ * @param level - The level of the AI: how long it seems to think at least.
  * @param onEnded - Called with whether the end of the match is shown over
  *   the whole page.
  * @param onLeave - Called when the player is done with the match.
@@ -590,12 +601,14 @@ function PlayMatch({
   api,
   started,
   fresh,
+  level,
   onEnded,
   onLeave,
 }: {
   api: Api;
   started: Played;
   fresh: boolean;
+  level: Level;
   onEnded: (ended: boolean) => void;
   onLeave: () => void;
 }) {
@@ -724,7 +737,11 @@ function PlayMatch({
   const [stuck, setStuck] = useState<number | null>(null);
   const { mutate: askForAiTurn, ...aiTurn } = useMutation({
     mutationKey: ["ai-turn"],
-    mutationFn: (version: number) => playAiTurn(api, started.id, version),
+    mutationFn: (version: number) => {
+      const request = playAiTurn(api, started.id, version);
+      // With reduced motion, the AI's moves show as soon as they come.
+      return mayMove() ? atLeast(THINKING[level], request) : request;
+    },
     onSuccess: onPlayed,
     onError: (error, version) => {
       setStuck(version);
