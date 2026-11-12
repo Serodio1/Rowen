@@ -111,6 +111,7 @@ forbidden_modules = ["*", "rowen.*"]
 ignore_imports = [
     "rowen.ai.** -> rowen.engine.**",
     "rowen.ai.** -> dataclasses",
+    "rowen.ai.** -> collections",
 ]
 broken_contract_guidance = """
 The AI may only import the engine (ADR 0003), so it sees a match only through

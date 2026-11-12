@@ -30,6 +30,7 @@ units, come before the samples: a Spy draws 2 cards, which a play-out's
 points-only scoring of each move doesn't see.
 """
 
+from collections.abc import Callable
 from dataclasses import replace
 
 from rowen.ai import baseline
@@ -107,14 +108,22 @@ def choose_action(
     if len(actions) == 1:
         return actions[0]
 
-    totals = dict.fromkeys(actions, 0)
+    # Each candidate is a first action and, on Hard, a plan for the rest of
+    # the round (ADR 0018, update of 12 November 2026). The legal actions
+    # come first, so a plan is played only when it scores strictly better.
+    candidates: list[tuple[Action, Plan | None]] = [(a, None) for a in actions]
+    if hard:
+        imagined = baseline.imagine(view)
+        candidates += [(plan(imagined, view.player), plan) for plan in PLANS]
+    totals = [0] * len(candidates)
     rng = Rng(seed=seed)
     for _ in range(samples):
         state, rng = guess(view, decks, rng)
-        for action in actions:
-            totals[action] += _play_out(state, action, hard=hard)
-    # max keeps the first of equal totals, in the order of the legal actions.
-    return max(actions, key=lambda action: totals[action])
+        for index, (action, plan) in enumerate(candidates):
+            totals[index] += _play_out(state, action, hard=hard, plan=plan)
+    # max keeps the first of equal totals, in the order of the candidates.
+    best = max(range(len(candidates)), key=lambda index: totals[index])
+    return candidates[best][0]
 
 
 def guess(
@@ -278,18 +287,74 @@ def _rule_of_thumb(
     return None
 
 
-def _play_out(state: GameState, action: Action, *, hard: bool = False) -> int:
+def _play_out(
+    state: GameState, action: Action, *, hard: bool = False, plan: Plan | None = None
+) -> int:
     """Return the score, for the player whose turn it is, after the action.
 
     After it, both players play on as ``_next`` says until the match ends. The
     score is the baseline's: who won, and then the cards left. Stopping at the
     end of the round instead won less (ADR 0018).
+
+    With a ``plan``, the player follows it instead on their own turns for the
+    rest of this round, while the opponent still plays. After a Medic, the
+    unit to revive is chosen as ``_next`` says.
     """
-    player = state.current
+    player, this_round = state.current, state.round
     state, _ = apply_legal(state, action)
     while not match_over(state):
-        state, _ = apply_legal(state, _next(state, hard=hard))
+        if (
+            plan is not None
+            and state.current == player
+            and state.round == this_round
+            and not state.reviving
+            and not state.players[1 - player].passed
+        ):
+            move = plan(state, player)
+        else:
+            move = _next(state, hard=hard)
+        state, _ = apply_legal(state, move)
     return baseline.score(state, player)
+
+
+# A plan for the rest of a round: the player's action on each of their turns.
+type Plan = Callable[[GameState, int], Action]
+
+
+def _plays(state: GameState) -> tuple[Action, ...]:
+    """Return the current player's legal actions, apart from Pass."""
+    return tuple(action for action in legal_actions(state) if action != Pass())
+
+
+def _minimal(state: GameState, player: int) -> Action:
+    """Win the round with the least: pass once ahead, else the weakest play that leads.
+
+    If no play puts the player ahead, they play the best one.
+    """
+    plays = _plays(state)
+    if not plays or baseline.player_lead(state, player) > 0:
+        return Pass()
+    leading = [a for a in plays if baseline.lead_after(state, a, player) > 0]
+    if not leading:
+        return baseline.best(state, plays)
+    return min(leading, key=lambda action: baseline.lead_after(state, action, player))
+
+
+def _give_up(state: GameState, player: int) -> Action:
+    """Give the round up: play a Spy, which draws cards, else pass."""
+    spies = tuple(a for a in legal_actions(state) if _plays_a_spy(state, a))
+    return baseline.best(state, spies) if spies else Pass()
+
+
+def _wait(state: GameState, player: int) -> Action:
+    """Wait for the opponent to pass: play the cheapest card, never pass first."""
+    plays = _plays(state)
+    if not plays:
+        return Pass()
+    return min(plays, key=lambda action: baseline.lead_after(state, action, player))
+
+
+PLANS: tuple[Plan, ...] = (_minimal, _give_up, _wait)
 
 
 def _next(state: GameState, *, hard: bool = False) -> Action:

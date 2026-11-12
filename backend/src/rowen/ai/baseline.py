@@ -254,14 +254,14 @@ def next_play(state: GameState, player: int) -> Action:
     closer = tuple(
         action
         for action in actions
-        if action != Pass() and _lead_after(state, action, player) > lead
+        if action != Pass() and lead_after(state, action, player) > lead
     )
     if not closer:
         return Pass()
     return best(state, closer)
 
 
-def _lead_after(state: GameState, action: Action, player: int) -> int:
+def lead_after(state: GameState, action: Action, player: int) -> int:
     """Return the player's lead once the action is carried out.
 
     After a Medic, that is before the unit it revives, which is chosen next.
