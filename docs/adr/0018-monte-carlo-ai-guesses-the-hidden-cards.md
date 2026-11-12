@@ -247,3 +247,31 @@ would build one. The player isn't told. A match still keeps only the id of
 the AI's faction: the deck follows from the player's deck and the level, so
 every request makes the same one again (`_played`). Only the Robots have such
 a deck; the Humans don't yet.
+
+## Update (2026-11-12): round plans measured, not kept
+
+The card game AI in The Witcher 3 first picks a tactic for the round, then
+the card that fits it. Tried here on Hard: besides each legal action, each
+sample also scored three plans for the rest of the round, the AI following
+the plan on its own turns until the round ended, and both players as
+`_next` says after it (design in
+`docs/superpowers/specs/2026-11-12-ai-round-plans-design.md`):
+
+- Minimal: pass once ahead, else the weakest play that puts it ahead;
+- Give up: a Spy, else pass;
+- Wait: the cheapest play, never passing first.
+
+A plan was played only when it scored strictly better than every legal
+action. Measured with `rowen-arena` against the Hard AI as it is, 400
+matches each, at commit `5fa5553` (branch `feat/ai-round-plans`):
+
+| Against | New Hard won | Time per move, new / old |
+| --- | --- | --- |
+| The current Hard, faction decks | 50.4% ± 5.0% | 0.26 s / 0.20 s |
+| The current Hard, the Spies deck (`docs/decks/spies.json`) | 52.2% ± 4.9% | 0.29 s / 0.22 s |
+| Easy, faction decks | 72.0% ± 4.4% | 0.22 s / 0.00 s |
+
+Neither win over the current Hard is ahead by more than its margin, so the
+plans were left out. The likely reason: the play-outs already give up lost
+rounds (`GIVE_UP_BEHIND`) and play every action out to the end of the
+match, so the plans mostly chose what a legal action already scored.
