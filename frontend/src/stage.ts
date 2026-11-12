@@ -13,7 +13,7 @@
  * goes, and every score, are where and what the server's views say.
  */
 import { useEffect, useState } from "react";
-import type { Card, Event, MovePlayed, View } from "./api/client.ts";
+import type { Card, Event, Level, MovePlayed, View } from "./api/client.ts";
 import { cardsById, eventText } from "./text.ts";
 
 /** How long each part of a step takes, in milliseconds. */
@@ -29,6 +29,30 @@ export const TIMES = {
   /** A big message over the whole screen, such as "The AI passed." */
   announce: 2000,
 } as const;
+
+/**
+ * How long the AI seems to think at least, by level, in milliseconds. Its
+ * strength doesn't change: the page only waits, so that a stronger AI seems
+ * to think longer, as on 12 November 2026 (ADR 0018). The wait is in the
+ * page, not on the server, where it would be billed as request time.
+ */
+export const THINKING: Readonly<Record<Level, number>> = {
+  easy: 1000,
+  normal: 2000,
+  hard: 3000,
+};
+
+/**
+ * The answer of `request`, once it came and at least `ms` milliseconds have
+ * gone by: a slower answer waits no longer.
+ */
+export async function atLeast<T>(ms: number, request: Promise<T>): Promise<T> {
+  const [answer] = await Promise.all([
+    request,
+    new Promise((resolve) => setTimeout(resolve, ms)),
+  ]);
+  return answer;
+}
 
 /**
  * One step of a move's animation, and the view of the match the board shows

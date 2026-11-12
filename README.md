@@ -202,7 +202,8 @@ With the web API running too (above, in another terminal), open
 a card in your hand to choose it: the places it may go light up, and clicking
 one plays it (a card with nowhere to choose, such as weather, is played by
 clicking it again). Once your move has played out, the page asks for the
-AI's turn and says "The AI is thinking…" until it has played. With the
+AI's turn and says "The AI is thinking…" until it has played: at least 1, 2
+or 3 seconds on Easy, Normal and Hard, unless you asked for reduced motion. With the
 keyboard: Tab and the arrow keys go from card to card, Enter chooses, 1, 2 and
 3 play the card chosen in the melee, ranged or siege row, and Escape lets it
 go. The page

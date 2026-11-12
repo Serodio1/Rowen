@@ -1,7 +1,9 @@
 # Round plans for the Hard AI, and how long each level thinks
 
 Date: 2026-11-12. Status: pull request 1 measured and not kept (ADR 0018,
-update of 12 November 2026); pull request 2 still to do.
+update of 12 November 2026). Pull request 2: more samples measured and not
+kept; each level seems to think 1, 2 or 3 s (ADR 0018, later update of the
+same day).
 
 ## Why
 

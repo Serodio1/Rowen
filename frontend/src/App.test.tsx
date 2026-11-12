@@ -23,7 +23,7 @@ import {
   sent,
   settle,
 } from "./fake-api.tsx";
-import { TIMES } from "./stage.ts";
+import { THINKING, TIMES } from "./stage.ts";
 import { DECKS, HOARFROST, SOLDIER, side, view } from "./test-data.ts";
 
 const THE_DECKS = { "GET /api/decks": { status: 200, body: { decks: DECKS } } };
@@ -549,7 +549,7 @@ test("the player chooses the AI's level before the deck, and finds it as chosen 
 
   const levels = screen.getByRole("group", { name: "AI level" });
   expect(levels).toHaveAccessibleDescription(
-    "Easy plays at once. Normal and Hard guess the cards you hold, and think a little longer.",
+    "Easy plays by what it sees. Normal and Hard guess the cards you hold, and think longer.",
   );
   expect(
     within(levels)
@@ -1614,7 +1614,7 @@ const AT_ROUND_1 = {
   },
 };
 
-test("once the player's move has played out, the page asks for the AI's turn, and says the AI is thinking", async () => {
+test("once the player's move has played out, the page asks for the AI's turn, and says the AI is thinking for at least its level's time", async () => {
   withMotion();
   const answer = later();
   const { api, requests } = fakeApi({
@@ -1640,7 +1640,14 @@ test("once the player's move has played out, the page asks for the AI's turn, an
   const [turn] = sent(requests, AI_TURN);
   expect(await turn?.json()).toEqual({ version: 2 });
 
+  // The answer comes at once, but the Normal AI (the level chosen first)
+  // seems to think for THINKING.normal, from when the page asked.
   answer.answer(Response.json(AI_PASSED.body));
+  await settle();
+  expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
+  expect(screen.queryByText("The AI passed.")).toBeNull();
+
+  await act(() => vi.advanceTimersByTimeAsync(THINKING.normal));
   // In the log, and over the screen.
   await screen.findAllByText("The AI passed.");
   expect(screen.queryByText("The AI is thinking…")).toBeNull();

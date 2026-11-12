@@ -14,6 +14,7 @@ import {
   type Played,
 } from "./api/client.ts";
 import { later, settle, showApp, to, type Answer } from "./fake-api.tsx";
+import { THINKING } from "./stage.ts";
 import { DECKS, view } from "./test-data.ts";
 
 const RUI = {
@@ -1074,4 +1075,49 @@ test("resuming a match that ended in another tab asks for the list again", async
   await screen.findByRole("listitem");
 
   expect(asked(requests)).toEqual([2, 2]);
+});
+
+test("a match resumed on the AI's turn seems to think for its own level's time, not the level chosen now", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  onTestFinished(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+  // The match was played on Hard; the level chosen now is Normal.
+  const theirs = view({ current: 1 });
+  const passed = view({ current: 0, legal_actions: [{ type: "pass" }] });
+  showApp({
+    ...RUI,
+    "GET /api/stats": stats([]),
+    "GET /api/matches": page([summary({ level: "hard" })]),
+    "GET /api/matches/a-match": {
+      status: 200,
+      body: { id: "a-match", version: 2, view: theirs, rounds: [] },
+    },
+    "POST /api/matches/a-match/ai-turn": {
+      status: 200,
+      body: {
+        id: "a-match",
+        version: 3,
+        view: passed,
+        rounds: [],
+        moves: [
+          { events: [{ type: "player_passed", player: 1 }], view: passed },
+        ],
+      },
+    },
+  });
+  await openMatches();
+  fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+  expect(await screen.findByText("The AI is thinking…")).toBeInTheDocument();
+
+  await act(() => vi.advanceTimersByTimeAsync(THINKING.normal));
+  expect(screen.getByText("The AI is thinking…")).toBeInTheDocument();
+  expect(screen.queryByText("The AI passed.")).toBeNull();
+
+  await act(() => vi.advanceTimersByTimeAsync(THINKING.hard - THINKING.normal));
+  expect((await screen.findAllByText("The AI passed.")).length).toBeGreaterThan(
+    0,
+  );
 });

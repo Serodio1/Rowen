@@ -5,7 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
-import type { Api, Match, MatchSummary } from "./api/client.ts";
+import type { Api, Level, Match, MatchSummary } from "./api/client.ts";
 import {
   decksQuery,
   matchesQuery,
@@ -25,7 +25,7 @@ import { ALERT, BUTTON, PANEL } from "./styles.ts";
  * first match of the new page, or back to Show more if the page didn't come.
  *
  * @param onResume - Called with a match the player chose to play on, once
- *   the page has it as it is now.
+ *   the page has it as it is now, and the level of its AI.
  * @param onBack - Called when the player is done with the list.
  */
 export function MyMatches({
@@ -34,7 +34,7 @@ export function MyMatches({
   onBack,
 }: {
   api: Api;
-  onResume: (match: Match) => void;
+  onResume: (match: Match, level: Level) => void;
   onBack: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -171,7 +171,11 @@ export function MyMatches({
                     // Given here, and not to useMutation, so it isn't
                     // called once the list is gone, as when the player went
                     // back meanwhile.
-                    resume.mutate(match.id, { onSuccess: onResume });
+                    resume.mutate(match.id, {
+                      onSuccess: (resumed) => {
+                        onResume(resumed, match.level);
+                      },
+                    });
                   }}
                 />
               ))}
