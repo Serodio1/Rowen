@@ -275,3 +275,27 @@ Neither win over the current Hard is ahead by more than its margin, so the
 plans were left out. The likely reason: the play-outs already give up lost
 rounds (`GIVE_UP_BEHIND`) and play every action out to the end of the
 match, so the plans mostly chose what a legal action already scored.
+
+## Update (2026-11-12, later): the Hard AI keeps 16 samples; each level seems to think a set time
+
+Would the Hard AI play better if it thought longer? Measured with
+`rowen-arena`, the Hard AI with 48 samples against the same AI with 16
+(`HARD_SAMPLES`), 400 matches each:
+
+| Decks | 48 samples won | Time per move, 48 / 16 |
+| --- | --- | --- |
+| Faction decks | 55.5% ± 4.9% | 0.56 s / 0.19 s |
+| The Spies deck (`docs/decks/spies.json`) | 50.9% ± 4.9% | 0.66 s / 0.22 s |
+| Both together | 53.2% ± 3.5% | |
+
+Three times the thinking won a little with the faction decks, nothing with
+the Spies deck, and together not by more than the margin. The server has
+one CPU and Cloud Run bills the time of each request, so the Hard AI keeps
+16 samples.
+
+The levels only *seem* to think for a set time at least: the page shows
+"The AI is thinking…" for at least 1 s on Easy, 2 s on Normal and 3 s on
+Hard (`THINKING` in `frontend/src/stage.ts`), from when it asks for the
+AI's turn. A slower answer waits no longer. The AI's strength doesn't
+change, and the wait is in the page, not on the server, where it would be
+billed. With reduced motion there is no wait, as there are no animations.
