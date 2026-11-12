@@ -21,7 +21,7 @@ round, and `_next` everywhere else.
 - Same view + same seed = same action.
 - Easy and Normal unchanged; `_rule_of_thumb` and the baseline cases unchanged.
 - Kept only if: new Hard beats current Hard by more than the margin (source
-  decks and `docs/decks/spies.json`), doesn't lose to Easy, ≤ +25 % time per move.
+  decks and `docs/decks/spies.json`), doesn't lose to Easy; time judged by PR 2 (≤ 5–7 s online).
 - Coverage 100 % (`uv run pytest --cov`).
 
 ## Review Focus

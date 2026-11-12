@@ -64,7 +64,8 @@ decks and with `docs/decks/spies.json`:
 
 1. the new Hard wins more than the current one, by more than the margin;
 2. it doesn't lose to Easy;
-3. it thinks at most 25 % longer per move.
+3. its time per move is judged by pull request 2 (5 to 7 s online at most),
+   not by the 25 % of 2 November (Rui, 12 November).
 
 If it fails, the code isn't merged: the numbers go into ADR 0018 and
 `docs/balance.md` as a measured idea, as on 2 November.
