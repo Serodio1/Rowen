@@ -11,7 +11,7 @@
       "id": "human",
       "name": "Human",
       "rows": ["melee"],
-      "strength": 2,
+      "strength": 1,
       "ability": "bond",
       "group": "humans",
       "copies": 5

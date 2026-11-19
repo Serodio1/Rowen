@@ -13,7 +13,7 @@ and the tests check that every deck in it is valid.
 
 | Card | Type | Row | Strength | Ability | Group | Copies |
 |---|---|---|---|---|---|---|
-| Human | Unit | Melee | 2 | Bond | humans | 5 |
+| Human | Unit | Melee | 1 | Bond | humans | 5 |
 | Soldier | Unit | Melee / Ranged | 4 | Agile | - | 3 |
 | Sniper | Unit | Ranged | 6 | - | - | 3 |
 | Informant | Unit | Melee | 3 | Spy | - | 2 |
