@@ -1,7 +1,8 @@
 /*
  * The look of the page: a dark wooden table with gold, after the card game in
  * The Witcher 3. All of it is drawn here, with CSS: no image, icon or font
- * comes from the game.
+ * comes from the game (the fonts are free ones, served with the page:
+ * src/main.tsx).
  *
  * Tailwind makes a class for each colour and font in `@theme` (such as
  * `bg-wood-800` or `font-display`), and each `@utility` is a class of its
@@ -137,6 +138,10 @@
 
   /* Fonts most computers have: Palatino on Windows and macOS, else Georgia. */
   --font-display: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  /* Carved capitals for the name of the game, the round and the labels. */
+  --font-title: "Cinzel Variable", var(--font-display);
+  /* The text: a humanist sans, rounder and narrower than the system's. */
+  --font-sans: "Alegreya Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
@@ -157,6 +162,8 @@
       rgb(0 0 0 / 0.5)
     );
     color: var(--color-parchment);
+    /* Alegreya's figures dip below the line by default: "0" reads as "o". */
+    font-variant-numeric: lining-nums;
   }
 }
 

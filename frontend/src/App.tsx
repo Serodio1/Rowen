@@ -171,8 +171,13 @@ export function App({ api }: { api: Api }) {
           className="mb-2 flex flex-col items-center gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] lg:mb-1"
           inert={ended}
         >
-          <h1 className="text-center font-display sm:col-start-2 text-3xl font-bold tracking-wide text-gold-300 drop-shadow">
-            Rowen
+          <h1 className="flex items-center gap-3 sm:col-start-2">
+            <Flourish />
+            {/* Gold leaf: lighter at the top, with a dark edge under it. */}
+            <span className="bg-linear-to-b from-gold-200 via-gold-300 to-gold-600 bg-clip-text pl-[0.2em] font-title text-3xl leading-tight font-bold tracking-[0.2em] text-transparent uppercase drop-shadow-[0_2px_0_rgb(0_0_0/0.7)]">
+              Rowen
+            </span>
+            <Flourish mirrored />
           </h1>
           <AccountBar
             api={api}
@@ -929,8 +934,29 @@ function PlayMatch({
   return (
     <section className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_17rem] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
       <div className="flex flex-col gap-2 lg:col-start-2" inert={over}>
-        <h2 className="text-center font-display text-xl text-gold-300 lg:text-2xl">
-          Round {board.round}
+        <h2 className="flex items-center justify-between rounded-lg border border-wood-600 bg-wood-900 px-4 py-1.5 shadow-inner shadow-black/40">
+          {/* Its text is "Round 1", as screen readers say it. */}
+          <span className="flex items-baseline gap-1 font-title text-xs tracking-widest text-gold-400 uppercase">
+            Round{" "}
+            <span className="font-display text-2xl leading-none font-bold tracking-normal text-gold-300 lg:text-3xl">
+              {board.round}
+            </span>
+          </span>
+          {/* A match is best of three rounds: the ones played, this one lit. */}
+          <span aria-hidden="true" className="flex gap-1.5">
+            {[1, 2, 3].map((n) => (
+              <span
+                key={n}
+                className={`size-3 rounded-full ${
+                  n < board.round
+                    ? "bg-gold-600"
+                    : n === board.round
+                      ? "bg-gold-300 shadow-[0_0_8px] shadow-gold-300/70"
+                      : "border-2 border-wood-600"
+                }`}
+              />
+            ))}
+          </span>
         </h2>
         {match.isError ? (
           // The page couldn't ask for the match after a move that didn't
@@ -1057,7 +1083,14 @@ function PlayMatch({
           )
         )}
       </div>
-      <div ref={movesArea} className="lg:col-start-2 lg:row-start-2">
+      <div
+        ref={movesArea}
+        className={`lg:col-start-2 lg:row-start-2 ${
+          view.match_over
+            ? ""
+            : "rounded-lg border border-gold-600/70 bg-linear-to-b from-wood-800 to-wood-900 p-3 shadow-md shadow-black/40"
+        }`}
+      >
         {view.match_over ? (
           over && (
             <div
@@ -1129,6 +1162,29 @@ function PlayMatch({
 }
 
 /**
+ * A line and a diamond beside the name of the game, pointing at it: the one
+ * on the right is `mirrored`.
+ */
+function Flourish({ mirrored = false }: { mirrored?: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 80 12"
+      className={`hidden h-3 w-16 text-gold-400 sm:block lg:w-20 ${mirrored ? "-scale-x-100" : ""}`}
+    >
+      <path d="M0 6h56" stroke="currentColor" strokeWidth="1" />
+      <path
+        d="M62 6l5-5 5 5-5 5z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <circle cx="77" cy="6" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+/**
  * What happened in the match so far, the latest first: the sentences of
  * each move and of the AI's answer. Screen readers read what is added.
  */
@@ -1143,16 +1199,14 @@ function Log({ entries, faded }: { entries: Entry[]; faded: boolean }) {
     // and scrolls; its size doesn't count, so it never makes the page taller.
     // Faded, it only can't be seen: screen readers still read what is added.
     <section
-      className={`mx-auto flex w-full max-w-3xl flex-col rounded-lg p-2 transition-opacity duration-300 lg:min-h-0 lg:flex-1 ${
-        open
-          ? "border border-wood-600 bg-wood-900/85 shadow-inner shadow-black/50"
-          : ""
+      className={`mx-auto flex w-full max-w-3xl flex-col rounded-lg border border-wood-600 bg-wood-950/70 p-2 shadow-inner shadow-black/50 transition-opacity duration-300 lg:min-h-0 ${
+        open ? "lg:flex-1" : ""
       } ${faded ? "opacity-0" : ""}`}
     >
-      <div className="mb-1 flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 pl-1">
         <h3
           id={id}
-          className="font-display text-xs tracking-widest text-gold-300/80 uppercase"
+          className="font-title text-xs font-semibold tracking-widest text-gold-300 uppercase"
         >
           What happened
         </h3>
@@ -1177,16 +1231,19 @@ function Log({ entries, faded }: { entries: Entry[]; faded: boolean }) {
         tabIndex={open ? 0 : undefined}
         className={
           open
-            ? "max-h-48 overflow-y-auto rounded-sm px-1 text-sm focus-visible:outline-2 focus-visible:outline-gold-300 lg:max-h-none lg:min-h-0 lg:flex-1"
+            ? "mt-1 max-h-48 overflow-y-auto rounded-sm border-t border-wood-800 px-1 pt-1 text-sm focus-visible:outline-2 focus-visible:outline-gold-300 lg:max-h-none lg:min-h-0 lg:flex-1"
             : "sr-only"
         }
       >
         {entries.length === 0 ? (
           <p className="italic opacity-70">Nothing yet.</p>
         ) : (
-          <ol role="list" className="flex flex-col divide-y divide-gold-600/80">
+          <ol role="list" className="flex flex-col divide-y divide-wood-700">
             {entries.map((entry) => (
-              <li key={entry.number} className="py-1">
+              <li
+                key={entry.number}
+                className="relative py-1 pl-3 before:absolute before:top-2.5 before:left-0 before:size-1.5 before:rotate-45 before:bg-gold-400"
+              >
                 {entry.sentences.map((sentence, index) => (
                   // A move can make the same sentence twice, such as two
                   // copies of a unit mustered: the place is the key. How the
@@ -1294,7 +1351,7 @@ function DiscardPile({
       <div className="flex items-center justify-between gap-2">
         <h3
           id={id}
-          className="font-display text-xs tracking-widest text-gold-300 uppercase"
+          className="font-title text-xs tracking-widest text-gold-300 uppercase"
         >
           {name}
         </h3>

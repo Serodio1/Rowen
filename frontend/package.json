@@ -22,6 +22,8 @@
   },
   "dependencies": {
     "@floating-ui/react-dom": "2.1.9",
+    "@fontsource-variable/cinzel": "^5.3.0",
+    "@fontsource/alegreya-sans": "^5.3.0",
     "@tanstack/react-query": "^5.104.5",
     "openapi-fetch": "^0.17.0",
     "react": "^19.3.1",

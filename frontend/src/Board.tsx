@@ -439,7 +439,7 @@ function Weather({
     >
       <h3
         id={id}
-        className="font-display text-xs tracking-widest text-gold-300/80 uppercase"
+        className="font-title text-xs tracking-widest text-gold-300/80 uppercase"
       >
         Weather
       </h3>
@@ -822,7 +822,7 @@ function Hand({
         <div>
           <h3
             id={reviveId}
-            className="mb-1 font-display text-xs tracking-widest text-gold-300 uppercase"
+            className="mb-1 font-title text-xs tracking-widest text-gold-300 uppercase"
           >
             Revive a unit from your discard pile
           </h3>
@@ -838,7 +838,7 @@ function Hand({
         <div>
           <h3
             id={id}
-            className="mb-1 font-display text-xs tracking-widest text-gold-300/80 uppercase"
+            className="mb-1 font-title text-xs tracking-widest text-gold-300/80 uppercase"
           >
             Your hand
           </h3>

@@ -570,7 +570,7 @@ function CardColumn({
       <h3
         id={id}
         tabIndex={-1}
-        className="font-display text-sm tracking-widest text-gold-300 uppercase outline-none"
+        className="font-title text-sm tracking-widest text-gold-300 uppercase outline-none"
       >
         {title}
       </h3>
